@@ -14,7 +14,7 @@ import {IStandardBridge} from './IStandardBridge.sol';
 
 /**
  * @title AaveBaseEthERC20Bridge
- * @author efecarranza.eth
+ * @author TokenLogic
  * @notice Helper contract to bridge assets from Base to Ethereum Mainnet
  */
 contract AaveBaseEthERC20Bridge is Ownable, Rescuable, IAaveBaseEthERC20Bridge {
