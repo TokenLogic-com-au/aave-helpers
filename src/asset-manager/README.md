@@ -188,5 +188,20 @@ The function `startWithdraw(uint256[] amounts)` takes in an array of `amounts` d
 
 For example, if we're trying to withdraw 1500 stETH, we would execute the following call: `startWithdraw([750e18, 750e18])`.
 
-The function `startWithdraw(uint256[] amounts)` can only be called by the owner.
-The function `finalizeWithdraw(index)` can only be called by the owner or the guardian.
+The functions `startWithdraw(uint256[] amounts)` and `finalizeWithdraw(index)` can only be called by the owner or the guardian.
+
+# Aave weETH Withdrawer Information
+
+This contract allows the Aave DAO to easily withdraw weETH back to ETH natively.
+
+![Aave Weeth Withdrawer diagram](./images/AaveWeethWithdrawer.png)
+
+## Usage
+
+To use it, you need to (1) transfer an `amount` of `weETH` to the `Withdrawer`, (2) call `startWithdraw(amount)`, (3) note the `requestId` emited by `StartedWithdrawal()`,and after waiting TODO hours, (4) call `finalizeWithdraw(requestId)` to collect the ETH, deposit it into WETH, and send it to the Aave DAO Collector.
+
+### AaveWeethWithdrawer is deployed at eth:[0x4D29D2eE3B039c51690e830d8a4ade0d4d03DDbe](https://etherscan.io/address/0x4D29D2eE3B039c51690e830d8a4ade0d4d03DDbe)
+
+### Notes
+
+The functions `startWithdraw(amount)` and `finalizeWithdraw(requestId)` can only be called by the owner or the guardian.
