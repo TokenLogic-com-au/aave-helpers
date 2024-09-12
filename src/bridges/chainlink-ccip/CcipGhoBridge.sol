@@ -13,16 +13,26 @@ import {ICcipGhoBridge} from './ICcipGhoBridge.sol';
 
 /**
  * @title CcipGhoBridge
- * @author LucasWongC (Tokenlogic)
- * @notice Helper contract to bridge GHO using chainlink ccip
+ * @author LucasWongC
+ * @notice Helper contract to bridge GHO using Chainlink CCIP
  */
 contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
+  /// @dev Chainlink CCIP router address
   address public immutable ROUTER;
+  /// @dev LINK token address
   address public immutable LINK;
+  /// @dev GHO token address
   address public immutable GHO;
 
+  /// @dev Address of bridge (chainSelector => bridge address)
   mapping(uint64 => address) public bridges;
 
+  /**
+   * @param _router The address of the Chainlink CCIP router
+   * @param _link The address of the LINK token
+   * @param _gho The address of the GHO token
+   * @param _owner The address of the contract owner
+   */
   constructor(address _router, address _link, address _gho, address _owner) CCIPReceiver(_router) {
     ROUTER = _router;
     LINK = _link;
@@ -33,13 +43,15 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
 
   receive() external payable {}
 
+  /// @dev Checks if the destination bridge has been set up
   modifier checkDestination(uint64 chainSelector) {
     if (bridges[chainSelector] == address(0)) {
-      revert UnsupportChain();
+      revert UnsupportedChain();
     }
     _;
   }
 
+  /// @inheritdoc ICcipGhoBridge
   function transfer(
     uint64 destinationChainSelector,
     Transfer[] calldata transfers,
@@ -93,6 +105,7 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
     emit TransferIssued(messageId, destinationChainSelector, totalAmount);
   }
 
+  /// @inheritdoc ICcipGhoBridge
   function quoteTransfer(
     uint64 destinationChainSelector,
     Transfer[] calldata transfers,
@@ -126,6 +139,7 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
     fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
   }
 
+  /// @inheritdoc CCIPReceiver
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     bytes32 messageId = message.messageId;
     uint64 sourceChainSelector = message.sourceChainSelector;
@@ -147,6 +161,11 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
     emit TransferFinished(messageId);
   }
 
+  /**
+   * @notice Set up destination bridge data
+   * @param _destinationChainSelector The selector of the destination chain
+   * @param _bridge The address of the bridge
+   */
   function setDestinationBridge(
     uint64 _destinationChainSelector,
     address _bridge

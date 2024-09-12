@@ -108,13 +108,13 @@ contract CcipGhoBridgeTest is Test {
 }
 
 contract TansferTokensPayFeesInLinkTest is CcipGhoBridgeTest {
-  function test_revertsIf_UnregisteredDestination() external {
+  function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
     ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
     transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.UnsupportChain.selector);
+    vm.expectRevert(ICcipGhoBridge.UnsupportedChain.selector);
     sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.LINK);
   }
 
@@ -152,13 +152,13 @@ contract TansferTokensPayFeesInLinkTest is CcipGhoBridgeTest {
 }
 
 contract TansferTokensPayFeesInNativeTest is CcipGhoBridgeTest {
-  function test_revertsIf_UnregisteredDestination() external {
+  function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
     ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
     transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.UnsupportChain.selector);
+    vm.expectRevert(ICcipGhoBridge.UnsupportedChain.selector);
     sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.Native);
   }
 
