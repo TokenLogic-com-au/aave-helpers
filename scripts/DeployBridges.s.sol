@@ -11,6 +11,7 @@ import {AaveArbEthERC20Bridge} from 'src/bridges/arbitrum/AaveArbEthERC20Bridge.
 import {AavePolEthERC20Bridge} from 'src/bridges/polygon/AavePolEthERC20Bridge.sol';
 import {AavePolEthPlasmaBridge} from 'src/bridges/polygon/AavePolEthPlasmaBridge.sol';
 import {AaveOpEthERC20Bridge} from 'src/bridges/optimism/AaveOpEthERC20Bridge.sol';
+import {CcipGhoBridge} from 'src/bridges/chainlink-ccip/CcipGhoBridge.sol';
 
 contract DeployEthereum is EthereumScript {
   function run() external broadcast {
@@ -58,5 +59,29 @@ contract DeployArbBridgeArbitrum is ArbitrumScript {
   function run() external broadcast {
     bytes32 salt = 'Aave Treasury Bridge';
     new AaveArbEthERC20Bridge{salt: salt}(0x3765A685a401622C060E5D700D9ad89413363a91);
+  }
+}
+
+contract DeployCcipGhoBridgeEthereum is EthereumScript {
+  function run() external broadcast {
+    bytes32 salt = 'GHO Chainlink CCIP Bridge';
+    new CcipGhoBridge{salt: salt}(
+      0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D,
+      0x514910771AF9Ca656af840dff83E8264EcF986CA,
+      0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f,
+      0x3765A685a401622C060E5D700D9ad89413363a91
+    );
+  }
+}
+
+contract DeployCcipGhoBridgeArbitrum is ArbitrumScript {
+  function run() external broadcast {
+    bytes32 salt = 'GHO Chainlink CCIP Bridge';
+    new CcipGhoBridge{salt: salt}(
+      0x141fa059441E0ca23ce184B6A78bafD2A517DdE8,
+      0xf97f4df75117a78c1A5a0DBb814Af92458539FB4,
+      0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33,
+      0x3765A685a401622C060E5D700D9ad89413363a91
+    );
   }
 }
