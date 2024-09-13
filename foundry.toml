@@ -7,7 +7,7 @@ libs = ['lib']
 remappings = [
   '@chainlink/contracts/=node_modules/@chainlink/contracts',
   '@chainlink/contracts-ccip/=node_modules/@chainlink/contracts-ccip',
-  '@chainlink/local=node_modules/@chainlink/local',
+  '@chainlink/local/=node_modules/@chainlink/local',
 ]
 fs_permissions = [{ access = "read-write", path = "./reports" }]
 ffi = true
