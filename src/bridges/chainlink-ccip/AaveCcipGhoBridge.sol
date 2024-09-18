@@ -2,8 +2,9 @@
 
 pragma solidity ^0.8.0;
 
-import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
+import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {LinkTokenInterface} from '@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol';
 import {CCIPReceiver} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
@@ -16,13 +17,15 @@ import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
  * @author LucasWongC
  * @notice Helper contract to bridge GHO using Chainlink CCIP
  */
-contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuardian {
+contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuardian, Rescuable {
   /// @dev Chainlink CCIP router address
   address public immutable ROUTER;
   /// @dev LINK token address
   address public immutable LINK;
   /// @dev GHO token address
   address public immutable GHO;
+  /// @dev Aave Collector address
+  address public immutable COLLECTOR;
 
   /// @dev Address of bridge (chainSelector => bridge address)
   mapping(uint64 selector => address bridge) public bridges;
@@ -38,12 +41,14 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     address _router,
     address _link,
     address _gho,
+    address _collector,
     address _owner,
     address _guardian
   ) CCIPReceiver(_router) {
     ROUTER = _router;
     LINK = _link;
     GHO = _gho;
+    COLLECTOR = _collector;
 
     _transferOwnership(_owner);
     _updateGuardian(_guardian);
@@ -62,7 +67,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   /// @inheritdoc IAaveCcipGhoBridge
   function transfer(
     uint64 destinationChainSelector,
-    Transfer[] calldata transfers,
+    uint256 amount,
     PayFeesIn payFeesIn
   )
     external
@@ -71,30 +76,19 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     onlyOwnerOrGuardian
     returns (bytes32 messageId)
   {
-    uint256 totalAmount;
-
-    uint256 length = transfers.length;
-    for (uint256 i; i < length; ) {
-      totalAmount += transfers[i].amount;
-
-      unchecked {
-        ++i;
-      }
-    }
-
-    if (totalAmount == 0) {
+    if (amount == 0) {
       revert InvalidTransferAmount();
     }
 
-    IERC20(GHO).transferFrom(msg.sender, address(this), totalAmount);
-    IERC20(GHO).approve(ROUTER, totalAmount);
+    IERC20(GHO).transferFrom(msg.sender, address(this), amount);
+    IERC20(GHO).approve(ROUTER, amount);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: totalAmount});
+    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(bridges[destinationChainSelector]),
-      data: abi.encode(transfers),
+      data: '',
       tokenAmounts: tokenAmounts,
       extraArgs: '',
       feeToken: payFeesIn == PayFeesIn.LINK ? LINK : address(0)
@@ -117,36 +111,25 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
       }
     }
 
-    emit TransferIssued(messageId, destinationChainSelector, totalAmount);
+    emit TransferIssued(messageId, destinationChainSelector, amount);
   }
 
   /// @inheritdoc IAaveCcipGhoBridge
   function quoteTransfer(
     uint64 destinationChainSelector,
-    Transfer[] calldata transfers,
+    uint256 amount,
     PayFeesIn payFeesIn
   ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
-    uint256 totalAmount;
-
-    uint256 length = transfers.length;
-    for (uint256 i; i < length; ) {
-      totalAmount += transfers[i].amount;
-
-      unchecked {
-        ++i;
-      }
-    }
-
-    if (totalAmount == 0) {
+    if (amount == 0) {
       revert InvalidTransferAmount();
     }
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: totalAmount});
+    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(bridges[destinationChainSelector]),
-      data: abi.encode(transfers),
+      data: '',
       tokenAmounts: tokenAmounts,
       extraArgs: '',
       feeToken: payFeesIn == PayFeesIn.LINK ? LINK : address(0)
@@ -160,20 +143,13 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     bytes32 messageId = message.messageId;
     uint64 sourceChainSelector = message.sourceChainSelector;
     address bridge = abi.decode(message.sender, (address));
-    Transfer[] memory transfers = abi.decode(message.data, (Transfer[]));
+    Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
 
-    if (bridge != bridges[sourceChainSelector]) {
+    if (bridge != bridges[sourceChainSelector] || tokenAmounts.length != 1) {
       revert InvalidMessage();
     }
 
-    uint256 length = transfers.length;
-    for (uint256 i; i < length; ) {
-      IERC20(GHO).transfer(transfers[i].to, transfers[i].amount);
-
-      unchecked {
-        ++i;
-      }
-    }
+    IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
 
     emit TransferFinished(messageId);
   }
@@ -190,5 +166,10 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     bridges[_destinationChainSelector] = _bridge;
 
     emit DestinationUpdated(_destinationChainSelector, _bridge);
+  }
+
+  /// @inheritdoc Rescuable
+  function whoCanRescue() public view override returns (address) {
+    return owner();
   }
 }
