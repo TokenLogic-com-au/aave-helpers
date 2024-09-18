@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-interface ICcipGhoBridge {
+interface IAaveCcipGhoBridge {
   /// @dev Fee payment token
   enum PayFeesIn {
     Native,
