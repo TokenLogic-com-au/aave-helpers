@@ -6,6 +6,7 @@ import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {GovernanceV3Ethereum} from 'aave-address-book/GovernanceV3Ethereum.sol';
 import {GovernanceV3Optimism} from 'aave-address-book/GovernanceV3Optimism.sol';
 import {GovernanceV3Polygon} from 'aave-address-book/GovernanceV3Polygon.sol';
+import {GovernanceV3Arbitrum} from 'aave-address-book/GovernanceV3Arbitrum.sol';
 import {ArbitrumScript, EthereumScript, OptimismScript, PolygonScript} from 'solidity-utils/contracts/utils/ScriptUtils.sol';
 import {AaveArbEthERC20Bridge} from 'src/bridges/arbitrum/AaveArbEthERC20Bridge.sol';
 import {AavePolEthERC20Bridge} from 'src/bridges/polygon/AavePolEthERC20Bridge.sol';
@@ -74,8 +75,9 @@ contract DeployAaveCcipGhoBridgeEthereum is EthereumScript {
       AaveV3EthereumAssets.LINK_UNDERLYING,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
-      0x94A8518B76A3c45F5387B521695024379d43d715, // owner address
-      0x94A8518B76A3c45F5387B521695024379d43d715 // guardian address
+      GovernanceV3Ethereum.EXECUTOR_LVL_1, // owner address
+      // https://app.safe.global/home?safe=eth:0x2CFe3ec4d5a6811f4B8067F0DE7e47DfA938Aa30
+      0x2CFe3ec4d5a6811f4B8067F0DE7e47DfA938Aa30 // guardian address
     );
   }
 }
@@ -89,8 +91,9 @@ contract DeployAaveCcipGhoBridgeArbitrum is ArbitrumScript {
       AaveV3ArbitrumAssets.LINK_UNDERLYING,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
-      0x94A8518B76A3c45F5387B521695024379d43d715, // owner address
-      0x94A8518B76A3c45F5387B521695024379d43d715 // guardian address
+      GovernanceV3Arbitrum.EXECUTOR_LVL_1, // owner address
+      // https://app.safe.global/home?safe=arb1:0xCb45E82419baeBCC9bA8b1e5c7858e48A3B26Ea6
+      0xCb45E82419baeBCC9bA8b1e5c7858e48A3B26Ea6 // guardian address
     );
   }
 }
