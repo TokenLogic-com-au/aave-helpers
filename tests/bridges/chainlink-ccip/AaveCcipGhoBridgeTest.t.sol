@@ -10,9 +10,9 @@ import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
 
-import {CcipGhoBridge, ICcipGhoBridge} from 'src/bridges/chainlink-ccip/CcipGhoBridge.sol';
+import {AaveCcipGhoBridge, IAaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
-contract CcipGhoBridgeTest is Test {
+contract AaveCcipGhoBridgeTest is Test {
   event TransferIssued(
     bytes32 indexed messageId,
     uint64 indexed destinationChainSelector,
@@ -31,8 +31,8 @@ contract CcipGhoBridgeTest is Test {
   IERC20 public sourceLinkToken;
 
   uint256 amountToSend = 1_000e18;
-  CcipGhoBridge sourceBridge;
-  CcipGhoBridge destinationBridge;
+  AaveCcipGhoBridge sourceBridge;
+  AaveCcipGhoBridge destinationBridge;
 
   function setUp() public {
     destinationFork = vm.createSelectFork(vm.rpcUrl('arbitrum'));
@@ -44,6 +44,7 @@ contract CcipGhoBridgeTest is Test {
     ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
     vm.makePersistent(address(ccipLocalSimulatorFork));
 
+    // arbitrum mainnet register config (https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet#arbitrum-mainnet)
     Register.NetworkDetails memory destinationNetworkDetails = Register.NetworkDetails({
       chainSelector: 4949039107694359620,
       routerAddress: 0x141fa059441E0ca23ce184B6A78bafD2A517DdE8,
@@ -55,15 +56,16 @@ contract CcipGhoBridgeTest is Test {
     ccipLocalSimulatorFork.setNetworkDetails(block.chainid, destinationNetworkDetails);
     destinationChainSelector = destinationNetworkDetails.chainSelector;
 
-    destinationBridge = new CcipGhoBridge(
+    destinationBridge = new AaveCcipGhoBridge(
       destinationNetworkDetails.routerAddress,
       destinationNetworkDetails.linkAddress,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
-      address(this)
+      address(this),
+      alice
     );
-    // vm.makePersistent(address(destinationBridge));
 
     vm.selectFork(sourceFork);
+    // mainnet register config (https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet#ethereum-mainnet)
     Register.NetworkDetails memory sourceNetworkDetails = Register.NetworkDetails({
       chainSelector: 5009297550715157269,
       routerAddress: 0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D,
@@ -76,13 +78,13 @@ contract CcipGhoBridgeTest is Test {
     sourceLinkToken = IERC20(sourceNetworkDetails.linkAddress);
     sourceRouter = IRouterClient(sourceNetworkDetails.routerAddress);
 
-    sourceBridge = new CcipGhoBridge(
+    sourceBridge = new AaveCcipGhoBridge(
       sourceNetworkDetails.routerAddress,
       sourceNetworkDetails.linkAddress,
       AaveV3EthereumAssets.GHO_UNDERLYING,
-      address(this)
+      address(this),
+      alice
     );
-    // vm.makePersistent(address(sourceBridge));
 
     vm.startPrank(address(AaveV3Ethereum.COLLECTOR));
     IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).transfer(alice, amountToSend);
@@ -107,27 +109,39 @@ contract CcipGhoBridgeTest is Test {
   }
 }
 
-contract TansferTokensPayFeesInLinkTest is CcipGhoBridgeTest {
+contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.UnsupportedChain.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.LINK);
+    vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
+  }
+
+  function test_revertsIf_NotOwnerOrGuardian() external {
+    vm.selectFork(sourceFork);
+    sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
+
+    vm.startPrank(bob);
+    vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: 0});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: 0});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.InvalidTransferAmount.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.LINK);
+    vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
   }
 
   function test_success() external {
@@ -137,13 +151,13 @@ contract TansferTokensPayFeesInLinkTest is CcipGhoBridgeTest {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
     vm.expectEmit(false, true, false, true, address(sourceBridge));
     emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
-    sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.LINK);
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
 
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
     uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(bob);
@@ -151,39 +165,39 @@ contract TansferTokensPayFeesInLinkTest is CcipGhoBridgeTest {
   }
 }
 
-contract TansferTokensPayFeesInNativeTest is CcipGhoBridgeTest {
+contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.UnsupportedChain.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.Native);
+    vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.Native);
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: 0});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: 0});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.InvalidTransferAmount.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.Native);
+    vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.Native);
   }
 
   function test_revertsIf_InsufficientFee() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
-    vm.expectRevert(ICcipGhoBridge.InsufficientFee.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, ICcipGhoBridge.PayFeesIn.Native);
+    vm.expectRevert(IAaveCcipGhoBridge.InsufficientFee.selector);
+    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.Native);
   }
 
   function test_success() external {
@@ -193,13 +207,13 @@ contract TansferTokensPayFeesInNativeTest is CcipGhoBridgeTest {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    ICcipGhoBridge.Transfer[] memory transfers = new ICcipGhoBridge.Transfer[](1);
-    transfers[0] = ICcipGhoBridge.Transfer({to: bob, amount: amountToSend});
+    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
+    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     uint256 fee = sourceBridge.quoteTransfer(
       destinationChainSelector,
       transfers,
-      ICcipGhoBridge.PayFeesIn.Native
+      IAaveCcipGhoBridge.PayFeesIn.Native
     );
 
     vm.startPrank(alice);
@@ -208,7 +222,7 @@ contract TansferTokensPayFeesInNativeTest is CcipGhoBridgeTest {
     sourceBridge.transfer{value: fee}(
       destinationChainSelector,
       transfers,
-      ICcipGhoBridge.PayFeesIn.Native
+      IAaveCcipGhoBridge.PayFeesIn.Native
     );
 
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
@@ -217,7 +231,7 @@ contract TansferTokensPayFeesInNativeTest is CcipGhoBridgeTest {
   }
 }
 
-contract SetDestinationBridgeTest is CcipGhoBridgeTest {
+contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
   function test_revertIf_NotOwner() external {
     vm.selectFork(sourceFork);
     vm.startPrank(alice);

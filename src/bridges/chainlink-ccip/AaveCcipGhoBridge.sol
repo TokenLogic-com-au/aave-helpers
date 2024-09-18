@@ -2,21 +2,21 @@
 
 pragma solidity ^0.8.0;
 
-import {Ownable} from 'solidity-utils/contracts/oz-common/Ownable.sol';
+import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {LinkTokenInterface} from '@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol';
 import {CCIPReceiver} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 
-import {ICcipGhoBridge} from './ICcipGhoBridge.sol';
+import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
 
 /**
- * @title CcipGhoBridge
+ * @title AaveCcipGhoBridge
  * @author LucasWongC
  * @notice Helper contract to bridge GHO using Chainlink CCIP
  */
-contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
+contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuardian {
   /// @dev Chainlink CCIP router address
   address public immutable ROUTER;
   /// @dev LINK token address
@@ -25,20 +25,28 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
   address public immutable GHO;
 
   /// @dev Address of bridge (chainSelector => bridge address)
-  mapping(uint64 => address) public bridges;
+  mapping(uint64 selector => address bridge) public bridges;
 
   /**
    * @param _router The address of the Chainlink CCIP router
    * @param _link The address of the LINK token
    * @param _gho The address of the GHO token
    * @param _owner The address of the contract owner
+   * @param _guardian The address of guardian
    */
-  constructor(address _router, address _link, address _gho, address _owner) CCIPReceiver(_router) {
+  constructor(
+    address _router,
+    address _link,
+    address _gho,
+    address _owner,
+    address _guardian
+  ) CCIPReceiver(_router) {
     ROUTER = _router;
     LINK = _link;
     GHO = _gho;
 
     _transferOwnership(_owner);
+    _updateGuardian(_guardian);
   }
 
   receive() external payable {}
@@ -51,15 +59,22 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
     _;
   }
 
-  /// @inheritdoc ICcipGhoBridge
+  /// @inheritdoc IAaveCcipGhoBridge
   function transfer(
     uint64 destinationChainSelector,
     Transfer[] calldata transfers,
     PayFeesIn payFeesIn
-  ) external payable checkDestination(destinationChainSelector) returns (bytes32 messageId) {
+  )
+    external
+    payable
+    checkDestination(destinationChainSelector)
+    onlyOwnerOrGuardian
+    returns (bytes32 messageId)
+  {
     uint256 totalAmount;
 
-    for (uint256 i; i < transfers.length; ) {
+    uint256 length = transfers.length;
+    for (uint256 i; i < length; ) {
       totalAmount += transfers[i].amount;
 
       unchecked {
@@ -105,7 +120,7 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
     emit TransferIssued(messageId, destinationChainSelector, totalAmount);
   }
 
-  /// @inheritdoc ICcipGhoBridge
+  /// @inheritdoc IAaveCcipGhoBridge
   function quoteTransfer(
     uint64 destinationChainSelector,
     Transfer[] calldata transfers,
@@ -113,7 +128,8 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
   ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
     uint256 totalAmount;
 
-    for (uint256 i; i < transfers.length; ) {
+    uint256 length = transfers.length;
+    for (uint256 i; i < length; ) {
       totalAmount += transfers[i].amount;
 
       unchecked {
@@ -150,7 +166,8 @@ contract CcipGhoBridge is ICcipGhoBridge, CCIPReceiver, Ownable {
       revert InvalidMessage();
     }
 
-    for (uint256 i; i < transfers.length; ) {
+    uint256 length = transfers.length;
+    for (uint256 i; i < length; ) {
       IERC20(GHO).transfer(transfers[i].to, transfers[i].amount);
 
       unchecked {
