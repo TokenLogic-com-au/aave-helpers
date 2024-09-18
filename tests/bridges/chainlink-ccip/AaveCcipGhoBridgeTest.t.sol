@@ -8,7 +8,7 @@ import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.s
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
 
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
-import {AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
+import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
 
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
@@ -60,6 +60,7 @@ contract AaveCcipGhoBridgeTest is Test {
       destinationNetworkDetails.routerAddress,
       destinationNetworkDetails.linkAddress,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
+      address(AaveV3Arbitrum.COLLECTOR),
       address(this),
       alice
     );
@@ -82,6 +83,7 @@ contract AaveCcipGhoBridgeTest is Test {
       sourceNetworkDetails.routerAddress,
       sourceNetworkDetails.linkAddress,
       AaveV3EthereumAssets.GHO_UNDERLYING,
+      address(AaveV3Ethereum.COLLECTOR),
       address(this),
       alice
     );
@@ -112,55 +114,60 @@ contract AaveCcipGhoBridgeTest is Test {
 contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
+    sourceBridge.transfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.LINK
+    );
   }
 
   function test_revertsIf_NotOwnerOrGuardian() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
-
     vm.startPrank(bob);
     vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
+    sourceBridge.transfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.LINK
+    );
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: 0});
-
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
+    sourceBridge.transfer(destinationChainSelector, 0, IAaveCcipGhoBridge.PayFeesIn.LINK);
   }
 
   function test_success() external {
     vm.selectFork(destinationFork);
-    uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(bob);
+    uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
 
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
-
     vm.startPrank(alice);
     vm.expectEmit(false, true, false, true, address(sourceBridge));
     emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.LINK);
+    sourceBridge.transfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.LINK
+    );
 
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
-    uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(bob);
+    uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
     assertEq(afterBalance, beforeBalance + amountToSend);
   }
 }
@@ -168,51 +175,62 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
 contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
-
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.Native);
+    sourceBridge.transfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.Native
+    );
+  }
+
+  function test_revertsIf_NotOwnerOrGuardian() external {
+    vm.selectFork(sourceFork);
+    sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+
+    vm.startPrank(bob);
+    vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
+    sourceBridge.transfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.Native
+    );
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: 0});
-
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.Native);
+    sourceBridge.transfer(destinationChainSelector, 0, IAaveCcipGhoBridge.PayFeesIn.Native);
   }
 
   function test_revertsIf_InsufficientFee() external {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
-
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InsufficientFee.selector);
-    sourceBridge.transfer(destinationChainSelector, transfers, IAaveCcipGhoBridge.PayFeesIn.Native);
+    sourceBridge.transfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.Native
+    );
   }
 
   function test_success() external {
     vm.selectFork(destinationFork);
-    uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(bob);
+    uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
 
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    IAaveCcipGhoBridge.Transfer[] memory transfers = new IAaveCcipGhoBridge.Transfer[](1);
-    transfers[0] = IAaveCcipGhoBridge.Transfer({to: bob, amount: amountToSend});
-
     uint256 fee = sourceBridge.quoteTransfer(
       destinationChainSelector,
-      transfers,
+      amountToSend,
       IAaveCcipGhoBridge.PayFeesIn.Native
     );
 
@@ -221,12 +239,14 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
     emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
     sourceBridge.transfer{value: fee}(
       destinationChainSelector,
-      transfers,
+      amountToSend,
       IAaveCcipGhoBridge.PayFeesIn.Native
     );
 
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
-    uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(bob);
+    uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
     assertEq(afterBalance, beforeBalance + amountToSend);
   }
 }

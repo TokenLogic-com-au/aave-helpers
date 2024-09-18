@@ -9,34 +9,29 @@ interface IAaveCcipGhoBridge {
     LINK
   }
 
-  struct Transfer {
-    address to;
-    uint256 amount;
-  }
-
   /**
    * @notice Transfers tokens to the destination chain and distributes them
    * @param destinationChainSelector The selector of the destination chain
-   * @param transfers The list of recipient addresses and token amounts to transfer
+   * @param amount The amount to transfer
    * @param payFeesIn The fee payment method
    * @return messageId The ID of the cross-chain message
    */
   function transfer(
     uint64 destinationChainSelector,
-    Transfer[] calldata transfers,
+    uint256 amount,
     PayFeesIn payFeesIn
   ) external payable returns (bytes32 messageId);
 
   /**
    * @notice calculates fee amount to exeucte transfers
    * @param destinationChainSelector The selector of the destination chain
-   * @param transfers The list of recipient addresses and token amounts to transfer
+   * @param amount The amount to transfer
    * @param payFeesIn The fee payment method
    * @return fee The amount of fee
    */
   function quoteTransfer(
     uint64 destinationChainSelector,
-    Transfer[] calldata transfers,
+    uint256 amount,
     PayFeesIn payFeesIn
   ) external view returns (uint256 fee);
 
@@ -44,12 +39,12 @@ interface IAaveCcipGhoBridge {
    * @dev Emits when a new token transfer is issued
    * @param messageId The ID of the cross-chain message
    * @param destinationChainSelector The selector of the destination chain
-   * @param totalAmount The total amount of GHO tokens
+   * @param amount The total amount of GHO tokens
    */
   event TransferIssued(
     bytes32 indexed messageId,
     uint64 indexed destinationChainSelector,
-    uint256 totalAmount
+    uint256 amount
   );
 
   /**
