@@ -13,6 +13,9 @@ import {AavePolEthPlasmaBridge} from 'src/bridges/polygon/AavePolEthPlasmaBridge
 import {AaveOpEthERC20Bridge} from 'src/bridges/optimism/AaveOpEthERC20Bridge.sol';
 import {AaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
+import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
+import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
+
 contract DeployEthereum is EthereumScript {
   function run() external broadcast {
     bytes32 salt = 'Aave Treasury Bridge';
@@ -68,12 +71,9 @@ contract DeployAaveCcipGhoBridgeEthereum is EthereumScript {
     new AaveCcipGhoBridge{salt: salt}(
       // https://etherscan.io/address/0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D
       0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D, // ccip router address
-      // https://etherscan.io/address/0x514910771AF9Ca656af840dff83E8264EcF986CA
-      0x514910771AF9Ca656af840dff83E8264EcF986CA, // ccip link token address
-      // https://etherscan.io/address/0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f
-      0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f, // gho address
-      // https://etherscan.io/address/0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c
-      0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c, // collector address
+      AaveV3EthereumAssets.LINK_UNDERLYING,
+      AaveV3EthereumAssets.GHO_UNDERLYING,
+      address(AaveV3Ethereum.COLLECTOR),
       0x94A8518B76A3c45F5387B521695024379d43d715, // owner address
       0x94A8518B76A3c45F5387B521695024379d43d715 // guardian address
     );
@@ -86,12 +86,9 @@ contract DeployAaveCcipGhoBridgeArbitrum is ArbitrumScript {
     new AaveCcipGhoBridge{salt: salt}(
       // https://arbiscan.io/address/0x141fa059441E0ca23ce184B6A78bafD2A517DdE8
       0x141fa059441E0ca23ce184B6A78bafD2A517DdE8, // ccip router address
-      // https://arbiscan.io/address/0xf97f4df75117a78c1A5a0DBb814Af92458539FB4
-      0xf97f4df75117a78c1A5a0DBb814Af92458539FB4, // ccip link token address
-      // https://arbiscan.io/address/0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33
-      0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33, // gho address
-      // https://arbiscan.io/address/0x053D55f9B5AF8694c503EB288a1B7E552f590710
-      0x053D55f9B5AF8694c503EB288a1B7E552f590710, // collector address
+      AaveV3ArbitrumAssets.LINK_UNDERLYING,
+      AaveV3ArbitrumAssets.GHO_UNDERLYING,
+      address(AaveV3Arbitrum.COLLECTOR),
       0x94A8518B76A3c45F5387B521695024379d43d715, // owner address
       0x94A8518B76A3c45F5387B521695024379d43d715 // guardian address
     );
