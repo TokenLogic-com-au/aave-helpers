@@ -75,9 +75,9 @@ contract DeployAaveCcipGhoBridgeEthereum is EthereumScript {
       AaveV3EthereumAssets.LINK_UNDERLYING,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
-      GovernanceV3Ethereum.EXECUTOR_LVL_1, // owner address
+      0x94A8518B76A3c45F5387B521695024379d43d715, // owner address
       // https://app.safe.global/home?safe=eth:0x2CFe3ec4d5a6811f4B8067F0DE7e47DfA938Aa30
-      0x2CFe3ec4d5a6811f4B8067F0DE7e47DfA938Aa30 // guardian address
+      0x94A8518B76A3c45F5387B521695024379d43d715 // guardian address
     );
   }
 }
@@ -91,9 +91,9 @@ contract DeployAaveCcipGhoBridgeArbitrum is ArbitrumScript {
       AaveV3ArbitrumAssets.LINK_UNDERLYING,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
-      GovernanceV3Arbitrum.EXECUTOR_LVL_1, // owner address
+      0x94A8518B76A3c45F5387B521695024379d43d715, // owner address
       // https://app.safe.global/home?safe=arb1:0xCb45E82419baeBCC9bA8b1e5c7858e48A3B26Ea6
-      0xCb45E82419baeBCC9bA8b1e5c7858e48A3B26Ea6 // guardian address
+      0x94A8518B76A3c45F5387B521695024379d43d715 // guardian address
     );
   }
 }
