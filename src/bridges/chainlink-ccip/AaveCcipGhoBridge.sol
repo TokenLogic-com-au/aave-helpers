@@ -141,11 +141,9 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   /// @inheritdoc CCIPReceiver
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     bytes32 messageId = message.messageId;
-    uint64 sourceChainSelector = message.sourceChainSelector;
-    address bridge = abi.decode(message.sender, (address));
     Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
 
-    if (bridge != bridges[sourceChainSelector] || tokenAmounts.length != 1) {
+    if (tokenAmounts[0].token != GHO || tokenAmounts[0].amount == 0) {
       revert InvalidMessage();
     }
 
