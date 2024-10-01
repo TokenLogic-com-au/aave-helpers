@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from 'forge-std/Test.sol';
+import {Test, Vm, console} from 'forge-std/Test.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
 
 import {AaveCctpBridge, IAaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
+import {ICctpMessageTransmitter} from './ICctpMessageTransmitter.sol';
 
 contract AaveCctpBridgeTest is Test {
   /// @notice Emitted when new bridge message sent
   event BridgeMessageSent(uint32 toChainId, uint256 amount);
+  /// @notice Emitted when redeem token on receiving chain
+  event BridgeMessageReceived(bytes message);
   /// @notice Emitted when collector address updated
   event CollectorUpdated(uint32 toChainId, address collector);
 
@@ -19,6 +22,7 @@ contract AaveCctpBridgeTest is Test {
   uint256 public destinationFork;
   address public alice;
   address public bob;
+  uint256 bobPrivateKey;
 
   uint256 amountToSend = 1_000e6;
   AaveCctpBridge sourceBridge;
@@ -26,20 +30,34 @@ contract AaveCctpBridgeTest is Test {
   uint32 sourceChainId = 0;
   uint32 destinationChainId = 3;
 
+  bytes32 MessageSentTopic = keccak256('MessageSent(bytes)');
+  bytes message;
+
   function setUp() public {
     destinationFork = vm.createSelectFork(vm.rpcUrl('arbitrum'));
     sourceFork = vm.createFork(vm.rpcUrl('mainnet'));
 
-    bob = makeAddr('bob');
+    (bob, bobPrivateKey) = makeAddrAndKey('bob');
     alice = makeAddr('alice');
 
     destinationBridge = new AaveCctpBridge(
       0x19330d10D9Cc8751218eaf51E8885D058642E08A, // https://arbiscan.io/address/0x19330d10D9Cc8751218eaf51E8885D058642E08A
       0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca, // https://arbiscan.io/address/0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca
-      AaveV3ArbitrumAssets.USDC_UNDERLYING,
+      AaveV3ArbitrumAssets.USDCn_UNDERLYING,
       address(this),
       alice
     );
+
+    // set bob as an Attester
+    ICctpMessageTransmitter messageTransmitter = ICctpMessageTransmitter(
+      address(destinationBridge.MESSAGE_TRANSMITTER())
+    );
+    address attesterManager = messageTransmitter.attesterManager();
+
+    vm.startPrank(attesterManager);
+    messageTransmitter.enableAttester(bob);
+    messageTransmitter.setSignatureThreshold(1);
+    vm.stopPrank();
 
     vm.selectFork(sourceFork);
     sourceBridge = new AaveCctpBridge(
@@ -94,13 +112,47 @@ contract BridgeTokenTest is AaveCctpBridgeTest {
     uint256 beforeBalance = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).balanceOf(alice);
     sourceBridge.setCollector(destinationChainId, address(AaveV3Arbitrum.COLLECTOR));
 
+    vm.recordLogs();
     vm.startPrank(alice);
     vm.expectEmit(true, true, true, true, address(sourceBridge));
     emit BridgeMessageSent(destinationChainId, amountToSend);
     sourceBridge.bridgeUsdc(destinationChainId, amountToSend);
+    Vm.Log[] memory logs = vm.getRecordedLogs();
 
     uint256 afterBalance = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).balanceOf(alice);
     assertEq(afterBalance, beforeBalance - amountToSend);
+
+    // get message
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics[0] == MessageSentTopic) {
+        (message) = abi.decode(logs[i].data, (bytes));
+        break;
+      }
+    }
+
+    bytes32 digest = keccak256(abi.encodePacked(message));
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobPrivateKey, digest);
+    bytes memory signature = abi.encodePacked(r, s, v);
+
+    vm.selectFork(destinationFork);
+
+    console.logAddress(address(AaveV3Arbitrum.COLLECTOR));
+
+    beforeBalance = IERC20(AaveV3ArbitrumAssets.USDCn_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
+
+    vm.startPrank(alice);
+    vm.expectEmit(true, true, true, true, address(destinationBridge));
+    emit BridgeMessageReceived(message);
+    destinationBridge.receiveUsdc(message, signature);
+
+    afterBalance = IERC20(AaveV3ArbitrumAssets.USDCn_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
+    assertEq(afterBalance, beforeBalance + amountToSend);
+
+    vm.stopPrank();
   }
 }
 

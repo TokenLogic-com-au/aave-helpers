@@ -6,7 +6,7 @@ interface IAaveCctpBridge {
   /// @notice Emitted when new bridge message sent
   event BridgeMessageSent(uint32 toChainId, uint256 amount);
   /// @notice Emitted when redeem token on receiving chain
-  event BridgeMessageReceived(bytes messageId);
+  event BridgeMessageReceived(bytes message);
   /// @notice Emitted when collector address updated
   event CollectorUpdated(uint32 toChainId, address collector);
 

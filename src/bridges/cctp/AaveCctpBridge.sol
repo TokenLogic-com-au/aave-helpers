@@ -16,9 +16,9 @@ import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
  */
 contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
   /// @dev The messenger address of cctp protocol
-  ICctpTokenMessenger public immutable TOKEN_MESSENGER;
+  address public immutable TOKEN_MESSENGER;
   /// @dev The message transmitter address of cctp protocol
-  ICctpMessageTransmitter public immutable MESSAGE_TRANSMITTER;
+  address public immutable MESSAGE_TRANSMITTER;
   /// @dev The address of usdc
   IERC20 public immutable USDC;
 
@@ -39,8 +39,8 @@ contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
     address _owner,
     address _guardian
   ) {
-    TOKEN_MESSENGER = ICctpTokenMessenger(_tokenMessenger);
-    MESSAGE_TRANSMITTER = ICctpMessageTransmitter(_messageTransmitter);
+    TOKEN_MESSENGER = _tokenMessenger;
+    MESSAGE_TRANSMITTER = _messageTransmitter;
     USDC = IERC20(_usdc);
 
     _transferOwnership(_owner);
@@ -62,10 +62,10 @@ contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
       USDC.approve(address(TOKEN_MESSENGER), type(uint256).max);
     }
 
-    TOKEN_MESSENGER.depositForBurn(
+    ICctpTokenMessenger(TOKEN_MESSENGER).depositForBurn(
       _amount,
       _toChainId,
-      bytes32(bytes20(collectors[_toChainId])),
+      bytes32(uint256(uint160(collectors[_toChainId]))),
       address(USDC)
     );
 
@@ -74,7 +74,7 @@ contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
 
   /// @inheritdoc IAaveCctpBridge
   function receiveUsdc(bytes calldata _message, bytes calldata _attestation) external {
-    MESSAGE_TRANSMITTER.receiveMessage(_message, _attestation);
+    ICctpMessageTransmitter(MESSAGE_TRANSMITTER).receiveMessage(_message, _attestation);
 
     emit BridgeMessageReceived(_message);
   }
