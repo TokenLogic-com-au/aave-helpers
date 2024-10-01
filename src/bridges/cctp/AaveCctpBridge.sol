@@ -53,6 +53,10 @@ contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
       revert InvalidChain();
     }
 
+    if (_amount == 0) {
+      revert ZeroAmount();
+    }
+
     USDC.transferFrom(msg.sender, address(this), _amount);
     if (USDC.allowance(address(this), address(TOKEN_MESSENGER)) < type(uint256).max) {
       USDC.approve(address(TOKEN_MESSENGER), type(uint256).max);

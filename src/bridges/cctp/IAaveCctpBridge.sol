@@ -13,6 +13,9 @@ interface IAaveCctpBridge {
   /// @notice This function is not supported on this chain
   error InvalidChain();
 
+  /// @notice Amount is zero
+  error ZeroAmount();
+
   /**
    * @notice Bridges USDC to another chain
    * @param toChainId The id of destination chain
