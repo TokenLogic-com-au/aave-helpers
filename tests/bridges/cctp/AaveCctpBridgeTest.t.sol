@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test, Vm, console} from 'forge-std/Test.sol';
+import {Test, Vm} from 'forge-std/Test.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
@@ -30,7 +30,6 @@ contract AaveCctpBridgeTest is Test {
   uint32 sourceChainId = 0;
   uint32 destinationChainId = 3;
 
-  bytes32 MessageSentTopic = keccak256('MessageSent(bytes)');
   bytes message;
 
   function setUp() public {
@@ -124,6 +123,8 @@ contract BridgeTokenTest is AaveCctpBridgeTest {
 
     // get message
     for (uint256 i = 0; i < logs.length; ++i) {
+      bytes32 MessageSentTopic = keccak256('MessageSent(bytes)');
+
       if (logs[i].topics[0] == MessageSentTopic) {
         (message) = abi.decode(logs[i].data, (bytes));
         break;
@@ -135,8 +136,6 @@ contract BridgeTokenTest is AaveCctpBridgeTest {
     bytes memory signature = abi.encodePacked(r, s, v);
 
     vm.selectFork(destinationFork);
-
-    console.logAddress(address(AaveV3Arbitrum.COLLECTOR));
 
     beforeBalance = IERC20(AaveV3ArbitrumAssets.USDCn_UNDERLYING).balanceOf(
       address(AaveV3Arbitrum.COLLECTOR)
