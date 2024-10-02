@@ -90,3 +90,16 @@ To deploy and interact with this contract, ensure you have the following:
 2. **Set Collectors**: Use `setCollector` to configure the destination chain’s collector.
 3. **Bridge USDC**: Call `bridgeUsdc` to transfer USDC from one chain to another.
 4. **Receive USDC**: The receiver chain must handle the message and attestation using the `receiveUsdc` function.
+
+### Deployed Addresses
+
+Mainnet: [0x011647d3E585CD9f5F72aA96AF4C239c7F95c4F1](https://etherscan.io/address/0x011647d3E585CD9f5F72aA96AF4C239c7F95c4F1), Arbitrum: [0x4A0236EEf2063ceb229F0CF135fd24A57EBb7F31](https://arbiscan.io/address/0x4A0236EEf2063ceb229F0CF135fd24A57EBb7F31)
+
+
+Confirmed Bridges:
+
+| Direct                | Transfer Tx | Receive Tx |
+| ---------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Ethereum -> Arbitrum  | [0x648405b38914db3669f1ee4064642d792701aa25a5cf1a6525bf5dc7c93bc1d8](https://etherscan.io/tx/0x648405b38914db3669f1ee4064642d792701aa25a5cf1a6525bf5dc7c93bc1d8)  | [0x0e2c0e3b6317705228a5abd83a490410a74b7af04e427eef28cf6e9eeed00e22](https://arbiscan.io/tx/0x0e2c0e3b6317705228a5abd83a490410a74b7af04e427eef28cf6e9eeed00e22) |
+| Arbitrum -> Ethereum  | [0x167f2277884d4227a0d5768558a5e52aaa1a3a29561d73bc9b81d4d85036011b](https://arbiscan.io/tx/0x167f2277884d4227a0d5768558a5e52aaa1a3a29561d73bc9b81d4d85036011b) | [0xe30226c478abde8da169fafcc83c07b53d418aa2e70340af13d4e7ea68d9e324](https://etherscan.io/tx/0xe30226c478abde8da169fafcc83c07b53d418aa2e70340af13d4e7ea68d9e324) |
+
