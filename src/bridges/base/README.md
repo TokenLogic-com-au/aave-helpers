@@ -39,4 +39,10 @@ Just like when proving the message, there's a command in order to finalize the b
 
 ## Transactions
 
+| Token  | Bridge                                                                                                     | Prove                                                                                            | Finalize                                                                                        |
+| ------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| USDC | [Tx](https://basescan.org/tx/0x1597ea1a99e66f077d7ef6f2236036f4a75aabb9063b4b3ced75ba62653d8d7f) | [Tx](https://etherscan.io/tx/0xd70544e57bc395ae6f5ea9e634c6eb4bef226cd6d93efc5006aa940497026f18) | [Tx](https://etherscan.io/tx/0x9039bb87ba613e82c2fa6dfce78657d2d79c86926f0b3c80cd1fe82ea708c303) |
+
 ## Deployed Address
+
+Optimism [0xe0401d2996f29b2bda1628125606bff8ab4be67e](https://basescan.org/address/0xe0401d2996f29b2bda1628125606bff8ab4be67e)
