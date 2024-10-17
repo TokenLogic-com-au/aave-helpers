@@ -4,13 +4,16 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
+import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
+import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
+import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 
 import {IBalancerPool} from './balancer-v2/IBalancerPool.sol';
 import {IBalancerVault, IAsset} from './balancer-v2/IBalancerVault.sol';
 import {WeightedPoolUserData} from './balancer-v2/WeightedPoolUserData.sol';
 import {IBalancerStrategyManager} from './IBalancerStrategyManager.sol';
 
-contract BalancerV2StrategyManager is IBalancerStrategyManager {
+contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuardian, Rescuable {
   using SafeERC20 for IERC20;
 
   struct TokenConfig {
@@ -22,10 +25,25 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager {
   IBalancerPool public immutable POOL;
   IBalancerVault public immutable VAULT;
   uint256 public immutable TOKEN_COUNT;
+  address public immutable HYPERNATIVE;
 
   mapping(uint256 id => TokenConfig config) public tokenConfig;
 
-  constructor(address _vault, bytes32 _poolId, TokenConfig[] memory _tokenConfig) {
+  modifier onlyWithdrawable() {
+    if (_msgSender() != owner() && _msgSender() != guardian() && _msgSender() != HYPERNATIVE) {
+      revert AccessForbidden();
+    }
+    _;
+  }
+
+  constructor(
+    address _vault,
+    bytes32 _poolId,
+    TokenConfig[] memory _tokenConfig,
+    address _owner,
+    address _guardian,
+    address _hypernative
+  ) {
     VAULT = IBalancerVault(_vault);
     POOL_ID = _poolId;
 
@@ -40,10 +58,16 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager {
         ++i;
       }
     }
+
+    _transferOwnership(_owner);
+    _updateGuardian(_guardian);
+    HYPERNATIVE = _hypernative;
   }
 
   /// @inheritdoc IBalancerStrategyManager
-  function deposit(uint256[] calldata _tokenAmounts) external returns (uint256 bptAmount) {
+  function deposit(
+    uint256[] calldata _tokenAmounts
+  ) external onlyOwnerOrGuardian returns (uint256 bptAmount) {
     if (_tokenAmounts.length != TOKEN_COUNT) {
       revert TokenCountMismatch();
     }
@@ -102,12 +126,12 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager {
   }
 
   /// @inheritdoc IBalancerStrategyManager
-  function withdraw(uint256 bpt) external returns (uint256[] memory) {
+  function withdraw(uint256 bpt) external onlyOwnerOrGuardian returns (uint256[] memory) {
     return _withdraw(bpt);
   }
 
   /// @inheritdoc IBalancerStrategyManager
-  function emergencyWithdraw() external returns (uint256[] memory) {
+  function emergencyWithdraw() external onlyWithdrawable returns (uint256[] memory) {
     uint256 bptAmount = IERC20(address(POOL)).balanceOf(address(this));
 
     return _withdraw(bptAmount);
@@ -166,6 +190,19 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager {
     token.transfer(provider, tokenAmount);
   }
 
+  /// @inheritdoc Rescuable
+  function whoCanRescue() public view override returns (address) {
+    return owner();
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(
+    address
+  ) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
+    return type(uint256).max;
+  }
+
   error TokenCountMismatch();
   error InsufficientToken(address token);
+  error AccessForbidden();
 }
