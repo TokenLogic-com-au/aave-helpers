@@ -14,6 +14,12 @@ interface IBalancerVault {
   }
 
   function getPool(bytes32 poolId) external view returns (address, PoolSpecialization);
+  function getPoolTokens(
+    bytes32 poolId
+  )
+    external
+    view
+    returns (address[] memory tokens, uint256[] memory balances, uint256 lastChangeBlock);
 
   function joinPool(
     bytes32 poolId,

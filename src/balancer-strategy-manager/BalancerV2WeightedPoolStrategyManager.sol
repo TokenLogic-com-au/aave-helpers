@@ -13,7 +13,11 @@ import {IBalancerVault, IAsset} from './balancer-v2/IBalancerVault.sol';
 import {WeightedPoolUserData} from './balancer-v2/WeightedPoolUserData.sol';
 import {IBalancerStrategyManager} from './IBalancerStrategyManager.sol';
 
-contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuardian, Rescuable {
+contract BalancerV2WeightedPoolStrategyManager is
+  IBalancerStrategyManager,
+  OwnableWithGuardian,
+  Rescuable
+{
   using SafeERC20 for IERC20;
 
   struct TokenConfig {
@@ -50,8 +54,15 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
     (address poolAddress, ) = VAULT.getPool(_poolId);
     POOL = IBalancerPool(poolAddress);
 
+    address[] memory actuallTokens;
+    (actuallTokens, , ) = VAULT.getPoolTokens(_poolId);
+
     TOKEN_COUNT = _tokenConfig.length;
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
+      if (actuallTokens[i] != _tokenConfig[i].token) {
+        revert TokenMismatch();
+      }
+
       tokenConfig[i] = _tokenConfig[i];
 
       unchecked {
@@ -65,9 +76,7 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
   }
 
   /// @inheritdoc IBalancerStrategyManager
-  function deposit(
-    uint256[] calldata _tokenAmounts
-  ) external onlyOwnerOrGuardian returns (uint256 bptAmount) {
+  function deposit(uint256[] calldata _tokenAmounts) external onlyOwnerOrGuardian {
     if (_tokenAmounts.length != TOKEN_COUNT) {
       revert TokenCountMismatch();
     }
@@ -86,20 +95,9 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
 
     bytes memory userData = abi.encode(WeightedPoolUserData.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT);
 
-    uint256[] memory amountsIn;
-    (bptAmount, amountsIn) = POOL.queryJoin(
-      POOL_ID,
-      address(this),
-      address(this),
-      _tokenAmounts,
-      0,
-      0,
-      userData
-    );
-
     IAsset[] memory assets = new IAsset[](TOKEN_COUNT);
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
-      IERC20(tokenConfig[i].token).safeIncreaseAllowance(address(VAULT), amountsIn[i]);
+      IERC20(tokenConfig[i].token).safeIncreaseAllowance(address(VAULT), _tokenAmounts[i]);
       assets[i] = IAsset(tokenConfig[i].token);
 
       unchecked {
@@ -109,20 +107,18 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
 
     userData = abi.encode(
       WeightedPoolUserData.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT,
-      amountsIn,
-      bptAmount
+      _tokenAmounts,
+      0
     );
 
     IBalancerVault.JoinPoolRequest memory request = IBalancerVault.JoinPoolRequest({
       assets: assets,
-      maxAmountsIn: amountsIn,
+      maxAmountsIn: _tokenAmounts,
       userData: userData,
       fromInternalBalance: false
     });
 
     VAULT.joinPool(POOL_ID, address(this), address(this), request);
-
-    _backTokens();
   }
 
   /// @inheritdoc IBalancerStrategyManager
@@ -139,7 +135,7 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
 
   /// @dev withdraws token from pool
   function _withdraw(uint256 bptAmount) internal returns (uint256[] memory tokenAmounts) {
-    IERC20(address(POOL)).safeIncreaseAllowance(address(VAULT), bptAmount);
+    // IERC20(address(POOL)).safeIncreaseAllowance(address(VAULT), bptAmount);
 
     uint256[] memory minAmountsOut = new uint256[](TOKEN_COUNT);
     IAsset[] memory assets = new IAsset[](TOKEN_COUNT);
@@ -187,7 +183,10 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
   function _backToken(IERC20 token, address provider) internal returns (uint256 tokenAmount) {
     tokenAmount = token.balanceOf(address(this));
 
-    token.transfer(provider, tokenAmount);
+    if (tokenAmount > 0) {
+      token.approve(address(POOL), 0);
+      token.transfer(provider, tokenAmount);
+    }
   }
 
   /// @inheritdoc Rescuable
@@ -202,6 +201,7 @@ contract BalancerV2StrategyManager is IBalancerStrategyManager, OwnableWithGuard
     return type(uint256).max;
   }
 
+  error TokenMismatch();
   error TokenCountMismatch();
   error InsufficientToken(address token);
   error AccessForbidden();
