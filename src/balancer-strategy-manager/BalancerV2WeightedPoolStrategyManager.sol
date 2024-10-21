@@ -13,6 +13,12 @@ import {IBalancerVault, IAsset} from './balancer-v2/IBalancerVault.sol';
 import {WeightedPoolUserData} from './balancer-v2/WeightedPoolUserData.sol';
 import {IBalancerStrategyManager} from './IBalancerStrategyManager.sol';
 
+/**
+ * @title Balancer V2 Weighted Pool Strategy Manager
+ * @author TokenLogic
+ * @notice A contract to manage deposits and withdrawals into a Balancer V2 Weighted Pool.
+ * @dev This contract uses the Balancer Vault to manage liquidity, using exact token amounts for BPT.
+ */
 contract BalancerV2WeightedPoolStrategyManager is
   IBalancerStrategyManager,
   OwnableWithGuardian,
@@ -20,21 +26,41 @@ contract BalancerV2WeightedPoolStrategyManager is
 {
   using SafeERC20 for IERC20;
 
+  /// @notice The Balancer pool ID associated with the strategy
   bytes32 public immutable POOL_ID;
+
+  /// @notice The Balancer pool contract
   IBalancerPool public immutable POOL;
+
+  /// @notice The Balancer Vault contract
   IBalancerVault public immutable VAULT;
+
+  /// @notice The number of tokens in the pool
   uint256 public immutable TOKEN_COUNT;
+
+  /// @notice The address of the Hypernative service
   address public immutable HYPERNATIVE;
 
-  mapping(uint256 => TokenConfig) private tokenConfig;
+  /// @dev Mapping of token configurations (index to TokenConfig)
+  mapping(uint256 id => TokenConfig config) private tokenConfig;
 
+  /// @dev Restricts access to only the owner, guardian, or Hypernative address.
   modifier onlyWithdrawable() {
     if (_msgSender() != owner() && _msgSender() != guardian() && _msgSender() != HYPERNATIVE) {
-      revert AccessForbidden();
+      revert Unauthorized();
     }
     _;
   }
 
+  /**
+   * @notice Constructor to initialize the contract.
+   * @param _vault The address of the Balancer Vault.
+   * @param _poolId The Balancer pool ID.
+   * @param _tokenConfig The array of token configurations (address and provider).
+   * @param _owner The owner of the contract.
+   * @param _guardian The guardian of the contract.
+   * @param _hypernative The Hypernative service address.
+   */
   constructor(
     address _vault,
     bytes32 _poolId,
@@ -49,21 +75,23 @@ contract BalancerV2WeightedPoolStrategyManager is
     (address poolAddress, ) = VAULT.getPool(_poolId);
     POOL = IBalancerPool(poolAddress);
 
-    address[] memory actuallTokens;
-    (actuallTokens, , ) = VAULT.getPoolTokens(_poolId);
+    address[] memory actualTokens;
+    (actualTokens, , ) = VAULT.getPoolTokens(_poolId);
 
-    TOKEN_COUNT = actuallTokens.length;
+    TOKEN_COUNT = actualTokens.length;
 
     if (_tokenConfig.length != TOKEN_COUNT) {
       revert TokenCountMismatch();
     }
 
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
-      if (actuallTokens[i] != _tokenConfig[i].token) {
+      if (actualTokens[i] != _tokenConfig[i].token) {
         revert TokenMismatch();
       }
 
       tokenConfig[i] = _tokenConfig[i];
+
+      emit TokenProviderUpdated(i, _tokenConfig[i].token, address(0), _tokenConfig[i].provider);
 
       unchecked {
         ++i;
@@ -75,17 +103,16 @@ contract BalancerV2WeightedPoolStrategyManager is
     HYPERNATIVE = _hypernative;
   }
 
-  /**
-   * @dev sets token provider
-   * @param _id The index of token to set
-   * @param _provider The address of provider
-   */
+  /// @inheritdoc IBalancerStrategyManager
   function setTokenProvider(uint256 _id, address _provider) external onlyOwner {
     if (_id >= TOKEN_COUNT) {
       revert TokenCountMismatch();
     }
 
+    address oldProvider = tokenConfig[_id].provider;
     tokenConfig[_id].provider = _provider;
+
+    emit TokenProviderUpdated(_id, tokenConfig[_id].token, oldProvider, _provider);
   }
 
   /// @inheritdoc IBalancerStrategyManager
@@ -95,18 +122,16 @@ contract BalancerV2WeightedPoolStrategyManager is
     }
 
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
-      IERC20 token = IERC20(tokenConfig[i].token);
+      uint256 currentBalance = IERC20(tokenConfig[i].token).balanceOf(address(this));
 
-      if (_tokenAmounts[i] > token.balanceOf(address(this))) {
-        revert InsufficientToken(address(token));
+      if (_tokenAmounts[i] > currentBalance) {
+        revert InsufficientToken(tokenConfig[i].token, currentBalance);
       }
 
       unchecked {
         ++i;
       }
     }
-
-    bytes memory userData = abi.encode(WeightedPoolUserData.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT);
 
     IAsset[] memory assets = new IAsset[](TOKEN_COUNT);
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
@@ -118,7 +143,7 @@ contract BalancerV2WeightedPoolStrategyManager is
       }
     }
 
-    userData = abi.encode(
+    bytes memory userData = abi.encode(
       WeightedPoolUserData.JoinKind.EXACT_TOKENS_IN_FOR_BPT_OUT,
       _tokenAmounts,
       0
@@ -131,7 +156,11 @@ contract BalancerV2WeightedPoolStrategyManager is
       fromInternalBalance: false
     });
 
+    uint256 bptAmountBefore = IERC20(address(POOL)).balanceOf(address(this));
     VAULT.joinPool(POOL_ID, address(this), address(this), request);
+    uint256 bptAmountAfter = IERC20(address(POOL)).balanceOf(address(this));
+
+    emit TokenDeposit(_msgSender(), _tokenAmounts, bptAmountAfter - bptAmountBefore);
   }
 
   /// @inheritdoc IBalancerStrategyManager
@@ -141,25 +170,24 @@ contract BalancerV2WeightedPoolStrategyManager is
 
   /// @inheritdoc IBalancerStrategyManager
   function emergencyWithdraw() external onlyWithdrawable returns (uint256[] memory) {
-    uint256 bptAmount = IERC20(address(POOL)).balanceOf(address(this));
-
-    return _withdraw(bptAmount);
+    return _withdraw(IERC20(address(POOL)).balanceOf(address(this)));
   }
 
   /// @inheritdoc IBalancerStrategyManager
-  function getTokenConfig(uint256 id) external view override returns (TokenConfig memory) {
+  function getTokenConfig(uint256 id) external view returns (TokenConfig memory) {
     return tokenConfig[id];
   }
 
-  /// @dev withdraws token from pool
+  /**
+   * @dev Internal function to withdraw tokens from the pool.
+   * @param bptAmount The amount of BPT to burn.
+   * @return tokenAmounts The amounts of each token withdrawn.
+   */
   function _withdraw(uint256 bptAmount) internal returns (uint256[] memory tokenAmounts) {
-    // IERC20(address(POOL)).safeIncreaseAllowance(address(VAULT), bptAmount);
-
     uint256[] memory minAmountsOut = new uint256[](TOKEN_COUNT);
     IAsset[] memory assets = new IAsset[](TOKEN_COUNT);
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
       assets[i] = IAsset(tokenConfig[i].token);
-      minAmountsOut[i] = 0;
 
       unchecked {
         ++i;
@@ -179,15 +207,20 @@ contract BalancerV2WeightedPoolStrategyManager is
 
     VAULT.exitPool(POOL_ID, address(this), payable(address(this)), request);
 
-    tokenAmounts = _backTokens();
+    tokenAmounts = _sendTokensToProvider();
+
+    emit TokenWithdraw(_msgSender(), tokenAmounts, bptAmount);
   }
 
-  /// @dev send back remaining tokens to provider
-  function _backTokens() internal returns (uint256[] memory) {
+  /**
+   * @dev Internal function to return the remaining tokens to their respective providers.
+   * @return tokenAmounts The amounts of tokens returned to the providers.
+   */
+  function _sendTokensToProvider() internal returns (uint256[] memory) {
     uint256[] memory tokenAmounts = new uint256[](TOKEN_COUNT);
 
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
-      tokenAmounts[i] = _backToken(IERC20(tokenConfig[i].token), tokenConfig[i].provider);
+      tokenAmounts[i] = _sendTokenToProvider(IERC20(tokenConfig[i].token), tokenConfig[i].provider);
 
       unchecked {
         ++i;
@@ -197,12 +230,20 @@ contract BalancerV2WeightedPoolStrategyManager is
     return tokenAmounts;
   }
 
-  /// @dev send back remaining tokens to provider
-  function _backToken(IERC20 token, address provider) internal returns (uint256 tokenAmount) {
+  /**
+   * @dev Internal function to return the remaining balance of a token to its provider.
+   * @param token The IERC20 token contract.
+   * @param provider The address of the token provider.
+   * @return tokenAmount The amount of tokens returned.
+   */
+  function _sendTokenToProvider(
+    IERC20 token,
+    address provider
+  ) internal returns (uint256 tokenAmount) {
     tokenAmount = token.balanceOf(address(this));
 
     if (tokenAmount > 0) {
-      token.approve(address(POOL), 0);
+      token.forceApprove(address(POOL), 0);
       token.transfer(provider, tokenAmount);
     }
   }
@@ -218,9 +259,4 @@ contract BalancerV2WeightedPoolStrategyManager is
   ) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
     return type(uint256).max;
   }
-
-  error TokenMismatch();
-  error TokenCountMismatch();
-  error InsufficientToken(address token);
-  error AccessForbidden();
 }

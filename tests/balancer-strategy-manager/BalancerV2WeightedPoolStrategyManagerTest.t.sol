@@ -17,7 +17,9 @@ contract BalancerV2WeightedPoolStrategyManagerTest is Test {
     uint256[] protocolFeeAmounts
   );
 
+  // https://etherscan.io/address/0xBA12222222228d8Ba445958a75a0704d566BF2C8
   address public constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+  // https://balancer.fi/pools/ethereum/v2/0x3de27efa2f1aa663ae5d458857e731c129069f29000200000000000000000588
   bytes32 public constant POOL_ID =
     0x3de27efa2f1aa663ae5d458857e731c129069f29000200000000000000000588;
 
@@ -53,16 +55,12 @@ contract BalancerV2WeightedPoolStrategyManagerTest is Test {
     );
   }
 
-  function _fundAaveFromWhale(address to, uint256 amount) internal {
-    vm.startPrank(0x4da27a545c0c5B758a6BA100e3a049001de870f5);
-    IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).transfer(to, amount);
-    vm.stopPrank();
+  function _fundAave(address to, uint256 amount) internal {
+    deal(AaveV3EthereumAssets.AAVE_UNDERLYING, to, amount);
   }
 
-  function _fundWstEthFromWhale(address to, uint256 amount) internal {
-    vm.startPrank(0x0B925eD163218f6662a35e0f0371Ac234f9E9371);
-    IERC20(AaveV3EthereumAssets.wstETH_UNDERLYING).transfer(to, amount);
-    vm.stopPrank();
+  function _fundWstEth(address to, uint256 amount) internal {
+    deal(AaveV3EthereumAssets.wstETH_UNDERLYING, to, amount);
   }
 }
 
@@ -88,7 +86,7 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
 
     uint256[] memory invalidLengthBalances = new uint256[](3);
 
-    vm.expectRevert(BalancerV2WeightedPoolStrategyManager.TokenCountMismatch.selector);
+    vm.expectRevert(IBalancerStrategyManager.TokenCountMismatch.selector);
     strategyManager.deposit(invalidLengthBalances);
     vm.stopPrank();
   }
@@ -98,8 +96,9 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        BalancerV2WeightedPoolStrategyManager.InsufficientToken.selector,
-        AaveV3EthereumAssets.wstETH_UNDERLYING
+        IBalancerStrategyManager.InsufficientToken.selector,
+        AaveV3EthereumAssets.wstETH_UNDERLYING,
+        0
       )
     );
     strategyManager.deposit(balances);
@@ -107,8 +106,8 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
   }
 
   function test_success() public {
-    _fundAaveFromWhale(address(strategyManager), 8 ether);
-    _fundWstEthFromWhale(address(strategyManager), 1 ether);
+    _fundAave(address(strategyManager), 8 ether);
+    _fundWstEth(address(strategyManager), 1 ether);
     vm.startPrank(guardian);
 
     assertEq(
@@ -145,8 +144,8 @@ contract WithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
     balances[0] = 1 ether;
     balances[1] = 8 ether;
 
-    _fundAaveFromWhale(address(strategyManager), 8 ether);
-    _fundWstEthFromWhale(address(strategyManager), 1 ether);
+    _fundAave(address(strategyManager), 8 ether);
+    _fundWstEth(address(strategyManager), 1 ether);
 
     vm.prank(guardian);
     strategyManager.deposit(balances);
@@ -189,8 +188,8 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
     balances[0] = 1 ether;
     balances[1] = 8 ether;
 
-    _fundAaveFromWhale(address(strategyManager), 8 ether);
-    _fundWstEthFromWhale(address(strategyManager), 1 ether);
+    _fundAave(address(strategyManager), 8 ether);
+    _fundWstEth(address(strategyManager), 1 ether);
 
     vm.prank(guardian);
     strategyManager.deposit(balances);
@@ -199,7 +198,7 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
   function test_revertsIf_NotOwnerOrGuardianOrHypernative() public {
     vm.startPrank(alice);
 
-    vm.expectRevert(BalancerV2WeightedPoolStrategyManager.AccessForbidden.selector);
+    vm.expectRevert(IBalancerStrategyManager.Unauthorized.selector);
     strategyManager.emergencyWithdraw();
     vm.stopPrank();
   }
