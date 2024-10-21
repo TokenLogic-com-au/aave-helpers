@@ -6,7 +6,7 @@ import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {GovernanceV3Ethereum} from 'aave-address-book/GovernanceV3Ethereum.sol';
 
-import {BalancerV2WeightedPoolStrategyManager} from 'src/balancer-strategy-manager/BalancerV2WeightedPoolStrategyManager.sol';
+import {IBalancerStrategyManager, BalancerV2WeightedPoolStrategyManager} from 'src/balancer-strategy-manager/BalancerV2WeightedPoolStrategyManager.sol';
 
 contract BalancerV2WeightedPoolStrategyManagerTest is Test {
   event PoolBalanceChanged(
@@ -31,14 +31,14 @@ contract BalancerV2WeightedPoolStrategyManagerTest is Test {
 
   function setUp() public virtual {
     vm.createSelectFork(vm.rpcUrl('mainnet'), 20991650);
-    BalancerV2WeightedPoolStrategyManager.TokenConfig[]
-      memory tokens = new BalancerV2WeightedPoolStrategyManager.TokenConfig[](2);
+    IBalancerStrategyManager.TokenConfig[]
+      memory tokens = new IBalancerStrategyManager.TokenConfig[](2);
 
-    tokens[0] = BalancerV2WeightedPoolStrategyManager.TokenConfig({
+    tokens[0] = IBalancerStrategyManager.TokenConfig({
       token: AaveV3EthereumAssets.wstETH_UNDERLYING,
       provider: wstEthProvider
     });
-    tokens[1] = BalancerV2WeightedPoolStrategyManager.TokenConfig({
+    tokens[1] = IBalancerStrategyManager.TokenConfig({
       token: AaveV3EthereumAssets.AAVE_UNDERLYING,
       provider: aaveProvider
     });
@@ -220,7 +220,40 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
 
     assertEq(IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).balanceOf(aaveProvider), amounts[1]);
     assertEq(IERC20(AaveV3EthereumAssets.wstETH_UNDERLYING).balanceOf(wstEthProvider), amounts[0]);
+  }
+}
 
-    console.log(amounts[0], amounts[1]);
+contract SetTokenProviderTest is BalancerV2WeightedPoolStrategyManagerTest {
+  address public newAaveProvider;
+
+  function setUp() public override {
+    super.setUp();
+
+    newAaveProvider = makeAddr('new-aave-provider');
+  }
+
+  function test_revertsIf_NotOwner() public {
+    vm.startPrank(alice);
+
+    vm.expectRevert('Ownable: caller is not the owner');
+    strategyManager.setTokenProvider(1, newAaveProvider);
+    vm.stopPrank();
+  }
+
+  function test_success() public {
+    IBalancerStrategyManager.TokenConfig memory beforeTokenConfig = strategyManager.getTokenConfig(
+      1
+    );
+
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+
+    strategyManager.setTokenProvider(1, newAaveProvider);
+    vm.stopPrank();
+
+    IBalancerStrategyManager.TokenConfig memory afterTokenConfig = strategyManager.getTokenConfig(
+      1
+    );
+    assertEq(beforeTokenConfig.provider, aaveProvider);
+    assertEq(afterTokenConfig.provider, newAaveProvider);
   }
 }

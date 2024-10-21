@@ -20,18 +20,13 @@ contract BalancerV2WeightedPoolStrategyManager is
 {
   using SafeERC20 for IERC20;
 
-  struct TokenConfig {
-    address token;
-    address provider;
-  }
-
   bytes32 public immutable POOL_ID;
   IBalancerPool public immutable POOL;
   IBalancerVault public immutable VAULT;
   uint256 public immutable TOKEN_COUNT;
   address public immutable HYPERNATIVE;
 
-  mapping(uint256 id => TokenConfig config) public tokenConfig;
+  mapping(uint256 => TokenConfig) private tokenConfig;
 
   modifier onlyWithdrawable() {
     if (_msgSender() != owner() && _msgSender() != guardian() && _msgSender() != HYPERNATIVE) {
@@ -57,7 +52,12 @@ contract BalancerV2WeightedPoolStrategyManager is
     address[] memory actuallTokens;
     (actuallTokens, , ) = VAULT.getPoolTokens(_poolId);
 
-    TOKEN_COUNT = _tokenConfig.length;
+    TOKEN_COUNT = actuallTokens.length;
+
+    if (_tokenConfig.length != TOKEN_COUNT) {
+      revert TokenCountMismatch();
+    }
+
     for (uint256 i = 0; i < TOKEN_COUNT; ) {
       if (actuallTokens[i] != _tokenConfig[i].token) {
         revert TokenMismatch();
@@ -73,6 +73,19 @@ contract BalancerV2WeightedPoolStrategyManager is
     _transferOwnership(_owner);
     _updateGuardian(_guardian);
     HYPERNATIVE = _hypernative;
+  }
+
+  /**
+   * @dev sets token provider
+   * @param _id The index of token to set
+   * @param _provider The address of provider
+   */
+  function setTokenProvider(uint256 _id, address _provider) external onlyOwner {
+    if (_id >= TOKEN_COUNT) {
+      revert TokenCountMismatch();
+    }
+
+    tokenConfig[_id].provider = _provider;
   }
 
   /// @inheritdoc IBalancerStrategyManager
@@ -131,6 +144,11 @@ contract BalancerV2WeightedPoolStrategyManager is
     uint256 bptAmount = IERC20(address(POOL)).balanceOf(address(this));
 
     return _withdraw(bptAmount);
+  }
+
+  /// @inheritdoc IBalancerStrategyManager
+  function getTokenConfig(uint256 id) external view override returns (TokenConfig memory) {
+    return tokenConfig[id];
   }
 
   /// @dev withdraws token from pool
