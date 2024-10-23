@@ -2,10 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-interface IAsset {
-  // solhint-disable-previous-line no-empty-blocks
-}
-
 interface IBalancerVault {
   // Pools
   //
@@ -95,7 +91,7 @@ interface IBalancerVault {
   ) external payable;
 
   struct JoinPoolRequest {
-    IAsset[] assets;
+    address[] assets;
     uint256[] maxAmountsIn;
     bytes userData;
     bool fromInternalBalance;
@@ -144,7 +140,7 @@ interface IBalancerVault {
   ) external;
 
   struct ExitPoolRequest {
-    IAsset[] assets;
+    address[] assets;
     uint256[] minAmountsOut;
     bytes userData;
     bool toInternalBalance;

@@ -47,7 +47,6 @@ contract BalancerV2WeightedPoolStrategyManagerTest is Test {
 
     strategyManager = new BalancerV2WeightedPoolStrategyManager(
       BALANCER_VAULT,
-      POOL_ID,
       tokens,
       GovernanceV3Ethereum.EXECUTOR_LVL_1,
       guardian,
@@ -77,7 +76,7 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
     vm.startPrank(alice);
 
     vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
-    strategyManager.deposit(balances);
+    strategyManager.deposit(POOL_ID, balances);
     vm.stopPrank();
   }
 
@@ -87,7 +86,7 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
     uint256[] memory invalidLengthBalances = new uint256[](3);
 
     vm.expectRevert(IBalancerStrategyManager.TokenCountMismatch.selector);
-    strategyManager.deposit(invalidLengthBalances);
+    strategyManager.deposit(POOL_ID, invalidLengthBalances);
     vm.stopPrank();
   }
 
@@ -101,7 +100,7 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
         0
       )
     );
-    strategyManager.deposit(balances);
+    strategyManager.deposit(POOL_ID, balances);
     vm.stopPrank();
   }
 
@@ -127,7 +126,7 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
       new int256[](2),
       new uint256[](2)
     );
-    strategyManager.deposit(balances);
+    strategyManager.deposit(POOL_ID, balances);
     vm.stopPrank();
 
     assertEq(IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).balanceOf(address(strategyManager)), 0);
@@ -148,16 +147,18 @@ contract WithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
     _fundWstEth(address(strategyManager), 1 ether);
 
     vm.prank(guardian);
-    strategyManager.deposit(balances);
+    strategyManager.deposit(POOL_ID, balances);
 
-    bptAmount = IERC20(address(strategyManager.POOL())).balanceOf(address(strategyManager));
+    (address poolAddress, ) = strategyManager.VAULT().getPool(POOL_ID);
+
+    bptAmount = IERC20(poolAddress).balanceOf(address(strategyManager));
   }
 
   function test_revertsIf_NotOwnerOrGuardian() public {
     vm.startPrank(alice);
 
     vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
-    strategyManager.withdraw(bptAmount);
+    strategyManager.withdraw(POOL_ID, bptAmount);
     vm.stopPrank();
   }
 
@@ -172,7 +173,7 @@ contract WithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
       new int256[](2),
       new uint256[](2)
     );
-    uint256[] memory amounts = strategyManager.withdraw(bptAmount);
+    uint256[] memory amounts = strategyManager.withdraw(POOL_ID, bptAmount);
     vm.stopPrank();
 
     assertEq(IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).balanceOf(aaveProvider), amounts[1]);
@@ -192,14 +193,14 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
     _fundWstEth(address(strategyManager), 1 ether);
 
     vm.prank(guardian);
-    strategyManager.deposit(balances);
+    strategyManager.deposit(POOL_ID, balances);
   }
 
   function test_revertsIf_NotOwnerOrGuardianOrHypernative() public {
     vm.startPrank(alice);
 
     vm.expectRevert(IBalancerStrategyManager.Unauthorized.selector);
-    strategyManager.emergencyWithdraw();
+    strategyManager.emergencyWithdraw(POOL_ID);
     vm.stopPrank();
   }
 
@@ -214,7 +215,7 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
       new int256[](2),
       new uint256[](2)
     );
-    uint256[] memory amounts = strategyManager.emergencyWithdraw();
+    uint256[] memory amounts = strategyManager.emergencyWithdraw(POOL_ID);
     vm.stopPrank();
 
     assertEq(IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).balanceOf(aaveProvider), amounts[1]);
@@ -235,24 +236,24 @@ contract SetTokenProviderTest is BalancerV2WeightedPoolStrategyManagerTest {
     vm.startPrank(alice);
 
     vm.expectRevert('Ownable: caller is not the owner');
-    strategyManager.setTokenProvider(1, newAaveProvider);
+    strategyManager.setTokenProvider(AaveV3EthereumAssets.AAVE_UNDERLYING, newAaveProvider);
     vm.stopPrank();
   }
 
   function test_success() public {
-    IBalancerStrategyManager.TokenConfig memory beforeTokenConfig = strategyManager.getTokenConfig(
-      1
+    address beforeTokenProvider = strategyManager.tokenProvider(
+      AaveV3EthereumAssets.AAVE_UNDERLYING
     );
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
 
-    strategyManager.setTokenProvider(1, newAaveProvider);
+    strategyManager.setTokenProvider(AaveV3EthereumAssets.AAVE_UNDERLYING, newAaveProvider);
     vm.stopPrank();
 
-    IBalancerStrategyManager.TokenConfig memory afterTokenConfig = strategyManager.getTokenConfig(
-      1
+    address afterTokenProvider = strategyManager.tokenProvider(
+      AaveV3EthereumAssets.AAVE_UNDERLYING
     );
-    assertEq(beforeTokenConfig.provider, aaveProvider);
-    assertEq(afterTokenConfig.provider, newAaveProvider);
+    assertEq(beforeTokenProvider, aaveProvider);
+    assertEq(afterTokenProvider, newAaveProvider);
   }
 }

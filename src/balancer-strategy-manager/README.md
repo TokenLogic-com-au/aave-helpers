@@ -31,7 +31,6 @@ This contract imports several OpenZeppelin utilities, as well as Balancer-specif
 ```solidity
 constructor(
     address _vault,
-    bytes32 _poolId,
     TokenConfig[] memory _tokenConfig,
     address _owner,
     address _guardian,
@@ -40,40 +39,34 @@ constructor(
 ```
 
 - **_vault**: The address of the Balancer Vault.
-- **_poolId**: The ID of the Balancer pool.
 - **_tokenConfig**: The array of token configurations, containing token addresses and their providers.
 - **_owner**: The owner address of the contract.
 - **_guardian**: The guardian address for managing secure access.
 - **_hypernative**: The address of the Hypernative service.
 
-### `setTokenProvider(uint256 _id, address _provider)`
+### `setTokenProvider(address _token, address _provider)`
 
 - **Purpose**: Updates the token provider for a specific token.
 - **Access**: Only the owner can call this function.
 
-### `deposit(uint256[] calldata _tokenAmounts)`
+### `deposit(bytes32 _poolId, uint256[] calldata _tokenAmounts)`
 
 - **Purpose**: Deposits tokens into the Balancer pool and receives BPT tokens.
 - **Parameters**: `_tokenAmounts` is an array of token amounts for each pool token.
 - **Access**: Can be called by the owner or guardian.
 
-### `withdraw(uint256 bpt)`
+### `withdraw(bytes32 poolId, uint256 bpt)`
 
 - **Purpose**: Withdraws tokens by burning a specific amount of BPT.
-- **Parameters**: `bpt` is the amount of Balancer Pool Tokens (BPT) to burn.
+- **Parameters**: `poolId` is the id of pool and `bpt` is the amount of Balancer Pool Tokens (BPT) to burn.
 - **Returns**: An array representing the amounts of each token withdrawn.
 - **Access**: Can be called by the owner or guardian.
 
-### `emergencyWithdraw()`
+### `emergencyWithdraw(bytes32 poolId)`
 
 - **Purpose**: Withdraws all tokens by burning the entire BPT balance. This function is intended for emergency situations.
 - **Returns**: An array representing the amounts of each token withdrawn.
 - **Access**: Can be called by the owner, guardian, or the Hypernative service.
-
-### `getTokenConfig(uint256 id)`
-
-- **Purpose**: Retrieves the token configuration (token and provider) for a given token index.
-- **Returns**: A `TokenConfig` struct containing the token address and provider.
 
 ### Rescue Functions
 
@@ -85,7 +78,7 @@ The contract allows the owner to rescue tokens sent to the contract by accident:
 ### Internal Functions
 
 - **`_withdraw(uint256 bptAmount)`**: Internal function to handle withdrawal of tokens from the pool.
-- **`_sendTokensToProvider()`**: Sends remaining token balances back to their respective providers.
+- **`_sendTokensToProvider(address[] memory)`**: Sends remaining token balances back to their respective providers.
 - **`_sendTokenToProvider(IERC20 token, address provider)`**: Sends the remaining balance of a single token to its provider.
 
 ## Access Control
