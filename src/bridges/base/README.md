@@ -45,4 +45,4 @@ Just like when proving the message, there's a command in order to finalize the b
 
 ## Deployed Address
 
-Optimism [0xe0401d2996f29b2bda1628125606bff8ab4be67e](https://basescan.org/address/0xe0401d2996f29b2bda1628125606bff8ab4be67e)
+Base [0xe0401d2996f29b2bda1628125606bff8ab4be67e](https://basescan.org/address/0xe0401d2996f29b2bda1628125606bff8ab4be67e)
