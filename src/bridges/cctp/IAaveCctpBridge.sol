@@ -17,6 +17,12 @@ interface IAaveCctpBridge {
   error ZeroAmount();
 
   /**
+   * @notice The amount of tokens is insufficient.
+   * @param amount Current amount of token
+   */
+  error InsufficientBalance(uint256 amount);
+
+  /**
    * @notice Bridges USDC to another chain
    * @param toChainId The id of destination chain
    * @param amount The amount of token

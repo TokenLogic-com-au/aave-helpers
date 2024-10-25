@@ -67,9 +67,7 @@ contract AaveCctpBridgeTest is Test {
       alice
     );
 
-    vm.startPrank(address(AaveV3Ethereum.COLLECTOR));
-    IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).transfer(alice, amountToSend);
-    vm.stopPrank();
+    deal(AaveV3EthereumAssets.USDC_UNDERLYING, address(sourceBridge), amountToSend);
 
     vm.startPrank(alice);
     IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).approve(address(sourceBridge), amountToSend);
@@ -106,9 +104,22 @@ contract BridgeTokenTest is AaveCctpBridgeTest {
     sourceBridge.bridgeUsdc(destinationChainId, 0);
   }
 
+  function test_revertsIf_Insufficient() external {
+    vm.selectFork(sourceFork);
+    sourceBridge.setCollector(destinationChainId, address(AaveV3Arbitrum.COLLECTOR));
+
+    vm.startPrank(alice);
+    vm.expectRevert(
+      abi.encodeWithSelector(IAaveCctpBridge.InsufficientBalance.selector, amountToSend)
+    );
+    sourceBridge.bridgeUsdc(destinationChainId, amountToSend + 1);
+  }
+
   function test_success() external {
     vm.selectFork(sourceFork);
-    uint256 beforeBalance = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).balanceOf(alice);
+    uint256 beforeBalance = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).balanceOf(
+      address(sourceBridge)
+    );
     sourceBridge.setCollector(destinationChainId, address(AaveV3Arbitrum.COLLECTOR));
 
     vm.recordLogs();
@@ -118,7 +129,9 @@ contract BridgeTokenTest is AaveCctpBridgeTest {
     sourceBridge.bridgeUsdc(destinationChainId, amountToSend);
     Vm.Log[] memory logs = vm.getRecordedLogs();
 
-    uint256 afterBalance = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).balanceOf(alice);
+    uint256 afterBalance = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).balanceOf(
+      address(sourceBridge)
+    );
     assertEq(afterBalance, beforeBalance - amountToSend);
 
     // get message

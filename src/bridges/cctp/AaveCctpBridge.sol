@@ -8,6 +8,7 @@ import {ICctpTokenMessenger} from './ICctpTokenMessenger.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
+import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 
 /**
  * @title AaveCctpBridge
@@ -57,10 +58,12 @@ contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
       revert ZeroAmount();
     }
 
-    USDC.transferFrom(msg.sender, address(this), _amount);
-    if (USDC.allowance(address(this), address(TOKEN_MESSENGER)) < type(uint256).max) {
-      USDC.approve(address(TOKEN_MESSENGER), type(uint256).max);
+    uint256 balance = USDC.balanceOf(address(this));
+    if (balance < _amount) {
+      revert InsufficientBalance(balance);
     }
+
+    USDC.approve(address(TOKEN_MESSENGER), _amount);
 
     ICctpTokenMessenger(TOKEN_MESSENGER).depositForBurn(
       _amount,
@@ -93,5 +96,12 @@ contract AaveCctpBridge is IAaveCctpBridge, OwnableWithGuardian, Rescuable {
   /// @inheritdoc Rescuable
   function whoCanRescue() public view override returns (address) {
     return owner();
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(
+    address erc20Token
+  ) public view override(RescuableBase, IRescuableBase) returns (uint256) {
+    return type(uint256).max;
   }
 }
