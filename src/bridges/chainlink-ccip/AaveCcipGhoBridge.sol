@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
+import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 import {LinkTokenInterface} from '@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol';
 import {CCIPReceiver} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
@@ -16,6 +17,7 @@ import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
  * @title AaveCcipGhoBridge
  * @author LucasWongC
  * @notice Helper contract to bridge GHO using Chainlink CCIP
+ * @dev Sends GHO to AAVE collector of destination chain using chainlink CCIP
  */
 contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuardian, Rescuable {
   /// @dev Chainlink CCIP router address
@@ -139,6 +141,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   }
 
   /// @inheritdoc CCIPReceiver
+  /// @dev Sends gho to AAVE collector
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     bytes32 messageId = message.messageId;
     Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
@@ -155,7 +158,8 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   /**
    * @notice Set up destination bridge data
    * @param _destinationChainSelector The selector of the destination chain
-   * @param _bridge The address of the bridge
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+   * @param _bridge The address of the bridge on destination chain
    */
   function setDestinationBridge(
     uint64 _destinationChainSelector,
@@ -169,5 +173,12 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   /// @inheritdoc Rescuable
   function whoCanRescue() public view override returns (address) {
     return owner();
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(
+    address erc20Token
+  ) public view override(RescuableBase, IRescuableBase) returns (uint256) {
+    return type(uint256).max;
   }
 }

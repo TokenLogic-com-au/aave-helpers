@@ -88,13 +88,8 @@ contract AaveCcipGhoBridgeTest is Test {
       alice
     );
 
-    vm.startPrank(address(AaveV3Ethereum.COLLECTOR));
-    IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).transfer(alice, amountToSend);
-    vm.stopPrank();
-
-    vm.startPrank(0xBc10f2E862ED4502144c7d632a3459F49DFCDB5e);
-    IERC20(AaveV3EthereumAssets.LINK_UNDERLYING).transfer(alice, 100e18); // get link token from collector for test
-    vm.stopPrank();
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amountToSend);
+    deal(AaveV3EthereumAssets.LINK_UNDERLYING, alice, 100e18);
 
     vm.startPrank(alice);
     IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).approve(address(sourceBridge), amountToSend);
