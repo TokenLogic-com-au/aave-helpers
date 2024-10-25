@@ -86,8 +86,7 @@ contract BalancerV2WeightedPoolStrategyManager is
 
   /// @inheritdoc IBalancerStrategyManager
   function deposit(bytes32 _poolId, uint256[] calldata _tokenAmounts) external onlyOwnerOrGuardian {
-    address[] memory assets;
-    (assets, , ) = VAULT.getPoolTokens(_poolId);
+    (address[] memory assets, , ) = VAULT.getPoolTokens(_poolId);
     uint256 tokenCount = assets.length;
     (address poolAddress, ) = VAULT.getPool(_poolId);
 
@@ -102,12 +101,6 @@ contract BalancerV2WeightedPoolStrategyManager is
         revert InsufficientToken(assets[i], currentBalance);
       }
 
-      unchecked {
-        ++i;
-      }
-    }
-
-    for (uint256 i = 0; i < tokenCount; ) {
       IERC20(assets[i]).safeIncreaseAllowance(address(VAULT), _tokenAmounts[i]);
 
       unchecked {
@@ -138,16 +131,30 @@ contract BalancerV2WeightedPoolStrategyManager is
   /// @inheritdoc IBalancerStrategyManager
   function withdraw(
     bytes32 _poolId,
-    uint256 bpt
+    uint256 bptAmount
   ) external onlyOwnerOrGuardian returns (uint256[] memory) {
-    return _withdraw(_poolId, bpt);
+    return _withdraw(_poolId, bptAmount);
   }
 
   /// @inheritdoc IBalancerStrategyManager
-  function emergencyWithdraw(bytes32 _poolId) external onlyWithdrawable returns (uint256[] memory) {
-    (address poolAddress, ) = VAULT.getPool(_poolId);
+  function emergencyWithdraw(
+    bytes32[] memory _poolIds
+  ) external onlyWithdrawable returns (uint256[][] memory tokenAmounts) {
+    uint256 poolCount = _poolIds.length;
+    tokenAmounts = new uint256[][](poolCount);
 
-    return _withdraw(_poolId, IERC20(poolAddress).balanceOf(address(this)));
+    for (; poolCount > 0; ) {
+      unchecked {
+        --poolCount;
+      }
+
+      (address poolAddress, ) = VAULT.getPool(_poolIds[poolCount]);
+      uint256 bptAmount = IERC20(poolAddress).balanceOf(address(this));
+
+      if (bptAmount > 0) {
+        tokenAmounts[poolCount] = _withdraw(_poolIds[poolCount], bptAmount);
+      }
+    }
   }
 
   /**
@@ -160,8 +167,7 @@ contract BalancerV2WeightedPoolStrategyManager is
     bytes32 poolId,
     uint256 bptAmount
   ) internal returns (uint256[] memory tokenAmounts) {
-    address[] memory assets;
-    (assets, , ) = VAULT.getPoolTokens(poolId);
+    (address[] memory assets, , ) = VAULT.getPoolTokens(poolId);
     uint256 tokenCount = assets.length;
 
     bytes memory userData = abi.encode(

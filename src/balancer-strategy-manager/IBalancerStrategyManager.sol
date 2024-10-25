@@ -107,8 +107,8 @@ interface IBalancerStrategyManager {
   /**
    * @notice Emergency withdrawal of tokens from the Balancer pool.
    * @dev Burns all the BPT held by the contract and withdraws all associated tokens from the Balancer pool.
-   * @param poolId The id of balancer pool to deposit
+   * @param poolIds The id of balancer pool to deposit
    * @return tokens The amounts of tokens withdrawn.
    */
-  function emergencyWithdraw(bytes32 poolId) external returns (uint256[] memory tokens);
+  function emergencyWithdraw(bytes32[] memory poolIds) external returns (uint256[][] memory tokens);
 }

@@ -182,6 +182,7 @@ contract WithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
 }
 
 contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
+  bytes32[] poolIds;
   function setUp() public override {
     super.setUp();
 
@@ -194,13 +195,16 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
 
     vm.prank(guardian);
     strategyManager.deposit(POOL_ID, balances);
+
+    poolIds = new bytes32[](1);
+    poolIds[0] = POOL_ID;
   }
 
   function test_revertsIf_NotOwnerOrGuardianOrHypernative() public {
     vm.startPrank(alice);
 
     vm.expectRevert(IBalancerStrategyManager.Unauthorized.selector);
-    strategyManager.emergencyWithdraw(POOL_ID);
+    strategyManager.emergencyWithdraw(poolIds);
     vm.stopPrank();
   }
 
@@ -215,11 +219,14 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
       new int256[](2),
       new uint256[](2)
     );
-    uint256[] memory amounts = strategyManager.emergencyWithdraw(POOL_ID);
+    uint256[][] memory amounts = strategyManager.emergencyWithdraw(poolIds);
     vm.stopPrank();
 
-    assertEq(IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).balanceOf(aaveProvider), amounts[1]);
-    assertEq(IERC20(AaveV3EthereumAssets.wstETH_UNDERLYING).balanceOf(wstEthProvider), amounts[0]);
+    assertEq(IERC20(AaveV3EthereumAssets.AAVE_UNDERLYING).balanceOf(aaveProvider), amounts[0][1]);
+    assertEq(
+      IERC20(AaveV3EthereumAssets.wstETH_UNDERLYING).balanceOf(wstEthProvider),
+      amounts[0][0]
+    );
   }
 }
 
