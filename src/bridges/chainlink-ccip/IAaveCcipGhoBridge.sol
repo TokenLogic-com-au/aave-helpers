@@ -12,6 +12,7 @@ interface IAaveCcipGhoBridge {
   /**
    * @notice Transfers tokens to the destination chain and distributes them
    * @param destinationChainSelector The selector of the destination chain
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
    * @param payFeesIn The fee payment method
    * @return messageId The ID of the cross-chain message
@@ -25,6 +26,7 @@ interface IAaveCcipGhoBridge {
   /**
    * @notice calculates fee amount to exeucte transfers
    * @param destinationChainSelector The selector of the destination chain
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
    * @param payFeesIn The fee payment method
    * @return fee The amount of fee
@@ -39,6 +41,7 @@ interface IAaveCcipGhoBridge {
    * @dev Emits when a new token transfer is issued
    * @param messageId The ID of the cross-chain message
    * @param destinationChainSelector The selector of the destination chain
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The total amount of GHO tokens
    */
   event TransferIssued(

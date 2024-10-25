@@ -1,5 +1,5 @@
 ### Overview
-The `AaveCcipGhoBridge` smart contract is a custom implementation designed to facilitate the bridging of GHO tokens between different blockchain networks using Chainlink's Cross-Chain Interoperability Protocol (CCIP). It enables token transfers between chains in a secure and decentralized manner by leveraging Chainlink's infrastructure. Here's an overview of its key features and components:
+The `AaveCcipGhoBridge` smart contract is a custom implementation designed to facilitate the bridging of GHO tokens between different blockchain networks using [Chainlink's Cross-Chain Interoperability Protocol (CCIP)](https://docs.chain.link/ccip). It enables token transfers between chains in a secure and decentralized manner by leveraging Chainlink's infrastructure. Here's an overview of its key features and components:
 
 ### Key Components
 1. **Router, LINK, GHO Addresses**:
@@ -29,7 +29,7 @@ The `AaveCcipGhoBridge` smart contract is a custom implementation designed to fa
    - The contract owner can configure or update the bridge addresses for different destination chains through the `setDestinationBridge` function.
 
 ### Security Features
-- **Ownership Control**: The contract uses OpenZeppelin's `Ownable` contract to ensure only the owner can configure or update key components like destination bridges.
+- **Ownable With Guardian Control**: The contract uses OwnableWithGuardian contract to ensure only the owner can configure or update key components like destination bridges and owner or guradian can execute transaction.
 - **Validation**: It checks whether the destination chain and bridge address are valid before executing transfers, ensuring that users cannot send tokens to unsupported chains.
 
 ### Events
