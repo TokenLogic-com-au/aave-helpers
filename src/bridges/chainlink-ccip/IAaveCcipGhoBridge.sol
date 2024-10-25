@@ -56,7 +56,8 @@ interface IAaveCcipGhoBridge {
    */
   event TransferFinished(
     bytes32 indexed messageId,
-    uint64 indexed sourceChainSelector,
+    address indexed from,
+    address indexed to,
     uint256 amount
   );
 

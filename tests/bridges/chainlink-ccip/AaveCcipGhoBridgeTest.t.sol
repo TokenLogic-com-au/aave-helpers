@@ -18,6 +18,12 @@ contract AaveCcipGhoBridgeTest is Test {
     uint64 indexed destinationChainSelector,
     uint256 totalAmount
   );
+  event TransferFinished(
+    bytes32 indexed messageId,
+    address indexed from,
+    address indexed to,
+    uint256 amount
+  );
 
   event DestinationUpdated(uint64 indexed chainSelector, address indexed bridge);
 
@@ -159,6 +165,8 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
       IAaveCcipGhoBridge.PayFeesIn.LINK
     );
 
+    vm.expectEmit(false, true, true, true, address(destinationBridge));
+    emit TransferFinished(bytes32(0), alice, address(AaveV3Arbitrum.COLLECTOR), amountToSend);
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
     uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
       address(AaveV3Arbitrum.COLLECTOR)
