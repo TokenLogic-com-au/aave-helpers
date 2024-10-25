@@ -152,7 +152,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
 
     IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
 
-    emit TransferFinished(messageId);
+    emit TransferFinished(messageId, message.sourceChainSelector, tokenAmounts[0].amount);
   }
 
   /**

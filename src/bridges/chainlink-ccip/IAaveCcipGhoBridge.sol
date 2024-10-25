@@ -54,7 +54,11 @@ interface IAaveCcipGhoBridge {
    * @dev Emits when the token transfer is executed on the destination chain
    * @param messageId The ID of the cross-chain message
    */
-  event TransferFinished(bytes32 indexed messageId);
+  event TransferFinished(
+    bytes32 indexed messageId,
+    uint64 indexed sourceChainSelector,
+    uint256 amount
+  );
 
   /**
    * @dev Emits when the destination bridge data is updated
