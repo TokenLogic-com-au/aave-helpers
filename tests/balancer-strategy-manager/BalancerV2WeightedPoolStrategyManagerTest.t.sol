@@ -186,15 +186,9 @@ contract EmergencyWithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
   function setUp() public override {
     super.setUp();
 
-    uint256[] memory balances = new uint256[](2);
-    balances[0] = 1 ether;
-    balances[1] = 8 ether;
+    (address poolAddress, ) = strategyManager.VAULT().getPool(POOL_ID);
 
-    _fundAave(address(strategyManager), 8 ether);
-    _fundWstEth(address(strategyManager), 1 ether);
-
-    vm.prank(guardian);
-    strategyManager.deposit(POOL_ID, balances);
+    deal(poolAddress, address(strategyManager), 1 ether);
 
     poolIds = new bytes32[](1);
     poolIds[0] = POOL_ID;
