@@ -161,7 +161,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
    * @notice Set up destination bridge data
    * @param _destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
-   * @param _bridge The address of the bridge on destination chain
+   * @param _bridge The address of the bridge deployed on destination chain
    */
   function setDestinationBridge(
     uint64 _destinationChainSelector,
