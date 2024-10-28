@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Test} from 'forge-std/Test.sol';
+import {Test, console} from 'forge-std/Test.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {CCIPLocalSimulatorFork, Register} from '@chainlink/local/src/ccip/CCIPLocalSimulatorFork.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
@@ -251,6 +251,30 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
       address(AaveV3Arbitrum.COLLECTOR)
     );
     assertEq(afterBalance, beforeBalance + amountToSend);
+  }
+
+  function test_success_remainingFeeSendBack() external {
+    vm.selectFork(sourceFork);
+    sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    uint256 beforeBalance = payable(alice).balance;
+
+    uint256 fee = sourceBridge.quoteTransfer(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.Native
+    );
+
+    vm.startPrank(alice);
+    vm.expectEmit(false, true, false, true, address(sourceBridge));
+    emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
+    sourceBridge.transfer{value: fee + 1 gwei}(
+      destinationChainSelector,
+      amountToSend,
+      IAaveCcipGhoBridge.PayFeesIn.Native
+    );
+
+    uint256 afterBalance = payable(alice).balance;
+    assertEq(afterBalance, beforeBalance - fee);
   }
 }
 

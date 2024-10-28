@@ -109,7 +109,11 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
 
       messageId = IRouterClient(ROUTER).ccipSend{value: fee}(destinationChainSelector, message);
       if (msg.value > fee) {
-        payable(msg.sender).transfer(msg.value - fee);
+        (bool success, ) = (msg.sender).call{value: (msg.value - fee)}('');
+
+        if (!success) {
+          revert FundTransferBackFailed();
+        }
       }
     }
 
@@ -179,8 +183,8 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
 
   /// @inheritdoc IRescuableBase
   function maxRescue(
-    address erc20Token
-  ) public view override(RescuableBase, IRescuableBase) returns (uint256) {
+    address
+  ) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
     return type(uint256).max;
   }
 }
