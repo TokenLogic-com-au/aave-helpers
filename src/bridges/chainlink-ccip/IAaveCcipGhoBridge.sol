@@ -79,4 +79,7 @@ interface IAaveCcipGhoBridge {
 
   /// @dev Returns this error when the message comes from an invalid bridge
   error InvalidMessage();
+
+  /// @dev Returns this error when fund transfer to sender returns error
+  error FundTransferBackFailed();
 }
