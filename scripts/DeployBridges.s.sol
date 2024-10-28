@@ -16,6 +16,8 @@ import {AaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.so
 
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
+import {MiscEthereum} from 'aave-address-book/MiscEthereum.sol';
+import {MiscArbitrum} from 'aave-address-book/MiscArbitrum.sol';
 
 contract DeployEthereum is EthereumScript {
   function run() external broadcast {
@@ -67,33 +69,35 @@ contract DeployArbBridgeArbitrum is ArbitrumScript {
 }
 
 contract DeployAaveCcipGhoBridgeEthereum is EthereumScript {
+  // https://etherscan.io/address/0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D
+  address constant CCIP_ROUTER_ETHEREUM = 0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D; // ccip router address
+
   function run() external broadcast {
     bytes32 salt = 'GHO Chainlink CCIP Bridge';
     new AaveCcipGhoBridge{salt: salt}(
-      // https://etherscan.io/address/0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D
-      0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D, // ccip router address
+      CCIP_ROUTER_ETHEREUM,
       AaveV3EthereumAssets.LINK_UNDERLYING,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
       GovernanceV3Ethereum.EXECUTOR_LVL_1, // owner address
-      // https://app.safe.global/home?safe=eth:0x2CFe3ec4d5a6811f4B8067F0DE7e47DfA938Aa30
-      0x2CFe3ec4d5a6811f4B8067F0DE7e47DfA938Aa30 // guardian address
+      MiscEthereum.PROTOCOL_GUARDIAN
     );
   }
 }
 
 contract DeployAaveCcipGhoBridgeArbitrum is ArbitrumScript {
+  // https://arbiscan.io/address/0x141fa059441E0ca23ce184B6A78bafD2A517DdE8
+  address constant CCIP_ROUTER_ARBITRUM = 0x141fa059441E0ca23ce184B6A78bafD2A517DdE8; // ccip router address
+
   function run() external broadcast {
     bytes32 salt = 'GHO Chainlink CCIP Bridge';
     new AaveCcipGhoBridge{salt: salt}(
-      // https://arbiscan.io/address/0x141fa059441E0ca23ce184B6A78bafD2A517DdE8
-      0x141fa059441E0ca23ce184B6A78bafD2A517DdE8, // ccip router address
+      CCIP_ROUTER_ARBITRUM,
       AaveV3ArbitrumAssets.LINK_UNDERLYING,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
       GovernanceV3Arbitrum.EXECUTOR_LVL_1, // owner address
-      // https://app.safe.global/home?safe=arb1:0xCb45E82419baeBCC9bA8b1e5c7858e48A3B26Ea6
-      0xCb45E82419baeBCC9bA8b1e5c7858e48A3B26Ea6 // guardian address
+      MiscArbitrum.PROTOCOL_GUARDIAN
     );
   }
 }
