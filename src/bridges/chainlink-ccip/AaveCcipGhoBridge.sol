@@ -75,7 +75,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     external
     payable
     checkDestination(destinationChainSelector)
-    onlyOwnerOrGuardian
+    onlyOwner
     returns (bytes32 messageId)
   {
     if (amount == 0) {
