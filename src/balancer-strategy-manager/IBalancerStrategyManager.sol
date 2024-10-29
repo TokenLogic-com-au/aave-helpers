@@ -45,6 +45,13 @@ interface IBalancerStrategyManager {
     uint256 bptAmount
   );
 
+  /**
+   * @dev Emits when hypernative address is updated
+   * @param oldHypernative Old hypernative address
+   * @param newHypernative New hypernative address
+   */
+  event HypernativeUpdated(address indexed oldHypernative, address indexed newHypernative);
+
   /// @notice Error thrown when there is a mismatch between token addresses
   error TokenMismatch();
 

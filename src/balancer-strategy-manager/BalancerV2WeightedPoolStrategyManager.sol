@@ -31,14 +31,14 @@ contract BalancerV2WeightedPoolStrategyManager is
   /// @notice The number of tokens in the pool
 
   /// @notice The address of the Hypernative service
-  address public immutable HYPERNATIVE;
+  address public hypernative;
 
   /// @dev Mapping of token configurations (token to provider)
   mapping(address token => address provider) public override tokenProvider;
 
   /// @dev Restricts access to only the owner, guardian, or Hypernative address.
   modifier onlyWithdrawable() {
-    if (_msgSender() != owner() && _msgSender() != guardian() && _msgSender() != HYPERNATIVE) {
+    if (_msgSender() != owner() && _msgSender() != guardian() && _msgSender() != hypernative) {
       revert Unauthorized();
     }
     _;
@@ -73,7 +73,7 @@ contract BalancerV2WeightedPoolStrategyManager is
 
     _transferOwnership(_owner);
     _updateGuardian(_guardian);
-    HYPERNATIVE = _hypernative;
+    hypernative = _hypernative;
   }
 
   /// @inheritdoc IBalancerStrategyManager
@@ -82,6 +82,15 @@ contract BalancerV2WeightedPoolStrategyManager is
     tokenProvider[_token] = _provider;
 
     emit TokenProviderUpdated(_token, oldProvider, _provider);
+  }
+
+  /// @notice updates hypernative address
+  function setHypernative(address _hypernative) external onlyOwner {
+    address hypernativeBefore = hypernative;
+
+    hypernative = _hypernative;
+
+    emit HypernativeUpdated(hypernativeBefore, _hypernative);
   }
 
   /// @inheritdoc IBalancerStrategyManager

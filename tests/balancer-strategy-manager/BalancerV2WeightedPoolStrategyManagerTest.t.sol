@@ -16,6 +16,7 @@ contract BalancerV2WeightedPoolStrategyManagerTest is Test {
     int256[] deltas,
     uint256[] protocolFeeAmounts
   );
+  event HypernativeUpdated(address indexed oldHypernative, address indexed newHypernative);
 
   // https://etherscan.io/address/0xBA12222222228d8Ba445958a75a0704d566BF2C8
   address public constant BALANCER_VAULT = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
@@ -256,5 +257,31 @@ contract SetTokenProviderTest is BalancerV2WeightedPoolStrategyManagerTest {
     );
     assertEq(beforeTokenProvider, aaveProvider);
     assertEq(afterTokenProvider, newAaveProvider);
+  }
+}
+
+contract SetHypernativeTest is BalancerV2WeightedPoolStrategyManagerTest {
+  address public newHypernative;
+
+  function setUp() public override {
+    super.setUp();
+
+    newHypernative = makeAddr('new-hypernative');
+  }
+
+  function test_revertsIf_NotOwner() public {
+    vm.startPrank(alice);
+
+    vm.expectRevert('Ownable: caller is not the owner');
+    strategyManager.setHypernative(newHypernative);
+    vm.stopPrank();
+  }
+
+  function test_success() public {
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    vm.expectEmit(true, true, false, false, address(strategyManager));
+    emit HypernativeUpdated(hypernative, newHypernative);
+    strategyManager.setHypernative(newHypernative);
+    vm.stopPrank();
   }
 }
