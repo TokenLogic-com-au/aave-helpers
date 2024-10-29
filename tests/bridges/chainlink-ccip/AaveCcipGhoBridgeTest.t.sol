@@ -94,11 +94,14 @@ contract AaveCcipGhoBridgeTest is Test {
       alice
     );
 
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, amountToSend);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, amountToSend + 100e18);
     deal(AaveV3EthereumAssets.LINK_UNDERLYING, owner, 100e18);
 
     vm.startPrank(owner);
-    IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).approve(address(sourceBridge), amountToSend);
+    IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).approve(
+      address(sourceBridge),
+      amountToSend + 100e18
+    );
     IERC20(AaveV3EthereumAssets.LINK_UNDERLYING).approve(address(sourceBridge), 100e18);
 
     vm.deal(owner, 1 ether); // add native funds for native-fee test
@@ -119,10 +122,63 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
+    sourceBridge.transfer(destinationChainSelector, amountToSend, address(sourceLinkToken));
+  }
+
+  function test_revertsIf_NotOwner() external {
+    vm.selectFork(sourceFork);
+    vm.prank(owner);
+    sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+
+    vm.startPrank(alice);
+    vm.expectRevert('Ownable: caller is not the owner');
+    sourceBridge.transfer(destinationChainSelector, amountToSend, address(sourceLinkToken));
+  }
+
+  function test_revertsIf_InvalidTransferAmount() external {
+    vm.selectFork(sourceFork);
+    vm.startPrank(owner);
+    sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+
+    vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
+    sourceBridge.transfer(destinationChainSelector, 0, address(sourceLinkToken));
+  }
+
+  function test_success() external {
+    vm.selectFork(destinationFork);
+    vm.startPrank(owner);
+
+    uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
+
+    vm.selectFork(sourceFork);
+    sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+
+    vm.expectEmit(false, true, false, true, address(sourceBridge));
+    emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
+    sourceBridge.transfer(destinationChainSelector, amountToSend, address(sourceLinkToken));
+
+    vm.expectEmit(false, true, true, true, address(destinationBridge));
+    emit TransferFinished(bytes32(0), owner, address(AaveV3Arbitrum.COLLECTOR), amountToSend);
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
+    uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
+    assertEq(afterBalance, beforeBalance + amountToSend);
+  }
+}
+
+contract TansferTokensPayFeesInGhoTest is AaveCcipGhoBridgeTest {
+  function test_revertsIf_UnsupportedChain() external {
+    vm.selectFork(sourceFork);
+
+    vm.startPrank(alice);
+    vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
     sourceBridge.transfer(
       destinationChainSelector,
       amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.LINK
+      AaveV3EthereumAssets.GHO_UNDERLYING
     );
   }
 
@@ -136,7 +192,7 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
     sourceBridge.transfer(
       destinationChainSelector,
       amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.LINK
+      AaveV3EthereumAssets.GHO_UNDERLYING
     );
   }
 
@@ -146,7 +202,7 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    sourceBridge.transfer(destinationChainSelector, 0, IAaveCcipGhoBridge.PayFeesIn.LINK);
+    sourceBridge.transfer(destinationChainSelector, 0, AaveV3EthereumAssets.GHO_UNDERLYING);
   }
 
   function test_success() external {
@@ -165,7 +221,7 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
     sourceBridge.transfer(
       destinationChainSelector,
       amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.LINK
+      AaveV3EthereumAssets.GHO_UNDERLYING
     );
 
     vm.expectEmit(false, true, true, true, address(destinationBridge));
@@ -183,11 +239,7 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
     vm.selectFork(sourceFork);
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    sourceBridge.transfer(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    sourceBridge.transfer(destinationChainSelector, amountToSend, address(0));
   }
 
   function test_revertsIf_NotOwner() external {
@@ -197,11 +249,7 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
 
     vm.startPrank(alice);
     vm.expectRevert('Ownable: caller is not the owner');
-    sourceBridge.transfer(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    sourceBridge.transfer(destinationChainSelector, amountToSend, address(0));
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
@@ -210,7 +258,7 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    sourceBridge.transfer(destinationChainSelector, 0, IAaveCcipGhoBridge.PayFeesIn.Native);
+    sourceBridge.transfer(destinationChainSelector, 0, address(0));
   }
 
   function test_revertsIf_InsufficientFee() external {
@@ -219,11 +267,7 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
     vm.expectRevert(IAaveCcipGhoBridge.InsufficientFee.selector);
-    sourceBridge.transfer(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    sourceBridge.transfer(destinationChainSelector, amountToSend, address(0));
   }
 
   function test_success() external {
@@ -236,19 +280,11 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
     vm.selectFork(sourceFork);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
-    uint256 fee = sourceBridge.quoteTransfer(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    uint256 fee = sourceBridge.quoteTransfer(destinationChainSelector, amountToSend, address(0));
 
     vm.expectEmit(false, true, false, true, address(sourceBridge));
     emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
-    sourceBridge.transfer{value: fee}(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    sourceBridge.transfer{value: fee}(destinationChainSelector, amountToSend, address(0));
 
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
     uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
@@ -263,19 +299,11 @@ contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
     uint256 beforeBalance = payable(owner).balance;
 
-    uint256 fee = sourceBridge.quoteTransfer(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    uint256 fee = sourceBridge.quoteTransfer(destinationChainSelector, amountToSend, address(0));
 
     vm.expectEmit(false, true, false, true, address(sourceBridge));
     emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
-    sourceBridge.transfer{value: fee + 1 gwei}(
-      destinationChainSelector,
-      amountToSend,
-      IAaveCcipGhoBridge.PayFeesIn.Native
-    );
+    sourceBridge.transfer{value: fee + 1 gwei}(destinationChainSelector, amountToSend, address(0));
 
     uint256 afterBalance = payable(owner).balance;
     assertEq(afterBalance, beforeBalance - fee);

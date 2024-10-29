@@ -3,24 +3,18 @@
 pragma solidity ^0.8.0;
 
 interface IAaveCcipGhoBridge {
-  /// @dev Fee payment token
-  enum PayFeesIn {
-    Native,
-    LINK
-  }
-
   /**
    * @notice Transfers tokens to the destination chain and distributes them
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
-   * @param payFeesIn The fee payment method
+   * @param feeToken The address of payment token
    * @return messageId The ID of the cross-chain message
    */
   function transfer(
     uint64 destinationChainSelector,
     uint256 amount,
-    PayFeesIn payFeesIn
+    address feeToken
   ) external payable returns (bytes32 messageId);
 
   /**
@@ -28,13 +22,13 @@ interface IAaveCcipGhoBridge {
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
-   * @param payFeesIn The fee payment method
+   * @param feeToken The address of payment token
    * @return fee The amount of fee
    */
   function quoteTransfer(
     uint64 destinationChainSelector,
     uint256 amount,
-    PayFeesIn payFeesIn
+    address feeToken
   ) external view returns (uint256 fee);
 
   /**
