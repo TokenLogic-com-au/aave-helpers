@@ -3,10 +3,10 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
 import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
-import {LinkTokenInterface} from '@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol';
 import {CCIPReceiver} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
@@ -20,6 +20,8 @@ import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
  * @dev Sends GHO to AAVE collector of destination chain using chainlink CCIP
  */
 contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuardian, Rescuable {
+  using SafeERC20 for IERC20;
+
   /// @dev Chainlink CCIP router address
   address public immutable ROUTER;
   /// @dev LINK token address
@@ -70,7 +72,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   function transfer(
     uint64 destinationChainSelector,
     uint256 amount,
-    PayFeesIn payFeesIn
+    address feeToken
   )
     external
     payable
@@ -93,14 +95,14 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
       data: abi.encode(msg.sender),
       tokenAmounts: tokenAmounts,
       extraArgs: '',
-      feeToken: payFeesIn == PayFeesIn.LINK ? LINK : address(0)
+      feeToken: feeToken
     });
 
     uint256 fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
 
-    if (payFeesIn == PayFeesIn.LINK) {
-      LinkTokenInterface(LINK).transferFrom(msg.sender, address(this), fee);
-      LinkTokenInterface(LINK).approve(ROUTER, fee);
+    if (feeToken != address(0)) {
+      IERC20(feeToken).transferFrom(msg.sender, address(this), fee);
+      IERC20(feeToken).safeIncreaseAllowance(ROUTER, fee);
       messageId = IRouterClient(ROUTER).ccipSend(destinationChainSelector, message);
     } else {
       if (msg.value < fee) {
@@ -124,7 +126,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   function quoteTransfer(
     uint64 destinationChainSelector,
     uint256 amount,
-    PayFeesIn payFeesIn
+    address feeToken
   ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
     if (amount == 0) {
       revert InvalidTransferAmount();
@@ -138,7 +140,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
       data: abi.encode(msg.sender),
       tokenAmounts: tokenAmounts,
       extraArgs: '',
-      feeToken: payFeesIn == PayFeesIn.LINK ? LINK : address(0)
+      feeToken: feeToken
     });
 
     fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);

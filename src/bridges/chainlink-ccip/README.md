@@ -1,5 +1,5 @@
 ### Overview
-The `AaveCcipGhoBridge` smart contract is a custom implementation designed to facilitate the bridging of GHO tokens between different blockchain networks using [Chainlink's Cross-Chain Interoperability Protocol (CCIP)](https://docs.chain.link/ccip). It enables token transfers between chains in a secure and decentralized manner by leveraging Chainlink's infrastructure. Here's an overview of its key features and components:
+The `AaveCcipGhoBridge` smart contract is a custom implementation designed to facilitate the bridging of GHO tokens between different blockchain networks using [Chainlink's Cross-Chain Interoperability Protocol (CCIP)](https://docs.chain.link/ccip). It enables GHO transfers between chains in a secure and decentralized manner by leveraging Chainlink's infrastructure. Here's an overview of its key features and components:
 
 ### Key Components
 1. **Router, LINK, GHO Addresses**:
