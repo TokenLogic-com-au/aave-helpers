@@ -154,9 +154,13 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
 
     address sender = abi.decode(message.data, (address));
 
-    if (tokenAmounts[0].token != GHO || tokenAmounts[0].amount == 0) {
+    if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
       revert InvalidMessage();
     }
+
+    // if (tokenAmounts[0].token != GHO || tokenAmounts[0].amount == 0) {
+    //   revert InvalidMessage();
+    // }
 
     IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
 
