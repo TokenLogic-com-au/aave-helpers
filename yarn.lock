@@ -98,6 +98,18 @@
     gray-matter "^4.0.3"
     tsx "^4.7.1"
 
+"@chainlink/contracts-ccip@1.4.0":
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/@chainlink/contracts-ccip/-/contracts-ccip-1.4.0.tgz#54fda7df2350921b2335796a57637f2d958f7bcd"
+  integrity sha512-8F0OpmXy73vSbOvnKPL0DcYLA6FTiwQSKw1+DQzKyBYVbFk4vtijzs+5Ts/Beu6EIPqXlmLq7WVFZFHiDOBjCg==
+  dependencies:
+    "@arbitrum/nitro-contracts" "1.1.1"
+    "@arbitrum/token-bridge-contracts" "1.1.2"
+    "@eth-optimism/contracts" "0.6.0"
+    "@openzeppelin/contracts" "4.9.3"
+    "@openzeppelin/contracts-upgradeable" "4.9.3"
+    "@scroll-tech/contracts" "0.1.0"
+
 "@chainlink/contracts-ccip@^1.4.0":
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/@chainlink/contracts-ccip/-/contracts-ccip-1.5.0.tgz#bf7523255e8e79dd0a1874e96d0fdfb260fb80d3"
@@ -114,7 +126,20 @@
     "@scroll-tech/contracts" "0.1.0"
     semver "^7.6.3"
 
-"@chainlink/contracts@^1.1.1", "@chainlink/contracts@^1.2.0":
+"@chainlink/contracts@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@chainlink/contracts/-/contracts-1.2.0.tgz#e1706038477c58045323a854c31a2aca34770039"
+  integrity sha512-rcHxzYKcVErANPiLTfL+KOklmHGu8eCB3XtPZolJSQLbH3ZNw9IkaGynQ1IjNUlAnTwFw5c72FCKrNN023xD7g==
+  dependencies:
+    "@changesets/changelog-github" "^0.5.0"
+    "@changesets/cli" "~2.27.3"
+    "@eth-optimism/contracts" "0.6.0"
+    "@openzeppelin/contracts" "4.9.3"
+    "@openzeppelin/contracts-upgradeable" "4.9.3"
+    "@scroll-tech/contracts" "0.1.0"
+    semver "^7.6.2"
+
+"@chainlink/contracts@^1.1.1":
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/@chainlink/contracts/-/contracts-1.3.0.tgz#21fd0153867f46b607175eb09fc5027735f700ee"
   integrity sha512-Vk93nijTC5iRFW/L6FKUzeMuJy7k5dNzAtqlHpdreqtzL7efO/qXbYCkqjJFNXGurfOXVehHlehFoH4tWvSbfw==
@@ -185,7 +210,7 @@
     "@changesets/types" "^6.0.0"
     dotenv "^8.1.0"
 
-"@changesets/cli@~2.27.7", "@changesets/cli@~2.27.8":
+"@changesets/cli@~2.27.3", "@changesets/cli@~2.27.7", "@changesets/cli@~2.27.8":
   version "2.27.9"
   resolved "https://registry.yarnpkg.com/@changesets/cli/-/cli-2.27.9.tgz#7b58a4c9eaf95d81fe0d1386705ecefe94a20062"
   integrity sha512-q42a/ZbDnxPpCb5Wkm6tMVIxgeI9C/bexntzTeCFBrQEdpisQqk8kCHllYZMDjYtEc1ZzumbMJAG8H0Z4rdvjg==

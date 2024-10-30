@@ -9,6 +9,8 @@ import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 import {CCIPReceiver} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
+import {IRouter} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouter.sol';
+import {EVM2EVMOnRamp} from '@chainlink/contracts-ccip/src/v0.8/ccip/onRamp/EVM2EVMOnRamp.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 
 import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
@@ -68,6 +70,17 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     _;
   }
 
+  /// @dev Check fee token is valid on destination chain
+  modifier checkFeeToken(uint64 chainSelector, address feeToken) {
+    if (feeToken != address(0)) {
+      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = EVM2EVMOnRamp(
+        IRouter(ROUTER).getOnRamp(chainSelector)
+      ).getFeeTokenConfig(feeToken);
+      if (!feeTokenConfig.enabled) revert NotAFeeToken(feeToken);
+    }
+    _;
+  }
+
   /// @inheritdoc IAaveCcipGhoBridge
   function transfer(
     uint64 destinationChainSelector,
@@ -78,6 +91,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     payable
     checkDestination(destinationChainSelector)
     onlyOwner
+    checkFeeToken(destinationChainSelector, feeToken)
     returns (bytes32 messageId)
   {
     if (amount == 0) {
@@ -127,7 +141,13 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     uint64 destinationChainSelector,
     uint256 amount,
     address feeToken
-  ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
+  )
+    external
+    view
+    checkDestination(destinationChainSelector)
+    checkFeeToken(destinationChainSelector, feeToken)
+    returns (uint256 fee)
+  {
     if (amount == 0) {
       revert InvalidTransferAmount();
     }
