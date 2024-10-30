@@ -76,4 +76,8 @@ interface IAaveCcipGhoBridge {
 
   /// @dev Returns this error when fund transfer to sender returns error
   error FundTransferBackFailed();
+
+  /// @dev Returns this error when fee token is not supported
+  /// @param token The address of invalid token
+  error NotAFeeToken(address token);
 }
