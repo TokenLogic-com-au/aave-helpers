@@ -12,6 +12,7 @@ import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbi
 
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
+/// @dev forge test --match-path=tests/bridges/chainlink-ccip/*.sol -vvv
 contract AaveCcipGhoBridgeTest is Test {
   CCIPLocalSimulatorFork public ccipLocalSimulatorFork;
   uint256 public sourceFork;
@@ -116,7 +117,7 @@ contract AaveCcipGhoBridgeTest is Test {
   }
 }
 
-contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
+contract TransferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
 
@@ -169,7 +170,7 @@ contract TansferTokensPayFeesInLinkTest is AaveCcipGhoBridgeTest {
   }
 }
 
-contract TansferTokensPayFeesInGhoTest is AaveCcipGhoBridgeTest {
+contract TransferTokensPayFeesInGhoTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
 
@@ -234,7 +235,7 @@ contract TansferTokensPayFeesInGhoTest is AaveCcipGhoBridgeTest {
   }
 }
 
-contract TansferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
+contract TransferTokensPayFeesInNativeTest is AaveCcipGhoBridgeTest {
   function test_revertsIf_UnsupportedChain() external {
     vm.selectFork(sourceFork);
     vm.startPrank(alice);
