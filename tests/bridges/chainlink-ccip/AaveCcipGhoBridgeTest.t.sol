@@ -13,6 +13,19 @@ import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbi
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
 contract AaveCcipGhoBridgeTest is Test {
+  CCIPLocalSimulatorFork public ccipLocalSimulatorFork;
+  uint256 public sourceFork;
+  uint256 public destinationFork;
+  address public owner;
+  address public alice;
+  IRouterClient public sourceRouter;
+  uint64 public destinationChainSelector;
+  IERC20 public sourceLinkToken;
+
+  uint256 amountToSend = 1_000e18;
+  AaveCcipGhoBridge sourceBridge;
+  AaveCcipGhoBridge destinationBridge;
+
   event TransferIssued(
     bytes32 indexed messageId,
     uint64 indexed destinationChainSelector,
@@ -26,19 +39,6 @@ contract AaveCcipGhoBridgeTest is Test {
   );
 
   event DestinationUpdated(uint64 indexed chainSelector, address indexed bridge);
-
-  CCIPLocalSimulatorFork public ccipLocalSimulatorFork;
-  uint256 public sourceFork;
-  uint256 public destinationFork;
-  address public owner;
-  address public alice;
-  IRouterClient public sourceRouter;
-  uint64 public destinationChainSelector;
-  IERC20 public sourceLinkToken;
-
-  uint256 amountToSend = 1_000e18;
-  AaveCcipGhoBridge sourceBridge;
-  AaveCcipGhoBridge destinationBridge;
 
   function setUp() public {
     destinationFork = vm.createSelectFork(vm.rpcUrl('arbitrum'));

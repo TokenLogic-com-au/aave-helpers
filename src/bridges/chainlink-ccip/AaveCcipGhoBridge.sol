@@ -36,6 +36,25 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   /// @dev Address of bridge (chainSelector => bridge address)
   mapping(uint64 selector => address bridge) public bridges;
 
+  /// @dev Checks if the destination bridge has been set up
+  modifier checkDestination(uint64 chainSelector) {
+    if (bridges[chainSelector] == address(0)) {
+      revert UnsupportedChain();
+    }
+    _;
+  }
+
+  /// @dev Check fee token is valid on destination chain
+  modifier checkFeeToken(uint64 chainSelector, address feeToken) {
+    if (feeToken != address(0)) {
+      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = EVM2EVMOnRamp(
+        IRouter(ROUTER).getOnRamp(chainSelector)
+      ).getFeeTokenConfig(feeToken);
+      if (!feeTokenConfig.enabled) revert NotAFeeToken(feeToken);
+    }
+    _;
+  }
+
   /**
    * @param _router The address of the Chainlink CCIP router
    * @param _link The address of the LINK token
@@ -61,25 +80,6 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   }
 
   receive() external payable {}
-
-  /// @dev Checks if the destination bridge has been set up
-  modifier checkDestination(uint64 chainSelector) {
-    if (bridges[chainSelector] == address(0)) {
-      revert UnsupportedChain();
-    }
-    _;
-  }
-
-  /// @dev Check fee token is valid on destination chain
-  modifier checkFeeToken(uint64 chainSelector, address feeToken) {
-    if (feeToken != address(0)) {
-      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = EVM2EVMOnRamp(
-        IRouter(ROUTER).getOnRamp(chainSelector)
-      ).getFeeTokenConfig(feeToken);
-      if (!feeTokenConfig.enabled) revert NotAFeeToken(feeToken);
-    }
-    _;
-  }
 
   /// @inheritdoc IAaveCcipGhoBridge
   function transfer(

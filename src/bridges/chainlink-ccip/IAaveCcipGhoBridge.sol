@@ -4,34 +4,6 @@ pragma solidity ^0.8.0;
 
 interface IAaveCcipGhoBridge {
   /**
-   * @notice Transfers tokens to the destination chain and distributes them
-   * @param destinationChainSelector The selector of the destination chain
-   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
-   * @param amount The amount to transfer
-   * @param feeToken The address of payment token
-   * @return messageId The ID of the cross-chain message
-   */
-  function transfer(
-    uint64 destinationChainSelector,
-    uint256 amount,
-    address feeToken
-  ) external payable returns (bytes32 messageId);
-
-  /**
-   * @notice calculates fee amount to exeucte transfers
-   * @param destinationChainSelector The selector of the destination chain
-   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
-   * @param amount The amount to transfer
-   * @param feeToken The address of payment token
-   * @return fee The amount of fee
-   */
-  function quoteTransfer(
-    uint64 destinationChainSelector,
-    uint256 amount,
-    address feeToken
-  ) external view returns (uint256 fee);
-
-  /**
    * @dev Emits when a new token transfer is issued
    * @param messageId The ID of the cross-chain message
    * @param destinationChainSelector The selector of the destination chain
@@ -47,6 +19,9 @@ interface IAaveCcipGhoBridge {
   /**
    * @dev Emits when the token transfer is executed on the destination chain
    * @param messageId The ID of the cross-chain message
+   * @param from The address of sender on source chain
+   * @param to The address of receiver on destination chain
+   * @param amount The amount of token to translated
    */
   event TransferFinished(
     bytes32 indexed messageId,
@@ -80,4 +55,32 @@ interface IAaveCcipGhoBridge {
   /// @dev Returns this error when fee token is not supported
   /// @param token The address of invalid token
   error NotAFeeToken(address token);
+
+  /**
+   * @notice Transfers tokens to the destination chain and distributes them
+   * @param destinationChainSelector The selector of the destination chain
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+   * @param amount The amount to transfer
+   * @param feeToken The address of payment token
+   * @return messageId The ID of the cross-chain message
+   */
+  function transfer(
+    uint64 destinationChainSelector,
+    uint256 amount,
+    address feeToken
+  ) external payable returns (bytes32 messageId);
+
+  /**
+   * @notice calculates fee amount to exeucte transfers
+   * @param destinationChainSelector The selector of the destination chain
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+   * @param amount The amount to transfer
+   * @param feeToken The address of payment token
+   * @return fee The amount of fee
+   */
+  function quoteTransfer(
+    uint64 destinationChainSelector,
+    uint256 amount,
+    address feeToken
+  ) external view returns (uint256 fee);
 }
