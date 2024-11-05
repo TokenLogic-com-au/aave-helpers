@@ -105,6 +105,28 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     emit TransferIssued(messageId, destinationChainSelector, amount);
   }
 
+  /// @inheritdoc IAaveCcipGhoBridge
+  function quoteBridge(
+    uint64 destinationChainSelector,
+    uint256 amount
+  ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
+    if (amount == 0) {
+      revert InvalidTransferAmount();
+    }
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(bridges[destinationChainSelector]),
+      data: abi.encode(msg.sender),
+      tokenAmounts: tokenAmounts,
+      extraArgs: '',
+      feeToken: GHO
+    });
+
+    fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
+  }
+
   /// @inheritdoc CCIPReceiver
   /// @dev Sends gho to AAVE collector
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
