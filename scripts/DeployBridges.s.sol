@@ -77,8 +77,7 @@ contract DeployAaveCcipGhoBridgeEthereum is EthereumScript {
       CCIP_ROUTER_ETHEREUM,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
-      GovernanceV3Ethereum.EXECUTOR_LVL_1, // owner address
-      MiscEthereum.PROTOCOL_GUARDIAN
+      GovernanceV3Ethereum.EXECUTOR_LVL_1
     );
   }
 }
@@ -93,8 +92,7 @@ contract DeployAaveCcipGhoBridgeArbitrum is ArbitrumScript {
       CCIP_ROUTER_ARBITRUM,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
-      GovernanceV3Arbitrum.EXECUTOR_LVL_1, // owner address
-      MiscArbitrum.PROTOCOL_GUARDIAN
+      GovernanceV3Arbitrum.EXECUTOR_LVL_1
     );
   }
 }

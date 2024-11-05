@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {Test, console} from 'forge-std/Test.sol';
+import {Strings} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Strings.sol';
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {CCIPLocalSimulatorFork, Register} from '@chainlink/local/src/ccip/CCIPLocalSimulatorFork.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
@@ -66,8 +67,7 @@ contract AaveCcipGhoBridgeTest is Test {
       destinationNetworkDetails.routerAddress,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
-      owner,
-      alice
+      owner
     );
 
     vm.selectFork(sourceFork);
@@ -87,21 +87,20 @@ contract AaveCcipGhoBridgeTest is Test {
       sourceNetworkDetails.routerAddress,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
-      owner,
-      alice
+      owner
     );
 
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, amountToSend + 100e18);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amountToSend + 1000e18);
 
-    vm.startPrank(owner);
+    vm.startPrank(alice);
     IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).approve(
       address(sourceBridge),
-      amountToSend + 100e18
+      amountToSend + 1000e18
     );
-
-    vm.deal(owner, 1 ether); // add native funds for native-fee test
+    vm.stopPrank();
 
     vm.selectFork(destinationFork);
+    vm.startPrank(owner);
     destinationBridge.setDestinationBridge(
       sourceNetworkDetails.chainSelector,
       address(sourceBridge)
@@ -120,13 +119,20 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
     sourceBridge.bridge(destinationChainSelector, amountToSend);
   }
 
-  function test_revertsIf_NotOwner() external {
+  function test_revertsIf_NotBridger() external {
     vm.selectFork(sourceFork);
     vm.prank(owner);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
 
     vm.startPrank(alice);
-    vm.expectRevert('Ownable: caller is not the owner');
+    vm.expectRevert(
+      abi.encodePacked(
+        'AccessControl: account ',
+        Strings.toHexString(uint160(alice), 20),
+        ' is missing role ',
+        Strings.toHexString(uint256(sourceBridge.BRIDGER_ROLE()), 32)
+      )
+    );
     sourceBridge.bridge(destinationChainSelector, amountToSend);
   }
 
@@ -134,33 +140,40 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
     vm.selectFork(sourceFork);
     vm.startPrank(owner);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    sourceBridge.grantRole(sourceBridge.BRIDGER_ROLE(), alice);
+    vm.stopPrank();
 
+    vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
     sourceBridge.bridge(destinationChainSelector, 0);
   }
 
   function test_success() external {
     vm.selectFork(destinationFork);
-    vm.startPrank(owner);
 
     uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
       address(AaveV3Arbitrum.COLLECTOR)
     );
 
     vm.selectFork(sourceFork);
+    vm.startPrank(owner);
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    sourceBridge.grantRole(sourceBridge.BRIDGER_ROLE(), alice);
+    vm.stopPrank();
 
+    vm.startPrank(alice);
     vm.expectEmit(false, true, false, true, address(sourceBridge));
     emit TransferIssued(bytes32(0), destinationChainSelector, amountToSend);
     sourceBridge.bridge(destinationChainSelector, amountToSend);
 
     vm.expectEmit(false, true, true, true, address(destinationBridge));
-    emit TransferFinished(bytes32(0), owner, address(AaveV3Arbitrum.COLLECTOR), amountToSend);
+    emit TransferFinished(bytes32(0), alice, address(AaveV3Arbitrum.COLLECTOR), amountToSend);
     ccipLocalSimulatorFork.switchChainAndRouteMessage(destinationFork);
     uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
       address(AaveV3Arbitrum.COLLECTOR)
     );
     assertEq(afterBalance, beforeBalance + amountToSend);
+    vm.stopPrank();
   }
 }
 
@@ -169,7 +182,14 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
     vm.selectFork(sourceFork);
     vm.startPrank(alice);
 
-    vm.expectRevert('Ownable: caller is not the owner');
+    vm.expectRevert(
+      abi.encodePacked(
+        'AccessControl: account ',
+        Strings.toHexString(uint160(alice), 20),
+        ' is missing role ',
+        Strings.toHexString(uint256(sourceBridge.DEFAULT_ADMIN_ROLE()), 32)
+      )
+    );
     sourceBridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
     vm.stopPrank();
   }

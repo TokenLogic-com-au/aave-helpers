@@ -4,10 +4,10 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
 import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
-import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
-import {CCIPReceiver} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
+import {AccessControl, IAccessControl} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/AccessControl.sol';
+import {CCIPReceiver, IAny2EVMMessageReceiver, IERC165} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
 import {IRouter} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouter.sol';
 import {EVM2EVMOnRamp} from '@chainlink/contracts-ccip/src/v0.8/ccip/onRamp/EVM2EVMOnRamp.sol';
@@ -21,8 +21,11 @@ import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
  * @notice Helper contract to bridge GHO using Chainlink CCIP
  * @dev Sends GHO to AAVE collector of destination chain using chainlink CCIP
  */
-contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuardian, Rescuable {
+contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, Rescuable {
   using SafeERC20 for IERC20;
+
+  /// @dev This role defines which users can call bridge functions.
+  bytes32 public constant BRIDGER_ROLE = keccak256('AaveCcipGhoBridge.bridger');
 
   /// @dev Chainlink CCIP router address
   address public immutable ROUTER;
@@ -30,6 +33,8 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   address public immutable GHO;
   /// @dev Aave Collector address
   address public immutable COLLECTOR;
+  /// @dev Aave Executor address
+  address public immutable EXECUTOR;
 
   /// @dev Address of bridge (chainSelector => bridge address)
   mapping(uint64 selector => address bridge) public bridges;
@@ -46,25 +51,36 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
    * @param _router The address of the Chainlink CCIP router
    * @param _gho The address of the GHO token
    * @param _collector The address of collector on same chain
-   * @param _owner The address of the contract owner
-   * @param _guardian The address of guardian
+   * @param _executor The address of the contract executor
    */
   constructor(
     address _router,
     address _gho,
     address _collector,
-    address _owner,
-    address _guardian
+    address _executor
   ) CCIPReceiver(_router) {
     ROUTER = _router;
     GHO = _gho;
     COLLECTOR = _collector;
+    EXECUTOR = _executor;
 
-    _transferOwnership(_owner);
-    _updateGuardian(_guardian);
+    _setupRole(DEFAULT_ADMIN_ROLE, _executor);
+    _setRoleAdmin(BRIDGER_ROLE, DEFAULT_ADMIN_ROLE);
   }
 
   receive() external payable {}
+
+  /**
+   * @dev See {IERC165-supportsInterface}.
+   */
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override(AccessControl, CCIPReceiver) returns (bool) {
+    return
+      interfaceId == type(IAccessControl).interfaceId ||
+      interfaceId == type(IAny2EVMMessageReceiver).interfaceId ||
+      interfaceId == type(IERC165).interfaceId;
+  }
 
   /// @inheritdoc IAaveCcipGhoBridge
   function bridge(
@@ -74,7 +90,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     external
     payable
     checkDestination(destinationChainSelector)
-    onlyOwner
+    onlyRole(BRIDGER_ROLE)
     returns (bytes32 messageId)
   {
     if (amount == 0) {
@@ -157,7 +173,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   function setDestinationBridge(
     uint64 _destinationChainSelector,
     address _bridge
-  ) external onlyOwner {
+  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
     bridges[_destinationChainSelector] = _bridge;
 
     emit DestinationUpdated(_destinationChainSelector, _bridge);
@@ -165,7 +181,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
 
   /// @inheritdoc Rescuable
   function whoCanRescue() public view override returns (address) {
-    return owner();
+    return EXECUTOR;
   }
 
   /// @inheritdoc IRescuableBase
