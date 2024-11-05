@@ -40,8 +40,8 @@ interface IAaveCcipGhoBridge {
   /// @dev Returns this error when the destination chain is not set up
   error UnsupportedChain();
 
-  /// @dev Returns this error when the native fee amount is below the required amount
-  error InsufficientFee();
+  // /// @dev Returns this error when the native fee amount is below the required amount
+  // error InsufficientFee();
 
   /// @dev Returns this error when the total amount is zero
   error InvalidTransferAmount();
@@ -61,26 +61,23 @@ interface IAaveCcipGhoBridge {
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
-   * @param feeToken The address of payment token
    * @return messageId The ID of the cross-chain message
    */
-  function transfer(
+  function bridge(
     uint64 destinationChainSelector,
-    uint256 amount,
-    address feeToken
+    uint256 amount
   ) external payable returns (bytes32 messageId);
 
-  /**
-   * @notice calculates fee amount to exeucte transfers
-   * @param destinationChainSelector The selector of the destination chain
-   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
-   * @param amount The amount to transfer
-   * @param feeToken The address of payment token
-   * @return fee The amount of fee
-   */
-  function quoteTransfer(
-    uint64 destinationChainSelector,
-    uint256 amount,
-    address feeToken
-  ) external view returns (uint256 fee);
+  // /**
+  //  * @notice calculates fee amount to exeucte transfers
+  //  * @param destinationChainSelector The selector of the destination chain
+  //  *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+  //  * @param amount The amount to transfer
+  //  * @return fee The amount of fee
+  //  */
+  // function quoteTransfer(
+  //   uint64 destinationChainSelector,
+  //   uint256 amount,
+  //   address feeToken
+  // ) external view returns (uint256 fee);
 }

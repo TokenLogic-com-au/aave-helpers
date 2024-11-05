@@ -75,7 +75,6 @@ contract DeployAaveCcipGhoBridgeEthereum is EthereumScript {
     bytes32 salt = 'GHO Chainlink CCIP Bridge';
     new AaveCcipGhoBridge{salt: salt}(
       CCIP_ROUTER_ETHEREUM,
-      AaveV3EthereumAssets.LINK_UNDERLYING,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
       GovernanceV3Ethereum.EXECUTOR_LVL_1, // owner address
@@ -92,7 +91,6 @@ contract DeployAaveCcipGhoBridgeArbitrum is ArbitrumScript {
     bytes32 salt = 'GHO Chainlink CCIP Bridge';
     new AaveCcipGhoBridge{salt: salt}(
       CCIP_ROUTER_ARBITRUM,
-      AaveV3ArbitrumAssets.LINK_UNDERLYING,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
       GovernanceV3Arbitrum.EXECUTOR_LVL_1, // owner address

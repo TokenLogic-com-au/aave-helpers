@@ -26,8 +26,6 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
 
   /// @dev Chainlink CCIP router address
   address public immutable ROUTER;
-  /// @dev LINK token address
-  address public immutable LINK;
   /// @dev GHO token address
   address public immutable GHO;
   /// @dev Aave Collector address
@@ -44,34 +42,21 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     _;
   }
 
-  /// @dev Check fee token is valid on destination chain
-  modifier checkFeeToken(uint64 chainSelector, address feeToken) {
-    if (feeToken != address(0)) {
-      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = EVM2EVMOnRamp(
-        IRouter(ROUTER).getOnRamp(chainSelector)
-      ).getFeeTokenConfig(feeToken);
-      if (!feeTokenConfig.enabled) revert NotAFeeToken(feeToken);
-    }
-    _;
-  }
-
   /**
    * @param _router The address of the Chainlink CCIP router
-   * @param _link The address of the LINK token
    * @param _gho The address of the GHO token
+   * @param _collector The address of collector on same chain
    * @param _owner The address of the contract owner
    * @param _guardian The address of guardian
    */
   constructor(
     address _router,
-    address _link,
     address _gho,
     address _collector,
     address _owner,
     address _guardian
   ) CCIPReceiver(_router) {
     ROUTER = _router;
-    LINK = _link;
     GHO = _gho;
     COLLECTOR = _collector;
 
@@ -82,25 +67,20 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
   receive() external payable {}
 
   /// @inheritdoc IAaveCcipGhoBridge
-  function transfer(
+  function bridge(
     uint64 destinationChainSelector,
-    uint256 amount,
-    address feeToken
+    uint256 amount
   )
     external
     payable
     checkDestination(destinationChainSelector)
     onlyOwner
-    checkFeeToken(destinationChainSelector, feeToken)
     returns (bytes32 messageId)
   {
     if (amount == 0) {
       revert InvalidTransferAmount();
     }
 
-    IERC20(GHO).transferFrom(msg.sender, address(this), amount);
-    IERC20(GHO).approve(ROUTER, amount);
-
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
 
@@ -109,63 +89,20 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
       data: abi.encode(msg.sender),
       tokenAmounts: tokenAmounts,
       extraArgs: '',
-      feeToken: feeToken
+      feeToken: GHO
     });
 
     uint256 fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
 
-    if (feeToken != address(0)) {
-      if (feeToken == GHO) {
-        if (IERC20(feeToken).balanceOf(address(this)) < amount + fee) {
-          revert InsufficientFee();
-        }
-      } else {
-        if (IERC20(feeToken).balanceOf(address(this)) < fee) {
-          revert InsufficientFee();
-        }
-      }
-
-      IERC20(feeToken).safeIncreaseAllowance(ROUTER, fee);
-      messageId = IRouterClient(ROUTER).ccipSend(destinationChainSelector, message);
-    } else {
-      if (address(this).balance < fee) {
-        revert InsufficientFee();
-      }
-
-      messageId = IRouterClient(ROUTER).ccipSend{value: fee}(destinationChainSelector, message);
+    uint256 inBalance = IERC20(GHO).balanceOf(address(this));
+    if (inBalance < amount + fee) {
+      IERC20(GHO).transferFrom(msg.sender, address(this), amount + fee - inBalance);
     }
+
+    IERC20(GHO).approve(ROUTER, amount + fee);
+    messageId = IRouterClient(ROUTER).ccipSend(destinationChainSelector, message);
 
     emit TransferIssued(messageId, destinationChainSelector, amount);
-  }
-
-  /// @inheritdoc IAaveCcipGhoBridge
-  function quoteTransfer(
-    uint64 destinationChainSelector,
-    uint256 amount,
-    address feeToken
-  )
-    external
-    view
-    checkDestination(destinationChainSelector)
-    checkFeeToken(destinationChainSelector, feeToken)
-    returns (uint256 fee)
-  {
-    if (amount == 0) {
-      revert InvalidTransferAmount();
-    }
-
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(bridges[destinationChainSelector]),
-      data: abi.encode(msg.sender),
-      tokenAmounts: tokenAmounts,
-      extraArgs: '',
-      feeToken: feeToken
-    });
-
-    fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
   }
 
   /// @inheritdoc CCIPReceiver
