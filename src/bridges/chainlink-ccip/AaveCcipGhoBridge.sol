@@ -115,22 +115,24 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, OwnableWithGuard
     uint256 fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
 
     if (feeToken != address(0)) {
-      IERC20(feeToken).transferFrom(msg.sender, address(this), fee);
+      if (feeToken == GHO) {
+        if (IERC20(feeToken).balanceOf(address(this)) < amount + fee) {
+          revert InsufficientFee();
+        }
+      } else {
+        if (IERC20(feeToken).balanceOf(address(this)) < fee) {
+          revert InsufficientFee();
+        }
+      }
+
       IERC20(feeToken).safeIncreaseAllowance(ROUTER, fee);
       messageId = IRouterClient(ROUTER).ccipSend(destinationChainSelector, message);
     } else {
-      if (msg.value < fee) {
+      if (address(this).balance < fee) {
         revert InsufficientFee();
       }
 
       messageId = IRouterClient(ROUTER).ccipSend{value: fee}(destinationChainSelector, message);
-      if (msg.value > fee) {
-        (bool success, ) = (msg.sender).call{value: (msg.value - fee)}('');
-
-        if (!success) {
-          revert FundTransferBackFailed();
-        }
-      }
     }
 
     emit TransferIssued(messageId, destinationChainSelector, amount);
