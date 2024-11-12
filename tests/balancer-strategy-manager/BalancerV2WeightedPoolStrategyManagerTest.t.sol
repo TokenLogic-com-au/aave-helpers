@@ -8,6 +8,7 @@ import {GovernanceV3Ethereum} from 'aave-address-book/GovernanceV3Ethereum.sol';
 
 import {IBalancerStrategyManager, BalancerV2WeightedPoolStrategyManager} from 'src/balancer-strategy-manager/BalancerV2WeightedPoolStrategyManager.sol';
 
+/// @dev forge test --match-path=tests/balancer-strategy-manager/BalancerV2WeightedPoolStrategyManagerTest.t.sol -vvv
 contract BalancerV2WeightedPoolStrategyManagerTest is Test {
   event PoolBalanceChanged(
     bytes32 indexed poolId,
@@ -78,6 +79,16 @@ contract DepositTest is BalancerV2WeightedPoolStrategyManagerTest {
 
     vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
     strategyManager.deposit(POOL_ID, balances);
+    vm.stopPrank();
+  }
+
+  function test_withInvalidPoolId() public {
+    vm.startPrank(guardian);
+
+    bytes32 invalidPoolId = bytes32(uint256(POOL_ID) + 1);
+
+    vm.expectRevert('BAL#500');
+    strategyManager.deposit(invalidPoolId, balances);
     vm.stopPrank();
   }
 
@@ -160,6 +171,16 @@ contract WithdrawTest is BalancerV2WeightedPoolStrategyManagerTest {
 
     vm.expectRevert('ONLY_BY_OWNER_OR_GUARDIAN');
     strategyManager.withdraw(POOL_ID, bptAmount);
+    vm.stopPrank();
+  }
+
+  function test_withInvalidPoolId() public {
+    vm.startPrank(guardian);
+
+    bytes32 invalidPoolId = bytes32(uint256(POOL_ID) + 1);
+
+    vm.expectRevert('BAL#500');
+    strategyManager.withdraw(invalidPoolId, bptAmount);
     vm.stopPrank();
   }
 
