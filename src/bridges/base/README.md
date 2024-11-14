@@ -8,12 +8,12 @@ The official Base documentation can be found [here](https://docs.base.org).
 
 `function bridge(address token, address l1Token, uint256 amount) external onlyOwner`
 
-Callable on Base. Withdraws an ERC20 from Base to Mainnet. The ERC20 token must be a BaseBurnableERC20 in order to be bridged.
+Callable on source chain. Withdraws an ERC20 from Base to Mainnet. The ERC20 token must be a BaseBurnableERC20 in order to be bridged.
 The first parameter is the token's address on Base, while the second one is the token's equivalent address on Mainnet (ie: USDC on Base and USDC on Mainnet). The last parameter is the amount of tokens to bridge.
 
 `function emergencyTokenTransfer(address erc20Token, address to, uint256 amount) external;`
 
-Callable on Base. In case of emergency can be called by the owner to withdraw tokens from bridge contract back to any address on Base.
+Callable on source chain. In case of emergency can be called by the owner to withdraw tokens from bridge contract back to any address on Base.
 
 ## Proving The Message
 
