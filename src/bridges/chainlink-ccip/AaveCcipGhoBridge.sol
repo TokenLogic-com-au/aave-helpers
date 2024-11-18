@@ -9,8 +9,6 @@ import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/Resc
 import {AccessControl, IAccessControl} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/AccessControl.sol';
 import {CCIPReceiver, IAny2EVMMessageReceiver, IERC165} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
-import {IRouter} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouter.sol';
-import {EVM2EVMOnRamp} from '@chainlink/contracts-ccip/src/v0.8/ccip/onRamp/EVM2EVMOnRamp.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 
 import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
@@ -65,10 +63,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     EXECUTOR = _executor;
 
     _setupRole(DEFAULT_ADMIN_ROLE, _executor);
-    _setRoleAdmin(BRIDGER_ROLE, DEFAULT_ADMIN_ROLE);
   }
-
-  receive() external payable {}
 
   /**
    * @dev See {IERC165-supportsInterface}.

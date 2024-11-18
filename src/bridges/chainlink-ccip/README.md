@@ -1,47 +1,72 @@
+## AaveCcipGhoBridge Smart Contract
+
 ### Overview
-The `AaveCcipGhoBridge` smart contract is a custom implementation designed to facilitate the bridging of GHO tokens between different blockchain networks using [Chainlink's Cross-Chain Interoperability Protocol (CCIP)](https://docs.chain.link/ccip). It enables GHO transfers to the Aave Collector of another chain in a secure and decentralized manner by leveraging Chainlink's infrastructure. Here's an overview of its key features and components:
+
+The `AaveCcipGhoBridge` smart contract facilitates the secure bridging of GHO tokens across different blockchain networks using Chainlink's Cross-Chain Interoperability Protocol (CCIP). By leveraging Chainlink's decentralized infrastructure, it ensures reliable and transparent cross-chain token transfers while using GHO tokens exclusively for fees.
 
 ### Key Components
-1. **Router, LINK, GHO Addresses**:
-   - **`ROUTER`**: The Chainlink CCIP router address used for cross-chain communication.
-   - **`LINK`**: Address of the Chainlink token (LINK), used for paying transaction fees when required.
-   - **`GHO`**: Address of the GHO token, which the contract helps bridge across chains.
 
-2. **Bridges Mapping**: 
-   - A mapping of destination chain selectors (chain identifiers) to the corresponding bridge address on the destination chain.
+1. **Router and GHO Addresses**:
+   - **`ROUTER`**: The Chainlink CCIP router address for cross-chain communication.
+   - **`GHO`**: Address of the GHO token, which the contract bridges across chains.
+
+2. **Bridges Mapping**:
+   - A mapping of destination chain selectors (chain identifiers) to corresponding bridge addresses on the destination chains.
 
 ### Main Functionalities
+
 1. **Token Transfers**:
-   - The contract allows users to transfer GHO tokens from one blockchain to another. It collects all GHO tokens from the sender, validates the transfer, and sends the tokens via Chainlink CCIP to the specified destination chain.
-   - A modifier `checkDestination` ensures the destination chain and bridge are properly configured.
+   - Facilitates secure GHO token transfers between chains.  
+   - Collects GHO tokens from the sender, validates the destination chain and bridge configuration, and transfers the tokens via Chainlink CCIP.  
+   - The `checkDestination` modifier ensures that the destination chain and bridge are properly configured before any transfer.
 
 2. **Fee Payment**:
-   - Users can pay fees in either LINK tokens or native gas tokens of the chain (e.g., ETH).
-   - The contract calculates the required fees via the `IRouterClient.getFee` method and handles fee payments accordingly.
+   - Fees are paid exclusively in GHO tokens.  
+   - Calculates the required fee for a transfer and deducts it directly from the user's GHO balance.
 
 3. **Cross-Chain Message Handling**:
-   - When a cross-chain message is received, the `_ccipReceive` function decodes the message, verifies its authenticity, and releases the corresponding GHO tokens to the specified recipients on the destination chain.
+   - Processes incoming cross-chain messages using the `_ccipReceive` function.  
+   - Decodes the message, verifies its authenticity, and releases the corresponding GHO tokens to the recipient on the destination chain.
 
 4. **Quote Transfer**:
-   - This function, `quoteTransfer`, allows users to estimate the fee required for a token transfer without actually performing the transfer.
+   - The `quoteTransfer` function allows users to estimate the GHO fee required for a transfer without executing the transfer.
 
 5. **Setting Destination Bridges**:
-   - The contract owner can configure or update the bridge addresses for different destination chains through the `setDestinationBridge` function.
+   - The contract owner can configure or update the bridge addresses for different destination chains via the `setDestinationBridge` function.
 
 ### Security Features
-- **Ownable With Guardian Control**: The contract uses OwnableWithGuardian contract to ensure only the owner can configure or update key components like destination bridges and owner or guradian can execute transaction.
-- **Validation**: It checks whether the destination chain and bridge address are valid before executing transfers, ensuring that users cannot send tokens to unsupported chains.
+
+- **Role-Based Access Control**:  
+  Uses `AccessControl` to manage permissions:  
+  - `DEFAULT_ADMIN_ROLE`: Grants administrative rights.  
+  - `BRIDGER_ROLE`: Restricts who can initiate bridging operations.  
+  This ensures that only authorized users can perform critical functions.  
+
+- **Destination Validation**:  
+  The `checkDestination` modifier ensures that the destination chain and bridge address are properly configured before executing transfers.
+
+- **Token Approval Management**:  
+  Securely handles GHO token approvals for the router, mitigating over-approval risks.
+
+- **Rescue Functionality**:  
+  Implements a `Rescuable` mechanism, allowing the `EXECUTOR` to rescue funds in emergencies while maintaining security boundaries.
+
+- **CCIP Sender and Receiver Validation**:  
+  - Verifies messages originate from the correct source bridge using Chainlink CCIP.  
+  - Incoming messages must match the expected sender address for the specified source chain.
 
 ### Events
-- **TransferIssued**: Emitted when a transfer is successfully initiated.
-- **TransferFinished**: Emitted when a transfer completes successfully on the destination chain.
+
+- **TransferIssued**: Emitted when a transfer is successfully initiated.  
+- **TransferFinished**: Emitted when a transfer completes successfully on the destination chain.  
 - **DestinationUpdated**: Emitted when a new bridge address is set for a specific chain.
 
 ### Error Handling
-- **UnsupportedChain**: Thrown when attempting to transfer to an unsupported destination chain.
-- **InvalidTransferAmount**: Thrown when the total amount of tokens to transfer is zero.
-- **InsufficientFee**: Thrown if the provided fee is insufficient to cover the transaction.
-- **InvalidMessage**: Thrown when the message received from a source chain does not come from the expected bridge address.
+
+- **UnsupportedChain**: Thrown when attempting to transfer to an unsupported destination chain.  
+- **InvalidTransferAmount**: Thrown when the total amount of tokens to transfer is zero.  
+- **InsufficientFee**: Thrown if the provided fee is insufficient to cover the transaction.  
+- **InvalidMessage**: Thrown when a message received from a source chain does not come from the expected bridge address.
 
 ### Deployed Addresses
 
