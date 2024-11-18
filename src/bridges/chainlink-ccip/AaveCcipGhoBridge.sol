@@ -102,7 +102,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(bridges[destinationChainSelector]),
-      data: abi.encode(msg.sender),
+      data: '',
       tokenAmounts: tokenAmounts,
       extraArgs: '',
       feeToken: GHO
@@ -118,7 +118,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     IERC20(GHO).approve(ROUTER, amount + fee);
     messageId = IRouterClient(ROUTER).ccipSend(destinationChainSelector, message);
 
-    emit TransferIssued(messageId, destinationChainSelector, amount);
+    emit TransferIssued(messageId, destinationChainSelector, msg.sender, amount);
   }
 
   /// @inheritdoc IAaveCcipGhoBridge
@@ -134,7 +134,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(bridges[destinationChainSelector]),
-      data: abi.encode(msg.sender),
+      data: '',
       tokenAmounts: tokenAmounts,
       extraArgs: '',
       feeToken: GHO
@@ -149,15 +149,13 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     bytes32 messageId = message.messageId;
     Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
 
-    address sender = abi.decode(message.data, (address));
-
     if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
       revert InvalidMessage();
     }
 
     IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
 
-    emit TransferFinished(messageId, sender, COLLECTOR, tokenAmounts[0].amount);
+    emit TransferFinished(messageId, COLLECTOR, tokenAmounts[0].amount);
   }
 
   /**

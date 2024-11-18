@@ -8,27 +8,23 @@ interface IAaveCcipGhoBridge {
    * @param messageId The ID of the cross-chain message
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+   * @param from The address of sender on source chain
    * @param amount The total amount of GHO tokens
    */
   event TransferIssued(
     bytes32 indexed messageId,
     uint64 indexed destinationChainSelector,
+    address indexed from,
     uint256 amount
   );
 
   /**
    * @dev Emits when the token transfer is executed on the destination chain
    * @param messageId The ID of the cross-chain message
-   * @param from The address of sender on source chain
    * @param to The address of receiver on destination chain
    * @param amount The amount of token to translated
    */
-  event TransferFinished(
-    bytes32 indexed messageId,
-    address indexed from,
-    address indexed to,
-    uint256 amount
-  );
+  event TransferFinished(bytes32 indexed messageId, address indexed to, uint256 amount);
 
   /**
    * @dev Emits when the destination bridge data is updated
@@ -45,13 +41,6 @@ interface IAaveCcipGhoBridge {
 
   /// @dev Returns this error when the message comes from an invalid bridge
   error InvalidMessage();
-
-  /// @dev Returns this error when fund transfer to sender returns error
-  error FundTransferBackFailed();
-
-  /// @dev Returns this error when fee token is not supported
-  /// @param token The address of invalid token
-  error NotAFeeToken(address token);
 
   /**
    * @notice Transfers tokens to the destination chain and distributes them
