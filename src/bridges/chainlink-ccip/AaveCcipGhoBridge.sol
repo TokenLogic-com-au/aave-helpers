@@ -155,10 +155,6 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
       revert InvalidMessage();
     }
 
-    // if (tokenAmounts[0].token != GHO || tokenAmounts[0].amount == 0) {
-    //   revert InvalidMessage();
-    // }
-
     IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
 
     emit TransferFinished(messageId, sender, COLLECTOR, tokenAmounts[0].amount);
