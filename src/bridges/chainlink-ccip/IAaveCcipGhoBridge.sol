@@ -40,9 +40,6 @@ interface IAaveCcipGhoBridge {
   /// @dev Returns this error when the destination chain is not set up
   error UnsupportedChain();
 
-  // /// @dev Returns this error when the native fee amount is below the required amount
-  // error InsufficientFee();
-
   /// @dev Returns this error when the total amount is zero
   error InvalidTransferAmount();
 
