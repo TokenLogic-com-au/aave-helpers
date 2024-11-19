@@ -80,7 +80,8 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   /// @inheritdoc IAaveCcipGhoBridge
   function bridge(
     uint64 destinationChainSelector,
-    uint256 amount
+    uint256 amount,
+    uint256 gasLimit
   )
     external
     payable
@@ -88,20 +89,11 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     onlyRole(BRIDGER_ROLE)
     returns (bytes32 messageId)
   {
-    if (amount == 0) {
-      revert InvalidTransferAmount();
-    }
-
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(bridges[destinationChainSelector]),
-      data: '',
-      tokenAmounts: tokenAmounts,
-      extraArgs: '',
-      feeToken: GHO
-    });
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(
+      destinationChainSelector,
+      amount,
+      gasLimit
+    );
 
     uint256 fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
 
@@ -119,23 +111,50 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   /// @inheritdoc IAaveCcipGhoBridge
   function quoteBridge(
     uint64 destinationChainSelector,
-    uint256 amount
+    uint256 amount,
+    uint256 gasLimit
   ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(
+      destinationChainSelector,
+      amount,
+      gasLimit
+    );
+
+    fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
+  }
+
+  function _buildCCIPMessage(
+    uint64 destinationChainSelector,
+    uint256 amount,
+    uint256 gasLimit
+  ) internal view returns (Client.EVM2AnyMessage memory message) {
     if (amount == 0) {
       revert InvalidTransferAmount();
     }
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
 
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(bridges[destinationChainSelector]),
-      data: '',
-      tokenAmounts: tokenAmounts,
-      extraArgs: '',
-      feeToken: GHO
-    });
-
-    fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
+    if (gasLimit == 0) {
+      message = Client.EVM2AnyMessage({
+        receiver: abi.encode(bridges[destinationChainSelector]),
+        data: '',
+        tokenAmounts: tokenAmounts,
+        extraArgs: '',
+        feeToken: GHO
+      });
+    } else {
+      message = Client.EVM2AnyMessage({
+        receiver: abi.encode(bridges[destinationChainSelector]),
+        data: '',
+        tokenAmounts: tokenAmounts,
+        extraArgs: Client._argsToBytes(
+          Client.EVMExtraArgsV1({
+            gasLimit: gasLimit // Gas limit for the callback on the destination chain
+          })
+        ),
+        feeToken: GHO
+      });
+    }
   }
 
   /// @inheritdoc CCIPReceiver

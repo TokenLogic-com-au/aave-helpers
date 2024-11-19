@@ -47,11 +47,13 @@ interface IAaveCcipGhoBridge {
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
+   * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, uses default value
    * @return messageId The ID of the cross-chain message
    */
   function bridge(
     uint64 destinationChainSelector,
-    uint256 amount
+    uint256 amount,
+    uint256 gasLimit
   ) external payable returns (bytes32 messageId);
 
   /**
@@ -59,10 +61,12 @@ interface IAaveCcipGhoBridge {
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
+   * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, uses default value
    * @return fee The amount of fee
    */
   function quoteBridge(
     uint64 destinationChainSelector,
-    uint256 amount
+    uint256 amount,
+    uint256 gasLimit
   ) external view returns (uint256 fee);
 }

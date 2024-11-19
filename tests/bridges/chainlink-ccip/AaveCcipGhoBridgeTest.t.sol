@@ -96,6 +96,18 @@ contract AaveCcipGhoBridgeTest is Test {
     IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).approve(address(arbitrumBridge), type(uint256).max);
     vm.stopPrank();
   }
+
+  function _getMessageFromRecordedLogs() internal returns (Internal.EVM2EVMMessage memory message) {
+    Vm.Log[] memory entries = vm.getRecordedLogs();
+    uint256 length = entries.length;
+    for (uint256 i; i < length; ++i) {
+      if (entries[i].topics[0] == CCIPSendRequested.selector) {
+        message = abi.decode(entries[i].data, (Internal.EVM2EVMMessage));
+      }
+    }
+    // emit event again because getRecordedLogs clear logs once called
+    emit CCIPSendRequested(message);
+  }
 }
 
 contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
@@ -104,7 +116,7 @@ contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    mainnetBridge.bridge(arbitrumChainSelector, amountToSend);
+    mainnetBridge.bridge(arbitrumChainSelector, amountToSend, 0);
   }
 
   function test_revertsIf_NotBridger() external {
@@ -121,7 +133,7 @@ contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
         Strings.toHexString(uint256(mainnetBridge.BRIDGER_ROLE()), 32)
       )
     );
-    mainnetBridge.bridge(arbitrumChainSelector, amountToSend);
+    mainnetBridge.bridge(arbitrumChainSelector, amountToSend, 0);
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
@@ -133,7 +145,7 @@ contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    mainnetBridge.bridge(arbitrumChainSelector, 0);
+    mainnetBridge.bridge(arbitrumChainSelector, 0, 0);
   }
 
   function test_revertsIf_DestinationNotConfigured() external {
@@ -145,13 +157,13 @@ contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
     vm.stopPrank();
 
     vm.selectFork(mainnetFork);
-    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend);
+    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend, 0);
     deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
 
     vm.startPrank(alice);
     vm.expectEmit(false, true, true, true, address(mainnetBridge));
     emit TransferIssued(bytes32(0), arbitrumChainSelector, alice, amountToSend);
-    mainnetBridge.bridge(arbitrumChainSelector, amountToSend);
+    mainnetBridge.bridge(arbitrumChainSelector, amountToSend, 0);
 
     vm.expectRevert();
     ccipLocalSimulatorFork.switchChainAndRouteMessage(arbitrumFork);
@@ -175,24 +187,15 @@ contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
     vm.stopPrank();
 
     vm.selectFork(mainnetFork);
-    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend);
+    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend, 0);
     deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
 
     vm.startPrank(alice);
     vm.expectEmit(false, true, true, true, address(mainnetBridge));
     emit TransferIssued(bytes32(0), arbitrumChainSelector, alice, amountToSend);
-    mainnetBridge.bridge(arbitrumChainSelector, amountToSend);
+    mainnetBridge.bridge(arbitrumChainSelector, amountToSend, 0);
 
-    Internal.EVM2EVMMessage memory message;
-    Vm.Log[] memory entries = vm.getRecordedLogs();
-    uint256 length = entries.length;
-    for (uint256 i; i < length; ++i) {
-      if (entries[i].topics[0] == CCIPSendRequested.selector) {
-        message = abi.decode(entries[i].data, (Internal.EVM2EVMMessage));
-      }
-    }
-    // emit event again because getRecordedLogs clear logs once called
-    emit CCIPSendRequested(message);
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
     vm.expectEmit(true, true, false, true, address(arbitrumBridge));
     emit TransferFinished(message.messageId, address(AaveV3Arbitrum.COLLECTOR), amountToSend);
@@ -211,7 +214,7 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    arbitrumBridge.bridge(mainnetChainSelector, amountToSend);
+    arbitrumBridge.bridge(mainnetChainSelector, amountToSend, 0);
   }
 
   function test_revertsIf_NotBridger() external {
@@ -228,7 +231,7 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
         Strings.toHexString(uint256(arbitrumBridge.BRIDGER_ROLE()), 32)
       )
     );
-    arbitrumBridge.bridge(mainnetChainSelector, amountToSend);
+    arbitrumBridge.bridge(mainnetChainSelector, amountToSend, 0);
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
@@ -240,7 +243,7 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    arbitrumBridge.bridge(mainnetChainSelector, 0);
+    arbitrumBridge.bridge(mainnetChainSelector, 0, 0);
   }
 
   function test_revertsIf_DestinationNotConfigured() external {
@@ -252,13 +255,13 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
     vm.stopPrank();
 
     vm.selectFork(arbitrumFork);
-    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amountToSend);
+    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amountToSend, 0);
     deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
 
     vm.startPrank(alice);
     vm.expectEmit(false, true, true, true, address(arbitrumBridge));
     emit TransferIssued(bytes32(0), mainnetChainSelector, alice, amountToSend);
-    arbitrumBridge.bridge(mainnetChainSelector, amountToSend);
+    arbitrumBridge.bridge(mainnetChainSelector, amountToSend, 0);
 
     vm.expectRevert();
     ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
@@ -283,24 +286,15 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
     vm.stopPrank();
 
     vm.selectFork(arbitrumFork);
-    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amountToSend);
+    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amountToSend, 0);
     deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
 
     vm.startPrank(alice);
     vm.expectEmit(false, true, true, true, address(arbitrumBridge));
     emit TransferIssued(bytes32(0), mainnetChainSelector, alice, amountToSend);
-    arbitrumBridge.bridge(mainnetChainSelector, amountToSend);
+    arbitrumBridge.bridge(mainnetChainSelector, amountToSend, 0);
 
-    Internal.EVM2EVMMessage memory message;
-    Vm.Log[] memory entries = vm.getRecordedLogs();
-    uint256 length = entries.length;
-    for (uint256 i; i < length; ++i) {
-      if (entries[i].topics[0] == CCIPSendRequested.selector) {
-        message = abi.decode(entries[i].data, (Internal.EVM2EVMMessage));
-      }
-    }
-    // emit event again because getRecordedLogs clear logs once called
-    emit CCIPSendRequested(message);
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
     vm.expectEmit(true, true, false, true, address(mainnetBridge));
     emit TransferFinished(message.messageId, address(AaveV3Ethereum.COLLECTOR), amountToSend);
