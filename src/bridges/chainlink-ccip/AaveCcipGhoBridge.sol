@@ -37,10 +37,23 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   /// @dev Address of bridge (chainSelector => bridge address)
   mapping(uint64 selector => address bridge) public bridges;
 
+  /// @dev Saves invalid message
+  mapping(bytes32 messageId => Client.Any2EVMMessage message) private messageContents;
+  /// @dev Saves state of invalid message.
+  mapping(bytes32 messageId => bool failed) public isInvalidMessage;
+
   /// @dev Checks if the destination bridge has been set up
   modifier checkDestination(uint64 chainSelector) {
     if (bridges[chainSelector] == address(0)) {
       revert UnsupportedChain();
+    }
+    _;
+  }
+
+  /// @dev Checks if invalid message exist
+  modifier checkInvalidMessage(bytes32 messageId) {
+    if (!isInvalidMessage[messageId]) {
+      revert MessageNotFound();
     }
     _;
   }
@@ -123,6 +136,34 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
   }
 
+  /// @inheritdoc IAaveCcipGhoBridge
+  function getInvalidMessage(
+    bytes32 messageId
+  ) external view checkInvalidMessage(messageId) returns (Client.Any2EVMMessage memory message) {
+    message = messageContents[messageId];
+  }
+
+  /// @inheritdoc IAaveCcipGhoBridge
+  function handleInvalidMessage(
+    bytes32 messageId,
+    address receiver
+  ) external onlyRole(DEFAULT_ADMIN_ROLE) checkInvalidMessage(messageId) {
+    isInvalidMessage[messageId] = false;
+
+    Client.Any2EVMMessage memory message = messageContents[messageId];
+    Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
+    uint256 length = tokenAmounts.length;
+    for (uint256 i = 0; i < length; ) {
+      IERC20(tokenAmounts[i].token).safeTransfer(receiver, tokenAmounts[i].amount);
+
+      unchecked {
+        ++i;
+      }
+    }
+
+    emit HandledInvalidMessage(messageId);
+  }
+
   function _buildCCIPMessage(
     uint64 destinationChainSelector,
     uint256 amount,
@@ -148,9 +189,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
         data: '',
         tokenAmounts: tokenAmounts,
         extraArgs: Client._argsToBytes(
-          Client.EVMExtraArgsV1({
-            gasLimit: gasLimit // Gas limit for the callback on the destination chain
-          })
+          Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
         ),
         feeToken: GHO
       });
@@ -158,14 +197,26 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   }
 
   /// @inheritdoc CCIPReceiver
+  function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+    bytes32 messageId = message.messageId;
+
+    if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
+      messageContents[messageId] = message;
+      isInvalidMessage[messageId] = true;
+
+      emit ReceivedInvalidMessage(messageId);
+
+      return;
+    }
+
+    _ccipReceive(message);
+  }
+
+  /// @inheritdoc CCIPReceiver
   /// @dev Sends gho to AAVE collector
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     bytes32 messageId = message.messageId;
     Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
-
-    if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
-      revert InvalidMessage();
-    }
 
     IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
 

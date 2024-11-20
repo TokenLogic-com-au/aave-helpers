@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.0;
 
+import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
+
 interface IAaveCcipGhoBridge {
   /**
    * @dev Emits when a new token transfer is issued
@@ -33,14 +35,26 @@ interface IAaveCcipGhoBridge {
    */
   event DestinationUpdated(uint64 indexed chainSelector, address indexed bridge);
 
+  /**
+   * @dev Emits when receive invalid message
+   * @param messageId The id of message
+   */
+  event ReceivedInvalidMessage(bytes32 indexed messageId);
+
+  /**
+   * @dev Emits when receive invalid message
+   * @param messageId The id of message
+   */
+  event HandledInvalidMessage(bytes32 indexed messageId);
+
   /// @dev Returns this error when the destination chain is not set up
   error UnsupportedChain();
 
   /// @dev Returns this error when the total amount is zero
   error InvalidTransferAmount();
 
-  /// @dev Returns this error when the message comes from an invalid bridge
-  error InvalidMessage();
+  /// @dev Returns this error when message not found
+  error MessageNotFound();
 
   /**
    * @notice Transfers tokens to the destination chain and distributes them
@@ -69,4 +83,20 @@ interface IAaveCcipGhoBridge {
     uint256 amount,
     uint256 gasLimit
   ) external view returns (uint256 fee);
+
+  /**
+   * @notice handle invalid message
+   * @param messageId The id of message
+   * @param receiver The address to receive transferred funds
+   */
+  function handleInvalidMessage(bytes32 messageId, address receiver) external;
+
+  /**
+   * @notice Returns content of invalid message
+   * @param messageId The id of message
+   * @return message Message data
+   */
+  function getInvalidMessage(
+    bytes32 messageId
+  ) external view returns (Client.Any2EVMMessage memory message);
 }
