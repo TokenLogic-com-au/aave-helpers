@@ -87,9 +87,8 @@ interface IAaveCcipGhoBridge {
   /**
    * @notice handle invalid message
    * @param messageId The id of message
-   * @param receiver The address to receive transferred funds
    */
-  function handleInvalidMessage(bytes32 messageId, address receiver) external;
+  function handleInvalidMessage(bytes32 messageId) external;
 
   /**
    * @notice Returns content of invalid message

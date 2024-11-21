@@ -145,8 +145,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
 
   /// @inheritdoc IAaveCcipGhoBridge
   function handleInvalidMessage(
-    bytes32 messageId,
-    address receiver
+    bytes32 messageId
   ) external onlyRole(DEFAULT_ADMIN_ROLE) checkInvalidMessage(messageId) {
     isInvalidMessage[messageId] = false;
 
@@ -154,7 +153,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
     uint256 length = tokenAmounts.length;
     for (uint256 i = 0; i < length; ) {
-      IERC20(tokenAmounts[i].token).safeTransfer(receiver, tokenAmounts[i].amount);
+      IERC20(tokenAmounts[i].token).safeTransfer(COLLECTOR, tokenAmounts[i].amount);
 
       unchecked {
         ++i;

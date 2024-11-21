@@ -375,7 +375,7 @@ contract handleInvalidMessageTest is AaveCcipGhoBridgeTest {
         Strings.toHexString(uint256(mainnetBridge.DEFAULT_ADMIN_ROLE()), 32)
       )
     );
-    mainnetBridge.handleInvalidMessage(bytes32(0), alice);
+    mainnetBridge.handleInvalidMessage(bytes32(0));
     vm.stopPrank();
   }
 
@@ -384,7 +384,7 @@ contract handleInvalidMessageTest is AaveCcipGhoBridgeTest {
     vm.startPrank(owner);
 
     vm.expectRevert(IAaveCcipGhoBridge.MessageNotFound.selector);
-    mainnetBridge.handleInvalidMessage(bytes32(0), alice);
+    mainnetBridge.handleInvalidMessage(bytes32(0));
     vm.stopPrank();
   }
 
@@ -394,13 +394,17 @@ contract handleInvalidMessageTest is AaveCcipGhoBridgeTest {
     vm.selectFork(arbitrumFork);
     vm.startPrank(owner);
 
-    uint256 balanceBefore = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(alice);
+    uint256 balanceBefore = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
 
     vm.expectEmit(true, false, false, false, address(arbitrumBridge));
     emit HandledInvalidMessage(message.messageId);
-    arbitrumBridge.handleInvalidMessage(message.messageId, alice);
+    arbitrumBridge.handleInvalidMessage(message.messageId);
 
-    uint256 balanceAfter = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(alice);
+    uint256 balanceAfter = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
 
     assertEq(balanceAfter, balanceBefore + amountToSend);
 
