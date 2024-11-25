@@ -58,6 +58,14 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     _;
   }
 
+  /** @dev Modifier to allow only the contract itself to execute a function.
+   * Throws an exception if called by any account other than the contract itself.
+   */
+  modifier onlySelf() {
+    if (msg.sender != address(this)) revert OnlySelf();
+    _;
+  }
+
   /**
    * @param _router The address of the Chainlink CCIP router
    * @param _gho The address of the GHO token
@@ -208,11 +216,17 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
       return;
     }
 
+    try this.processMessage(message) {} catch {
+      emit FailedToDecodeMessage();
+    }
+  }
+
+  /// @dev wrap _ccipReceive as a external function
+  function processMessage(Client.Any2EVMMessage memory message) external onlySelf {
     _ccipReceive(message);
   }
 
   /// @inheritdoc CCIPReceiver
-  /// @dev Sends gho to AAVE collector
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     bytes32 messageId = message.messageId;
     Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
