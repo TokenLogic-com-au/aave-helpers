@@ -445,3 +445,26 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
     vm.stopPrank();
   }
 }
+
+contract ProcessMessageTest is AaveCcipGhoBridgeTest {
+  function test_reverts() public {
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+
+    // build dummy message for test
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32(0),
+      sourceChainSelector: arbitrumChainSelector,
+      sender: abi.encode(address(0)),
+      data: '',
+      destTokenAmounts: tokenAmounts
+    });
+
+    vm.expectRevert(IAaveCcipGhoBridge.OnlySelf.selector);
+    mainnetBridge.processMessage(message);
+
+    vm.stopPrank();
+  }
+}
