@@ -205,6 +205,13 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
 
   /// @inheritdoc CCIPReceiver
   function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+    try this.processMessage(message) {} catch {
+      emit FailedToDecodeMessage();
+    }
+  }
+
+  /// @dev wrap _ccipReceive as a external function
+  function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
     bytes32 messageId = message.messageId;
 
     if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
@@ -216,13 +223,6 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
       return;
     }
 
-    try this.processMessage(message) {} catch {
-      emit FailedToDecodeMessage();
-    }
-  }
-
-  /// @dev wrap _ccipReceive as a external function
-  function processMessage(Client.Any2EVMMessage memory message) external onlySelf {
     _ccipReceive(message);
   }
 

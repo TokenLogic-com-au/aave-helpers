@@ -11,7 +11,7 @@ import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
 
-import {AaveCcipGhoBridge, IAaveCcipGhoBridge} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
+import {AaveCcipGhoBridge, IAaveCcipGhoBridge, CCIPReceiver} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
 /// @dev forge test --match-path=tests/bridges/chainlink-ccip/*.sol -vvv
 contract AaveCcipGhoBridgeTest is Test {
@@ -464,6 +464,29 @@ contract ProcessMessageTest is AaveCcipGhoBridgeTest {
 
     vm.expectRevert(IAaveCcipGhoBridge.OnlySelf.selector);
     mainnetBridge.processMessage(message);
+
+    vm.stopPrank();
+  }
+}
+
+contract CcipReceiveTest is AaveCcipGhoBridgeTest {
+  function test_reverts() public {
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+
+    // build dummy message for test
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32(0),
+      sourceChainSelector: arbitrumChainSelector,
+      sender: abi.encode(address(0)),
+      data: '',
+      destTokenAmounts: tokenAmounts
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.InvalidRouter.selector, owner));
+    mainnetBridge.ccipReceive(message);
 
     vm.stopPrank();
   }
