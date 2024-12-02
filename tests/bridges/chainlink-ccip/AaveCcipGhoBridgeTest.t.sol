@@ -57,7 +57,10 @@ contract AaveCcipGhoBridgeTest is Test {
       linkAddress: 0xf97f4df75117a78c1A5a0DBb814Af92458539FB4,
       wrappedNativeAddress: 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1,
       ccipBnMAddress: 0xA189971a2c5AcA0DFC5Ee7a2C44a2Ae27b3CF389,
-      ccipLnMAddress: 0x30DeCD269277b8094c00B0bacC3aCaF3fF4Da7fB
+      ccipLnMAddress: 0x30DeCD269277b8094c00B0bacC3aCaF3fF4Da7fB,
+      rmnProxyAddress: 0xC311a21e6fEf769344EB1515588B9d535662a145,
+      registryModuleOwnerCustomAddress: 0x818792C958Ac33C01c58D5026cEc91A86e9071d7,
+      tokenAdminRegistryAddress: 0x39AE1032cF4B334a1Ed41cdD0833bdD7c7E7751E
     });
     ccipLocalSimulatorFork.setNetworkDetails(block.chainid, arbitrumNetworkDetails);
 
@@ -76,7 +79,10 @@ contract AaveCcipGhoBridgeTest is Test {
       linkAddress: 0x514910771AF9Ca656af840dff83E8264EcF986CA,
       wrappedNativeAddress: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
       ccipBnMAddress: 0xA189971a2c5AcA0DFC5Ee7a2C44a2Ae27b3CF389,
-      ccipLnMAddress: 0x30DeCD269277b8094c00B0bacC3aCaF3fF4Da7fB
+      ccipLnMAddress: 0x30DeCD269277b8094c00B0bacC3aCaF3fF4Da7fB,
+      rmnProxyAddress: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
+      registryModuleOwnerCustomAddress: 0x13022e3e6C77524308BD56AEd716E88311b2E533,
+      tokenAdminRegistryAddress: 0xb22764f98dD05c789929716D677382Df22C05Cb6
     });
     ccipLocalSimulatorFork.setNetworkDetails(block.chainid, mainnetDetails);
 

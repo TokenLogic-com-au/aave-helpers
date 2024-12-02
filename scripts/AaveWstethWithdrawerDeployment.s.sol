@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Script} from 'forge-std/Script.sol';
 import {MiscEthereum} from 'aave-address-book/MiscEthereum.sol';
-import {ITransparentProxyFactory} from 'solidity-utils/contracts/transparent-proxy/interfaces/ITransparentProxyFactory.sol';
+import {ITransparentProxyFactory, ProxyAdmin} from 'solidity-utils/contracts/transparent-proxy/interfaces/ITransparentProxyFactory.sol';
 import {AaveWstethWithdrawer} from 'src/asset-manager/AaveWstethWithdrawer.sol';
 
 contract DeployAaveWithdrawer is Script {
@@ -13,7 +13,7 @@ contract DeployAaveWithdrawer is Script {
     address aaveWithdrawer = address(new AaveWstethWithdrawer());
     ITransparentProxyFactory(MiscEthereum.TRANSPARENT_PROXY_FACTORY).create(
       aaveWithdrawer,
-      MiscEthereum.PROXY_ADMIN,
+      ProxyAdmin(MiscEthereum.PROXY_ADMIN),
       abi.encodeWithSelector(AaveWstethWithdrawer.initialize.selector)
     );
 
