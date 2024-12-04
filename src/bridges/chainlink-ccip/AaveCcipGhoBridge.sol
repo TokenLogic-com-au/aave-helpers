@@ -58,8 +58,9 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     _;
   }
 
-  /** @dev Modifier to allow only the contract itself to execute a function.
-   * Throws an exception if called by any account other than the contract itself.
+  /**
+   * @dev Modifier to allow only the contract itself to execute a function.
+   *      Throws an exception if called by any account other than the contract itself.
    */
   modifier onlySelf() {
     if (msg.sender != address(this)) revert OnlySelf();
@@ -171,6 +172,9 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     emit HandledInvalidMessage(messageId);
   }
 
+  /**
+   * @dev Builds ccip message for token transfer
+   */
   function _buildCCIPMessage(
     uint64 destinationChainSelector,
     uint256 amount,

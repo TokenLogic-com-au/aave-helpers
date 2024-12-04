@@ -26,6 +26,7 @@ contract AaveCcipGhoBridgeTest is Test {
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event ReceivedInvalidMessage(bytes32 indexed messageId);
   event HandledInvalidMessage(bytes32 indexed messageId);
+  event FailedToDecodeMessage();
 
   uint64 public constant mainnetChainSelector = 5009297550715157269;
   uint64 public constant arbitrumChainSelector = 4949039107694359620;
@@ -344,6 +345,44 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
     assertEq(afterBalance, beforeBalance + amountToSend, 'Bridged amount not updated correctly');
     vm.stopPrank();
   }
+
+  function test_success_customGasLimit() external {
+    vm.selectFork(mainnetFork);
+
+    uint256 beforeBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Ethereum.COLLECTOR)
+    );
+
+    vm.startPrank(owner);
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(mainnetChainSelector, address(mainnetBridge));
+    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(arbitrumFork);
+    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amountToSend, 300000);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
+
+    vm.startPrank(alice);
+    vm.expectEmit(false, true, true, true, address(arbitrumBridge));
+    emit TransferIssued(bytes32(0), mainnetChainSelector, alice, amountToSend);
+    arbitrumBridge.bridge(mainnetChainSelector, amountToSend, 300000);
+
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
+
+    vm.expectEmit(true, true, false, true, address(mainnetBridge));
+    emit TransferFinished(message.messageId, address(AaveV3Ethereum.COLLECTOR), amountToSend);
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
+    uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Ethereum.COLLECTOR)
+    );
+    assertEq(afterBalance, beforeBalance + amountToSend, 'Bridged amount not updated correctly');
+    vm.stopPrank();
+  }
 }
 
 contract handleInvalidMessageTest is AaveCcipGhoBridgeTest {
@@ -476,7 +515,7 @@ contract ProcessMessageTest is AaveCcipGhoBridgeTest {
 }
 
 contract CcipReceiveTest is AaveCcipGhoBridgeTest {
-  function test_reverts() public {
+  function test_reverts_InvalidRouter() public {
     vm.startPrank(owner);
     vm.selectFork(mainnetFork);
 
@@ -493,6 +532,118 @@ contract CcipReceiveTest is AaveCcipGhoBridgeTest {
 
     vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.InvalidRouter.selector, owner));
     mainnetBridge.ccipReceive(message);
+
+    vm.stopPrank();
+  }
+
+  function test_successWith_FailedToDecodeMessage() public {
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+
+    // build dummy message for test
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32(0),
+      sourceChainSelector: arbitrumChainSelector,
+      sender: abi.encode(address(0)),
+      data: '',
+      destTokenAmounts: tokenAmounts
+    });
+    vm.stopPrank();
+
+    vm.startPrank(mainnetBridge.ROUTER());
+
+    vm.expectEmit(address(mainnetBridge));
+    emit FailedToDecodeMessage();
+    mainnetBridge.ccipReceive(message);
+
+    vm.stopPrank();
+  }
+}
+
+contract QuoteTransferTest is AaveCcipGhoBridgeTest {
+  function test_revertsIf_UnsupportedChain() external {
+    vm.selectFork(mainnetFork);
+
+    vm.startPrank(alice);
+    vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
+    mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend, 0);
+  }
+
+  function test_revertsIf_InvalidTransferAmount() external {
+    vm.selectFork(mainnetFork);
+    vm.startPrank(owner);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+    vm.stopPrank();
+
+    vm.startPrank(alice);
+    vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
+    mainnetBridge.quoteBridge(arbitrumChainSelector, 0, 0);
+  }
+
+  function test_success() external {
+    vm.selectFork(mainnetFork);
+    vm.startPrank(owner);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+    vm.stopPrank();
+
+    vm.startPrank(alice);
+    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend, 0);
+
+    assertGt(fee, 0);
+  }
+}
+
+contract RescuableTest is AaveCcipGhoBridgeTest {
+  function test_assert() external {
+    vm.selectFork(mainnetFork);
+    assertEq(mainnetBridge.whoCanRescue(), owner);
+    assertEq(mainnetBridge.maxRescue(address(0)), type(uint256).max);
+  }
+}
+
+contract GetInvalidMessage is AaveCcipGhoBridgeTest {
+  function _buildInvalidMessage() internal returns (Internal.EVM2EVMMessage memory) {
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+
+    vm.stopPrank();
+
+    vm.selectFork(mainnetFork);
+    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amountToSend, 0);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
+
+    vm.startPrank(alice);
+    mainnetBridge.bridge(arbitrumChainSelector, amountToSend, 0);
+
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
+
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(arbitrumFork);
+
+    return message;
+  }
+
+  function test_revertIf_MessageNotFound() external {
+    vm.selectFork(mainnetFork);
+    vm.startPrank(owner);
+
+    vm.expectRevert(IAaveCcipGhoBridge.MessageNotFound.selector);
+    mainnetBridge.getInvalidMessage(bytes32(0));
+    vm.stopPrank();
+  }
+
+  function test_success() external {
+    Internal.EVM2EVMMessage memory message = _buildInvalidMessage();
+
+    vm.selectFork(arbitrumFork);
+    vm.startPrank(owner);
+
+    arbitrumBridge.getInvalidMessage(message.messageId);
 
     vm.stopPrank();
   }
