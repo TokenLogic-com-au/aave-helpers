@@ -26,7 +26,6 @@ contract AaveCcipGhoBridgeTest is Test {
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event ReceivedInvalidMessage(bytes32 indexed messageId);
   event HandledInvalidMessage(bytes32 indexed messageId);
-  event FailedToDecodeMessage();
 
   uint64 public constant mainnetChainSelector = 5009297550715157269;
   uint64 public constant arbitrumChainSelector = 4949039107694359620;
@@ -536,7 +535,7 @@ contract CcipReceiveTest is AaveCcipGhoBridgeTest {
     vm.stopPrank();
   }
 
-  function test_successWith_FailedToDecodeMessage() public {
+  function test_successWith_ReceivedInvalidMessage() public {
     vm.startPrank(owner);
     vm.selectFork(mainnetFork);
 
@@ -555,7 +554,7 @@ contract CcipReceiveTest is AaveCcipGhoBridgeTest {
     vm.startPrank(mainnetBridge.ROUTER());
 
     vm.expectEmit(address(mainnetBridge));
-    emit FailedToDecodeMessage();
+    emit ReceivedInvalidMessage(bytes32(0));
     mainnetBridge.ccipReceive(message);
 
     vm.stopPrank();

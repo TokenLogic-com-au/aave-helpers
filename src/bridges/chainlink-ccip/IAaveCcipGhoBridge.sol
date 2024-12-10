@@ -47,11 +47,6 @@ interface IAaveCcipGhoBridge {
    */
   event HandledInvalidMessage(bytes32 indexed messageId);
 
-  /**
-   * @dev Emits when message decoding failed
-   */
-  event FailedToDecodeMessage();
-
   /// @dev Returns this error when the destination chain is not set up
   error UnsupportedChain();
 

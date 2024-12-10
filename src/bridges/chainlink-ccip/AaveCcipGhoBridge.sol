@@ -145,6 +145,63 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
   }
 
+  /**
+   * @dev Builds ccip message for token transfer
+   */
+  function _buildCCIPMessage(
+    uint64 destinationChainSelector,
+    uint256 amount,
+    uint256 gasLimit
+  ) internal view returns (Client.EVM2AnyMessage memory message) {
+    if (amount == 0) {
+      revert InvalidTransferAmount();
+    }
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
+
+    message = Client.EVM2AnyMessage({
+      receiver: abi.encode(bridges[destinationChainSelector]),
+      data: '',
+      tokenAmounts: tokenAmounts,
+      extraArgs: gasLimit == 0
+        ? bytes('')
+        : Client._argsToBytes(
+          Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
+        ),
+      feeToken: GHO
+    });
+  }
+
+  /// @inheritdoc CCIPReceiver
+  function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+    try this.processMessage(message) {} catch {
+      bytes32 messageId = message.messageId;
+      messageContents[messageId] = message;
+      isInvalidMessage[messageId] = true;
+
+      emit ReceivedInvalidMessage(messageId);
+    }
+  }
+
+  /// @dev wrap _ccipReceive as a external function
+  function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
+    if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
+      revert();
+    }
+
+    _ccipReceive(message);
+  }
+
+  /// @inheritdoc CCIPReceiver
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
+    bytes32 messageId = message.messageId;
+    Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
+
+    IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
+
+    emit TransferFinished(messageId, COLLECTOR, tokenAmounts[0].amount);
+  }
+
   /// @inheritdoc IAaveCcipGhoBridge
   function getInvalidMessage(
     bytes32 messageId
@@ -170,74 +227,6 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     }
 
     emit HandledInvalidMessage(messageId);
-  }
-
-  /**
-   * @dev Builds ccip message for token transfer
-   */
-  function _buildCCIPMessage(
-    uint64 destinationChainSelector,
-    uint256 amount,
-    uint256 gasLimit
-  ) internal view returns (Client.EVM2AnyMessage memory message) {
-    if (amount == 0) {
-      revert InvalidTransferAmount();
-    }
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: GHO, amount: amount});
-
-    if (gasLimit == 0) {
-      message = Client.EVM2AnyMessage({
-        receiver: abi.encode(bridges[destinationChainSelector]),
-        data: '',
-        tokenAmounts: tokenAmounts,
-        extraArgs: '',
-        feeToken: GHO
-      });
-    } else {
-      message = Client.EVM2AnyMessage({
-        receiver: abi.encode(bridges[destinationChainSelector]),
-        data: '',
-        tokenAmounts: tokenAmounts,
-        extraArgs: Client._argsToBytes(
-          Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
-        ),
-        feeToken: GHO
-      });
-    }
-  }
-
-  /// @inheritdoc CCIPReceiver
-  function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
-    try this.processMessage(message) {} catch {
-      emit FailedToDecodeMessage();
-    }
-  }
-
-  /// @dev wrap _ccipReceive as a external function
-  function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
-    bytes32 messageId = message.messageId;
-
-    if (bridges[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
-      messageContents[messageId] = message;
-      isInvalidMessage[messageId] = true;
-
-      emit ReceivedInvalidMessage(messageId);
-
-      return;
-    }
-
-    _ccipReceive(message);
-  }
-
-  /// @inheritdoc CCIPReceiver
-  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
-    bytes32 messageId = message.messageId;
-    Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
-
-    IERC20(GHO).transfer(COLLECTOR, tokenAmounts[0].amount);
-
-    emit TransferFinished(messageId, COLLECTOR, tokenAmounts[0].amount);
   }
 
   /**
