@@ -59,18 +59,23 @@ interface IAaveCcipGhoBridge {
   /// @dev Emits when a function is called outside of the contract itself.
   error OnlySelf();
 
+  /// @dev Emits when native fee is insufficient
+  error InsufficientNativeFee();
+
   /**
    * @notice Transfers tokens to the destination chain and distributes them
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
    * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, uses default value
+   * @param feeToken The address of fee token
    * @return messageId The ID of the cross-chain message
    */
   function bridge(
     uint64 destinationChainSelector,
     uint256 amount,
-    uint256 gasLimit
+    uint256 gasLimit,
+    address feeToken
   ) external payable returns (bytes32 messageId);
 
   /**
@@ -79,12 +84,14 @@ interface IAaveCcipGhoBridge {
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
    * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, uses default value
+   * @param feeToken The address of fee token
    * @return fee The amount of fee
    */
   function quoteBridge(
     uint64 destinationChainSelector,
     uint256 amount,
-    uint256 gasLimit
+    uint256 gasLimit,
+    address feeToken
   ) external view returns (uint256 fee);
 
   /**

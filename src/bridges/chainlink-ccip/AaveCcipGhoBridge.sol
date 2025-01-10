@@ -103,7 +103,8 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   function bridge(
     uint64 destinationChainSelector,
     uint256 amount,
-    uint256 gasLimit
+    uint256 gasLimit,
+    address feeToken
   )
     external
     payable
@@ -114,32 +115,53 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     Client.EVM2AnyMessage memory message = _buildCCIPMessage(
       destinationChainSelector,
       amount,
-      gasLimit
+      gasLimit,
+      feeToken
     );
 
     uint256 fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
 
     uint256 inBalance = IERC20(GHO).balanceOf(address(this));
-    if (inBalance < amount + fee) {
-      IERC20(GHO).transferFrom(msg.sender, address(this), amount + fee - inBalance);
+    uint256 totalGhoAmount = amount;
+
+    if (feeToken == address(0)) {
+      if (msg.value < fee) revert InsufficientNativeFee();
+    } else if (feeToken == GHO) {
+      totalGhoAmount += fee;
+    } else {
+      IERC20(feeToken).transferFrom(msg.sender, address(this), fee);
+      IERC20(feeToken).approve(ROUTER, fee);
     }
 
-    IERC20(GHO).approve(ROUTER, amount + fee);
-    messageId = IRouterClient(ROUTER).ccipSend(destinationChainSelector, message);
+    if (inBalance < totalGhoAmount) {
+      IERC20(GHO).transferFrom(msg.sender, address(this), totalGhoAmount - inBalance);
+    }
+    IERC20(GHO).approve(ROUTER, totalGhoAmount);
+
+    messageId = IRouterClient(ROUTER).ccipSend{value: feeToken == address(0) ? fee : 0}(
+      destinationChainSelector,
+      message
+    );
 
     emit TransferIssued(messageId, destinationChainSelector, msg.sender, amount);
+
+    if (msg.value > fee) {
+      payable(msg.sender).call{value: msg.value - fee}('');
+    }
   }
 
   /// @inheritdoc IAaveCcipGhoBridge
   function quoteBridge(
     uint64 destinationChainSelector,
     uint256 amount,
-    uint256 gasLimit
+    uint256 gasLimit,
+    address feeToken
   ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
     Client.EVM2AnyMessage memory message = _buildCCIPMessage(
       destinationChainSelector,
       amount,
-      gasLimit
+      gasLimit,
+      feeToken
     );
 
     fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
@@ -151,7 +173,8 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   function _buildCCIPMessage(
     uint64 destinationChainSelector,
     uint256 amount,
-    uint256 gasLimit
+    uint256 gasLimit,
+    address feeToken
   ) internal view returns (Client.EVM2AnyMessage memory message) {
     if (amount == 0) {
       revert InvalidTransferAmount();
@@ -168,7 +191,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
         : Client._argsToBytes(
           Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
         ),
-      feeToken: GHO
+      feeToken: feeToken
     });
   }
 
