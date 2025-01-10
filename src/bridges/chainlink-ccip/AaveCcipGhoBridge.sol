@@ -143,11 +143,15 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
       message
     );
 
-    emit TransferIssued(messageId, destinationChainSelector, msg.sender, amount);
-
-    if (msg.value > fee) {
-      payable(msg.sender).call{value: msg.value - fee}('');
+    if (feeToken == address(0)) {
+      if (msg.value > fee) {
+        payable(msg.sender).call{value: msg.value - fee}('');
+      }
+    } else {
+      payable(msg.sender).call{value: msg.value}('');
     }
+
+    emit TransferIssued(messageId, destinationChainSelector, msg.sender, amount);
   }
 
   /// @inheritdoc IAaveCcipGhoBridge
@@ -189,7 +193,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
       extraArgs: gasLimit == 0
         ? bytes('')
         : Client._argsToBytes(
-          Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
+          Client.EVMExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
         ),
       feeToken: feeToken
     });

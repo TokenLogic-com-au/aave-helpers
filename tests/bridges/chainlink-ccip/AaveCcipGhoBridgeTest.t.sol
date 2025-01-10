@@ -130,7 +130,7 @@ contract AaveCcipGhoBridgeTest is Test {
   }
 }
 
-contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
+contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTest {
   address public feeToken = AaveV3EthereumAssets.GHO_UNDERLYING;
 
   function test_revertsIf_UnsupportedChain() external {
@@ -240,7 +240,7 @@ contract BridgeTokenEthToArb is AaveCcipGhoBridgeTest {
   }
 }
 
-contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
+contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTest {
   address public feeToken = address(0);
 
   function test_revertsIf_UnsupportedChain() external {
@@ -278,6 +278,25 @@ contract BridgeTokenArbToEth is AaveCcipGhoBridgeTest {
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
     arbitrumBridge.bridge(mainnetChainSelector, 0, 0, feeToken);
+  }
+
+  function test_revertsIf_InsufficientNativeFee() external {
+    vm.startPrank(owner);
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(mainnetChainSelector, address(mainnetBridge));
+    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
+
+    vm.stopPrank();
+
+    vm.selectFork(arbitrumFork);
+    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amountToSend, 0, feeToken);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amountToSend);
+    deal(alice, fee);
+
+    vm.startPrank(alice);
+    vm.expectRevert(IAaveCcipGhoBridge.InsufficientNativeFee.selector);
+    arbitrumBridge.bridge(mainnetChainSelector, amountToSend, 0, feeToken);
+    vm.stopPrank();
   }
 
   function test_revertsIf_DestinationNotConfigured() external {
