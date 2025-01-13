@@ -56,11 +56,14 @@ interface IAaveCcipGhoBridge {
   /// @dev Returns this error when message not found
   error MessageNotFound();
 
-  /// @dev Emits when a function is called outside of the contract itself.
+  /// @dev Return this error when a function is called outside of the contract itself.
   error OnlySelf();
 
-  /// @dev Emits when native fee is insufficient
+  /// @dev Return this error when native fee is insufficient
   error InsufficientNativeFee();
+
+  /// @dev return this error when fee token is not gho or native
+  error InvalidFeeToken();
 
   /**
    * @notice Transfers tokens to the destination chain and distributes them
@@ -107,5 +110,5 @@ interface IAaveCcipGhoBridge {
    */
   function getInvalidMessage(
     bytes32 messageId
-  ) external view returns (Client.Any2EVMMessage memory message);
+  ) external view returns (Client.EVMTokenAmount[] memory message);
 }

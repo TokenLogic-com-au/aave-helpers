@@ -38,7 +38,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   mapping(uint64 selector => address bridge) public bridges;
 
   /// @dev Saves invalid message
-  mapping(bytes32 messageId => Client.Any2EVMMessage message) private messageContents;
+  mapping(bytes32 messageId => Client.EVMTokenAmount[] message) private invalidTokenTransfers;
   /// @dev Saves state of invalid message.
   mapping(bytes32 messageId => bool failed) public isInvalidMessage;
 
@@ -129,8 +129,9 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     } else if (feeToken == GHO) {
       totalGhoAmount += fee;
     } else {
-      IERC20(feeToken).transferFrom(msg.sender, address(this), fee);
-      IERC20(feeToken).approve(ROUTER, fee);
+      // IERC20(feeToken).transferFrom(msg.sender, address(this), fee);
+      // IERC20(feeToken).approve(ROUTER, fee);
+      revert InvalidFeeToken();
     }
 
     if (inBalance < totalGhoAmount) {
@@ -145,10 +146,10 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
 
     if (feeToken == address(0)) {
       if (msg.value > fee) {
-        payable(msg.sender).call{value: msg.value - fee}('');
+        payable(msg.sender).transfer(msg.value - fee);
       }
     } else {
-      payable(msg.sender).call{value: msg.value}('');
+      payable(msg.sender).transfer(msg.value);
     }
 
     emit TransferIssued(messageId, destinationChainSelector, msg.sender, amount);
@@ -203,7 +204,16 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
     try this.processMessage(message) {} catch {
       bytes32 messageId = message.messageId;
-      messageContents[messageId] = message;
+
+      Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
+      uint256 length = tokenAmounts.length;
+      for (uint256 i = 0; i < length; ) {
+        invalidTokenTransfers[messageId].push(tokenAmounts[i]);
+
+        unchecked {
+          ++i;
+        }
+      }
       isInvalidMessage[messageId] = true;
 
       emit ReceivedInvalidMessage(messageId);
@@ -232,8 +242,22 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   /// @inheritdoc IAaveCcipGhoBridge
   function getInvalidMessage(
     bytes32 messageId
-  ) external view checkInvalidMessage(messageId) returns (Client.Any2EVMMessage memory message) {
-    message = messageContents[messageId];
+  )
+    external
+    view
+    checkInvalidMessage(messageId)
+    returns (Client.EVMTokenAmount[] memory tokenAmounts)
+  {
+    uint256 length = invalidTokenTransfers[messageId].length;
+    tokenAmounts = new Client.EVMTokenAmount[](length);
+
+    for (uint256 i = 0; i < length; ) {
+      tokenAmounts[i] = invalidTokenTransfers[messageId][i];
+
+      unchecked {
+        ++i;
+      }
+    }
   }
 
   /// @inheritdoc IAaveCcipGhoBridge
@@ -242,8 +266,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
   ) external onlyRole(DEFAULT_ADMIN_ROLE) checkInvalidMessage(messageId) {
     isInvalidMessage[messageId] = false;
 
-    Client.Any2EVMMessage memory message = messageContents[messageId];
-    Client.EVMTokenAmount[] memory tokenAmounts = message.destTokenAmounts;
+    Client.EVMTokenAmount[] memory tokenAmounts = invalidTokenTransfers[messageId];
     uint256 length = tokenAmounts.length;
     for (uint256 i = 0; i < length; ) {
       IERC20(tokenAmounts[i].token).safeTransfer(COLLECTOR, tokenAmounts[i].amount);
