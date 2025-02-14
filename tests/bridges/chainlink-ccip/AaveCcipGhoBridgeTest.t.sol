@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Test, console, Vm} from 'forge-std/Test.sol';
 import {Strings} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Strings.sol';
-import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {CCIPLocalSimulatorFork, Register, Internal} from '@chainlink/local/src/ccip/CCIPLocalSimulatorFork.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
