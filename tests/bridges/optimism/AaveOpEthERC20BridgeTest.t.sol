@@ -3,10 +3,12 @@
 pragma solidity ^0.8.0;
 
 import {Test} from 'forge-std/Test.sol';
-import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
+import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Optimism, AaveV3OptimismAssets} from 'aave-address-book/AaveV3Optimism.sol';
 import {GovernanceV3Optimism} from 'aave-address-book/GovernanceV3Optimism.sol';
+import {IRescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 
 import {AaveOpEthERC20Bridge} from 'src/bridges/optimism/AaveOpEthERC20Bridge.sol';
 import {IAaveOpEthERC20Bridge} from 'src/bridges/optimism/IAaveOpEthERC20Bridge.sol';
@@ -53,7 +55,9 @@ contract BridgeTest is AaveOpEthERC20BridgeTest {
 
     bridge.transferOwnership(GovernanceV3Optimism.EXECUTOR_LVL_1);
 
-    vm.expectRevert('Ownable: caller is not the owner');
+    vm.expectRevert(
+      abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this))
+    );
     bridge.bridge(
       AaveV3OptimismAssets.USDC_UNDERLYING,
       AaveV3EthereumAssets.USDC_UNDERLYING,
@@ -88,8 +92,9 @@ contract BridgeTest is AaveOpEthERC20BridgeTest {
 
 contract TransferOwnership is AaveOpEthERC20BridgeTest {
   function test_revertsIf_invalidCaller() public {
-    vm.startPrank(makeAddr('random-caller'));
-    vm.expectRevert('Ownable: caller is not the owner');
+    address addr = makeAddr('random-caller');
+    vm.startPrank(addr);
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, addr));
     bridge.transferOwnership(makeAddr('new-admin'));
     vm.stopPrank();
   }
@@ -104,7 +109,7 @@ contract TransferOwnership is AaveOpEthERC20BridgeTest {
 
 contract EmergencyTokenTransfer is AaveOpEthERC20BridgeTest {
   function test_revertsIf_invalidCaller() public {
-    vm.expectRevert('ONLY_RESCUE_GUARDIAN');
+    vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
     vm.startPrank(makeAddr('random-caller'));
     bridge.emergencyTokenTransfer(
       AaveV3OptimismAssets.USDC_UNDERLYING,

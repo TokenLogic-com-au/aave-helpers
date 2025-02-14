@@ -2,11 +2,13 @@
 pragma solidity ^0.8.0;
 
 import {Test} from 'forge-std/Test.sol';
-import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
+import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbitrum.sol';
 import {GovernanceV3Ethereum} from 'aave-address-book/GovernanceV3Ethereum.sol';
 import {GovernanceV3Arbitrum} from 'aave-address-book/GovernanceV3Arbitrum.sol';
+import {IRescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 
 import {AaveArbEthERC20Bridge} from '../../../src/bridges/arbitrum/AaveArbEthERC20Bridge.sol';
 import {IAaveArbEthERC20Bridge} from '../../../src/bridges/arbitrum/IAaveArbEthERC20Bridge.sol';
@@ -72,7 +74,9 @@ contract BridgeTest is AaveArbEthERC20BridgeTest {
 
     bridgeArbitrum.transferOwnership(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
 
-    vm.expectRevert('Ownable: caller is not the owner');
+    vm.expectRevert(
+      abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this))
+    );
     bridgeArbitrum.bridge(
       AaveV3ArbitrumAssets.USDC_UNDERLYING,
       AaveV3EthereumAssets.USDC_UNDERLYING,
@@ -93,10 +97,9 @@ contract BridgeTest is AaveArbEthERC20BridgeTest {
     bridgeArbitrum.transferOwnership(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
 
     vm.startPrank(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
-    
 
     ArbSysMock arbsys = new ArbSysMock();
-        vm.etch(address(0x0000000000000000000000000000000000000064), address(arbsys).code);
+    vm.etch(address(0x0000000000000000000000000000000000000064), address(arbsys).code);
 
     vm.expectEmit();
     emit Bridge(AaveV3ArbitrumAssets.USDC_UNDERLYING, amount);
@@ -113,7 +116,7 @@ contract BridgeTest is AaveArbEthERC20BridgeTest {
 
 contract EmergencyTokenTransfer is AaveArbEthERC20BridgeTest {
   function test_revertsIf_invalidCaller() public {
-    vm.expectRevert('ONLY_RESCUE_GUARDIAN');
+    vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
     vm.startPrank(makeAddr('random-caller'));
     bridgeArbitrum.emergencyTokenTransfer(
       AaveV3ArbitrumAssets.LINK_UNDERLYING,
@@ -261,8 +264,9 @@ contract ExitTest is AaveArbEthERC20BridgeTest {
 
 contract TransferOwnership is AaveArbEthERC20BridgeTest {
   function test_revertsIf_invalidCaller() public {
-    vm.startPrank(makeAddr('random-caller'));
-    vm.expectRevert('Ownable: caller is not the owner');
+    address addr = makeAddr('random-caller');
+    vm.startPrank(addr);
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, addr));
     bridgeMainnet.transferOwnership(makeAddr('new-admin'));
     vm.stopPrank();
   }

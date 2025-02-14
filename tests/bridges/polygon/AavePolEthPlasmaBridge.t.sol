@@ -3,13 +3,15 @@
 pragma solidity ^0.8.0;
 
 import {Test} from 'forge-std/Test.sol';
-import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
+import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV2Polygon, AaveV2PolygonAssets} from 'aave-address-book/AaveV2Polygon.sol';
 import {AaveV3Polygon, AaveV3PolygonAssets} from 'aave-address-book/AaveV3Polygon.sol';
 import {MiscEthereum} from 'aave-address-book/MiscEthereum.sol';
 import {GovernanceV3Ethereum} from 'aave-address-book/GovernanceV3Ethereum.sol';
 import {GovernanceV3Polygon} from 'aave-address-book/GovernanceV3Polygon.sol';
+import {IRescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 
 import {AavePolEthPlasmaBridge} from 'src/bridges/polygon/AavePolEthPlasmaBridge.sol';
 import {IAavePolEthPlasmaBridge} from 'src/bridges/polygon/IAavePolEthPlasmaBridge.sol';
@@ -61,7 +63,9 @@ contract BridgeTest is AavePolEthPlasmaBridgeTest {
 
     bridgePolygon.transferOwnership(GovernanceV3Polygon.EXECUTOR_LVL_1);
 
-    vm.expectRevert('Ownable: caller is not the owner');
+    vm.expectRevert(
+      abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this))
+    );
     bridgePolygon.bridge(amount);
   }
 
@@ -84,8 +88,9 @@ contract BridgeTest is AavePolEthPlasmaBridgeTest {
 
 contract TransferOwnership is AavePolEthPlasmaBridgeTest {
   function test_revertsIf_invalidCaller() public {
-    vm.startPrank(makeAddr('random-caller'));
-    vm.expectRevert('Ownable: caller is not the owner');
+    address addr = makeAddr('random-caller');
+    vm.startPrank(addr);
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, addr));
     bridgeMainnet.transferOwnership(makeAddr('new-admin'));
     vm.stopPrank();
   }
@@ -118,9 +123,7 @@ contract WithdrawToCollectorTest is AavePolEthPlasmaBridgeTest {
     uint256 balanceCollectorBefore = IERC20(MATIC_MAINNET).balanceOf(
       address(AaveV3Ethereum.COLLECTOR)
     );
-    uint256 balanceBridgeBefore = IERC20(MATIC_MAINNET).balanceOf(
-      address(bridgeMainnet)
-    );
+    uint256 balanceBridgeBefore = IERC20(MATIC_MAINNET).balanceOf(address(bridgeMainnet));
 
     assertEq(balanceBridgeBefore, amount);
 
@@ -136,7 +139,7 @@ contract WithdrawToCollectorTest is AavePolEthPlasmaBridgeTest {
 
 contract EmergencyTokenTransfer is AavePolEthPlasmaBridgeTest {
   function test_revertsIf_invalidCaller() public {
-    vm.expectRevert('ONLY_RESCUE_GUARDIAN');
+    vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
     vm.startPrank(makeAddr('random-caller'));
     bridgePolygon.emergencyTokenTransfer(
       AaveV2PolygonAssets.BAL_UNDERLYING,
@@ -207,7 +210,7 @@ contract ExitTest is AavePolEthPlasmaBridgeTest {
 /// The TX can be found here: https://etherscan.io/tx/0x75849d87d15d6a5837c29e2d97a10a442fa71bee50c8cb8ddc01058a474e581e
 contract ForkedBridgeTests is Test {
   event ConfirmExit(bytes proof);
-  
+
   function test_successful() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), 19419577); // One block before an actual exit
 
