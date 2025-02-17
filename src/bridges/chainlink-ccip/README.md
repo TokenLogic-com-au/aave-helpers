@@ -21,7 +21,7 @@ The `AaveCcipGhoBridge` smart contract facilitates the secure bridging of GHO to
    - The `checkDestination` modifier ensures that the destination chain and bridge are properly configured before any transfer.
 
 2. **Fee Payment**:
-   - Fees are paid exclusively in GHO tokens.  
+   - Fees are paid exclusively in GHO and ETH.  
    - Calculates the required fee for a transfer and deducts it directly from the user's GHO balance.
 
 3. **Cross-Chain Message Handling**:
