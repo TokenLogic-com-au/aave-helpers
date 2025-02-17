@@ -19,22 +19,22 @@ import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
  * @notice Helper contract to bridge GHO using Chainlink CCIP
  * @dev Sends GHO to AAVE collector of destination chain using chainlink CCIP
  */
-contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, Rescuable {
+contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipGhoBridge {
   using SafeERC20 for IERC20;
 
   /// @dev This role defines which users can call bridge functions.
   bytes32 public constant BRIDGER_ROLE = keccak256('BRIDGER_ROLE');
 
-  /// @dev Chainlink CCIP router address
+  /// @inheritdoc IAaveCcipGhoBridge
   address public immutable ROUTER;
-  /// @dev GHO token address
+  /// @inheritdoc IAaveCcipGhoBridge
   address public immutable GHO;
-  /// @dev Aave Collector address
+  /// @inheritdoc IAaveCcipGhoBridge
   address public immutable COLLECTOR;
-  /// @dev Aave Executor address
+  /// @inheritdoc IAaveCcipGhoBridge
   address public immutable EXECUTOR;
 
-  /// @dev Address of bridge (chainSelector => bridge address)
+  /// @inheritdoc IAaveCcipGhoBridge
   mapping(uint64 selector => address bridge) public bridges;
 
   /// @dev Saves invalid message
@@ -172,6 +172,11 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
 
   /**
    * @dev Builds ccip message for token transfer
+   * @param destinationChainSelector The selector of destination chain
+   * @param amount The amount to transfer
+   * @param gasLimit Gas limit on destination chain
+   * @param feeToken The address of fee token
+   * @return message EVM2EVMMessage to transfer token
    */
   function _buildCCIPMessage(
     uint64 destinationChainSelector,
@@ -264,12 +269,7 @@ contract AaveCcipGhoBridge is IAaveCcipGhoBridge, CCIPReceiver, AccessControl, R
     emit HandledInvalidMessage(messageId);
   }
 
-  /**
-   * @notice Set up destination bridge data
-   * @param _destinationChainSelector The selector of the destination chain
-   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
-   * @param _bridge The address of the bridge deployed on destination chain
-   */
+  /// @inheritdoc IAaveCcipGhoBridge
   function setDestinationBridge(
     uint64 _destinationChainSelector,
     address _bridge

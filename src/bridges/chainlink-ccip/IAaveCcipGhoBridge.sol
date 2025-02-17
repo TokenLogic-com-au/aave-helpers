@@ -4,6 +4,10 @@ pragma solidity ^0.8.0;
 
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 
+/**
+ * @title IAaveCcipBridge
+ * @dev Interface of AaveCcipGhoBridge
+ */
 interface IAaveCcipGhoBridge {
   /**
    * @dev Emits when a new token transfer is issued
@@ -66,7 +70,52 @@ interface IAaveCcipGhoBridge {
   error InvalidFeeToken();
 
   /**
-   * @notice Transfers tokens to the destination chain and distributes them
+   * @dev This role defines which users can call bridge functions.
+   * @return The bytes32 role of bridger
+   */
+  function BRIDGER_ROLE() external view returns (bytes32);
+
+  /**
+   * @dev Chainlink CCIP router address
+   * @return router address of Chainlink CCIP
+   */
+  function ROUTER() external view returns (address);
+
+  /**
+   * @dev GHO token address
+   * @return address of GHO token
+   */
+  function GHO() external view returns (address);
+
+  /**
+   * @dev Aave Collector address
+   * @return address of Aave Collector
+   */
+  function COLLECTOR() external view returns (address);
+
+  /**
+   * @dev Executor address
+   * @return address of Executor
+   */
+  function EXECUTOR() external view returns (address);
+
+  /**
+   * @dev Address of bridge (chainSelector => bridge address)
+   * @param selector The selector of another chain
+   * @return address of AaveCcipBridge on another chain
+   */
+  function bridges(uint64 selector) external view returns (address);
+
+  /**
+   * @dev Set up destination bridge data
+   * @param destinationChainSelector The selector of the destination chain
+   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+   * @param bridge The address of the bridge deployed on destination chain
+   */
+  function setDestinationBridge(uint64 destinationChainSelector, address bridge) external;
+
+  /**
+   * @dev Transfers tokens to the destination chain and distributes them
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
@@ -82,7 +131,7 @@ interface IAaveCcipGhoBridge {
   ) external payable returns (bytes32 messageId);
 
   /**
-   * @notice calculates fee amount to exeucte transfers
+   * @dev calculates fee amount to exeucte transfers
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
@@ -98,13 +147,13 @@ interface IAaveCcipGhoBridge {
   ) external view returns (uint256 fee);
 
   /**
-   * @notice handle invalid message
+   * @dev handle invalid message
    * @param messageId The id of message
    */
   function handleInvalidMessage(bytes32 messageId) external;
 
   /**
-   * @notice Returns content of invalid message
+   * @dev Returns content of invalid message
    * @param messageId The id of message
    * @return message Message data
    */
