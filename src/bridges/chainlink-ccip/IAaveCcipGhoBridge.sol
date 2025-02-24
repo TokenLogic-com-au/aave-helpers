@@ -115,9 +115,9 @@ interface IAaveCcipGhoBridge {
   function setDestinationBridge(uint64 destinationChainSelector, address bridge) external;
 
   /**
-   * @dev Transfers tokens to the destination chain and distributes them
+   * @notice Transfers tokens to the destination chain and distributes them
+   * @dev chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param destinationChainSelector The selector of the destination chain
-   *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
    * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, uses default value
    * @param feeToken The address of fee token
