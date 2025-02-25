@@ -229,7 +229,7 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
 }
 
 contract ProcessMessageTest is AaveCcipGhoBridgeTest {
-  function test_reverts() public {
+  function test_reverts_OnlySelf() public {
     vm.startPrank(owner);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);

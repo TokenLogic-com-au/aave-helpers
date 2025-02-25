@@ -235,8 +235,32 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTest {
     vm.stopPrank();
   }
 
+  function testFuzz_revertsIf_exceedLimit(uint256 amount) external {
+    vm.assume(amount > 300_000e18 && amount < 1e32); // rate limit capacity is 300K gho and made top limit to prevent arithmetic overflow
+
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(mainnetChainSelector, address(mainnetBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(mainnetFork);
+    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amount, 0, feeToken);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amount + fee);
+    deal(alice, 100);
+
+    vm.startPrank(alice);
+    vm.expectRevert();
+    mainnetBridge.bridge{value: 100}(arbitrumChainSelector, amount, 0, feeToken);
+    vm.stopPrank();
+  }
+
   function testFuzz_success(uint256 amount) external {
-    vm.assume(amount > 0 && amount < 300_000e18); // rate limit capacity is 300K gho
+    vm.assume(amount > 0 && amount <= 300_000e18); // rate limit capacity is 300K gho
     vm.selectFork(arbitrumFork);
 
     uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
@@ -470,8 +494,33 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTest {
     vm.stopPrank();
   }
 
+  function testFuzz_revertsIf_exceedLimit(uint256 amount) external {
+    vm.assume(amount > 300_000e18 && amount < 1e32); // rate limit capacity is 300K gho and made top limit to prevent arithmetic overflow
+    vm.selectFork(mainnetFork);
+
+    vm.startPrank(owner);
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(mainnetChainSelector, address(mainnetBridge));
+    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(arbitrumFork);
+    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amount, 300000, feeToken);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amount);
+    deal(alice, fee);
+
+    vm.startPrank(alice);
+    vm.expectRevert();
+    arbitrumBridge.bridge{value: fee}(mainnetChainSelector, amount, 300000, feeToken);
+    vm.stopPrank();
+  }
+
   function testFuzz_success(uint256 amount) external {
-    vm.assume(amount > 0 && amount < 300_000e18); // rate limit capacity is 300K gho
+    vm.assume(amount > 0 && amount <= 300_000e18); // rate limit capacity is 300K gho
     vm.selectFork(mainnetFork);
 
     uint256 beforeBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
@@ -620,7 +669,7 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
 }
 
 contract ProcessMessageTest is AaveCcipGhoBridgeTest {
-  function test_reverts() public {
+  function test_reverts_OnlySelf() public {
     vm.startPrank(owner);
     vm.selectFork(mainnetFork);
 
