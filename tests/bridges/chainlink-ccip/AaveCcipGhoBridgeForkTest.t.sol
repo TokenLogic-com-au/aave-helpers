@@ -234,6 +234,46 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTest {
     assertEq(afterBalance, beforeBalance + amountToSend, 'Bridged amount not updated correctly');
     vm.stopPrank();
   }
+
+  function testFuzz_success(uint256 amount) external {
+    vm.assume(amount > 0 && amount < 300_000e18); // rate limit capacity is 300K gho
+    vm.selectFork(arbitrumFork);
+
+    uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
+
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(mainnetChainSelector, address(mainnetBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(mainnetFork);
+    uint256 fee = mainnetBridge.quoteBridge(arbitrumChainSelector, amount, 0, feeToken);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amount + fee);
+    deal(alice, 100);
+
+    vm.startPrank(alice);
+    vm.expectEmit(false, true, true, true, address(mainnetBridge));
+    emit TransferIssued(bytes32(0), arbitrumChainSelector, alice, amount);
+    mainnetBridge.bridge{value: 100}(arbitrumChainSelector, amount, 0, feeToken);
+
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
+
+    vm.expectEmit(true, true, false, true, address(arbitrumBridge));
+    emit TransferFinished(message.messageId, address(AaveV3Arbitrum.COLLECTOR), amount);
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(arbitrumFork);
+    uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Arbitrum.COLLECTOR)
+    );
+    assertEq(afterBalance, beforeBalance + amount, 'Bridged amount not updated correctly');
+    vm.stopPrank();
+  }
 }
 
 contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTest {
@@ -427,6 +467,46 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTest {
       address(AaveV3Ethereum.COLLECTOR)
     );
     assertEq(afterBalance, beforeBalance + amountToSend, 'Bridged amount not updated correctly');
+    vm.stopPrank();
+  }
+
+  function testFuzz_success(uint256 amount) external {
+    vm.assume(amount > 0 && amount < 300_000e18); // rate limit capacity is 300K gho
+    vm.selectFork(mainnetFork);
+
+    uint256 beforeBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Ethereum.COLLECTOR)
+    );
+
+    vm.startPrank(owner);
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(mainnetChainSelector, address(mainnetBridge));
+    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(arbitrumChainSelector, address(arbitrumBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(arbitrumFork);
+    uint256 fee = arbitrumBridge.quoteBridge(mainnetChainSelector, amount, 300000, feeToken);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amount);
+    deal(alice, fee);
+
+    vm.startPrank(alice);
+    vm.expectEmit(false, true, true, true, address(arbitrumBridge));
+    emit TransferIssued(bytes32(0), mainnetChainSelector, alice, amount);
+    arbitrumBridge.bridge{value: fee}(mainnetChainSelector, amount, 300000, feeToken);
+
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
+
+    vm.expectEmit(true, true, false, true, address(mainnetBridge));
+    emit TransferFinished(message.messageId, address(AaveV3Ethereum.COLLECTOR), amount);
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
+    uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Ethereum.COLLECTOR)
+    );
+    assertEq(afterBalance, beforeBalance + amount, 'Bridged amount not updated correctly');
     vm.stopPrank();
   }
 }
