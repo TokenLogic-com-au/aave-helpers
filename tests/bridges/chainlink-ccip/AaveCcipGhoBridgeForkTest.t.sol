@@ -13,7 +13,7 @@ import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbi
 
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge, CCIPReceiver} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
-/// @dev forge test --match-path=tests/bridges/chainlink-ccip/*.sol -vvv
+/// @dev forge test --match-path=tests/bridges/chainlink-ccip/AaveCcipGhoBridgeForkTest.t.sol -vvv
 contract AaveCcipGhoBridgeTest is Test {
   event TransferIssued(
     bytes32 indexed messageId,
