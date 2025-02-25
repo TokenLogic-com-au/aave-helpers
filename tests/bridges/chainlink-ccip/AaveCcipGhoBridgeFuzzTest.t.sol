@@ -49,7 +49,7 @@ contract AaveCcipGhoBridgeTest is Test {
     vm.stopPrank();
   }
 
-  function testFuzz_Bridge(uint256 amount, uint256 gasLimit) public {
+  function testFuzz_BridgeWithGhoFee(uint256 amount, uint256 gasLimit) public {
     vm.assume(amount > 0 && amount < 1_000_000_000_000_000 ether);
     vm.assume(gasLimit < 10_000_000);
 
@@ -71,6 +71,32 @@ contract AaveCcipGhoBridgeTest is Test {
       abi.encodeWithSelector(ccipRouter.ccipSend.selector, destinationChainSelector, message)
     );
     bridge.bridge(destinationChainSelector, amount, gasLimit, address(gho));
+    vm.stopPrank();
+  }
+
+  function testFuzz_BridgeWithEthFee(uint256 amount, uint256 gasLimit) public {
+    vm.assume(amount > 0 && amount < 1_000_000_000_000_000 ether);
+    vm.assume(gasLimit < 10_000_000);
+
+    deal(address(gho), alice, amount);
+    deal(alice, mockFee);
+    vm.startPrank(alice);
+
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(amount, gasLimit, address(0));
+
+    // Mock CCIP router's fee estimate
+    vm.mockCall(
+      address(ccipRouter),
+      abi.encodeWithSelector(ccipRouter.getFee.selector, destinationChainSelector, message),
+      abi.encode(mockFee)
+    );
+
+    // Expect call to CCIP send function
+    vm.expectCall(
+      address(ccipRouter),
+      abi.encodeWithSelector(ccipRouter.ccipSend.selector, destinationChainSelector, message)
+    );
+    bridge.bridge{value: mockFee}(destinationChainSelector, amount, gasLimit, address(0));
     vm.stopPrank();
   }
 
