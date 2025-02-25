@@ -19,6 +19,7 @@ The `AaveCcipGhoBridge` smart contract facilitates the secure bridging of GHO to
    - Facilitates secure GHO token transfers between chains.  
    - Collects GHO tokens from the sender, validates the destination chain and bridge configuration, and transfers the tokens via Chainlink CCIP.  
    - The `checkDestination` modifier ensures that the destination chain and bridge are properly configured before any transfer.
+   - When user call this function, it sends gho from bridge contract first. And if balance of bridge is insufficient, it pull gho from user
 
 2. **Fee Payment**:
    - Fees are paid exclusively in GHO and ETH.  

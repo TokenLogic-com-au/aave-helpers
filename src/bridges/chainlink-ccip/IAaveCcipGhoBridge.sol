@@ -70,37 +70,37 @@ interface IAaveCcipGhoBridge {
   error InvalidFeeToken();
 
   /**
-   * @dev This role defines which users can call bridge functions.
+   * @notice This role defines which users can call bridge functions.
    * @return The bytes32 role of bridger
    */
   function BRIDGER_ROLE() external view returns (bytes32);
 
   /**
-   * @dev Chainlink CCIP router address
+   * @notice Chainlink CCIP router address
    * @return router address of Chainlink CCIP
    */
   function ROUTER() external view returns (address);
 
   /**
-   * @dev GHO token address
+   * @notice GHO token address
    * @return address of GHO token
    */
   function GHO() external view returns (address);
 
   /**
-   * @dev Aave Collector address
+   * @notice Aave Collector address
    * @return address of Aave Collector
    */
   function COLLECTOR() external view returns (address);
 
   /**
-   * @dev Executor address
+   * @notice Executor address
    * @return address of Executor
    */
   function EXECUTOR() external view returns (address);
 
   /**
-   * @dev Address of bridge (chainSelector => bridge address)
+   * @notice Returns the address of the bridge  by chain selector
    * @param selector The selector of another chain
    * @return address of AaveCcipBridge on another chain
    */
@@ -117,7 +117,7 @@ interface IAaveCcipGhoBridge {
   /**
    * @notice Transfers tokens to the destination chain and distributes them
    * @dev chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
-   *      When user call this function, it sends gho from bridge contract first.
+   * @dev When user call this function, it sends gho from bridge contract first.
    *      And if balance of bridge is insufficient, it pull gho from user
    * @param destinationChainSelector The selector of the destination chain
    * @param amount The amount to transfer
@@ -133,7 +133,7 @@ interface IAaveCcipGhoBridge {
   ) external payable returns (bytes32 messageId);
 
   /**
-   * @dev calculates fee amount to exeucte transfers
+   * @notice Returns the fee amount to execute the bridge transfer
    * @param destinationChainSelector The selector of the destination chain
    *        chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param amount The amount to transfer
@@ -149,13 +149,14 @@ interface IAaveCcipGhoBridge {
   ) external view returns (uint256 fee);
 
   /**
-   * @dev handle invalid message
+   * @notice Handle invalid message
+   * @dev Withdraws tokens included in invalid message to collector
    * @param messageId The id of message
    */
   function handleInvalidMessage(bytes32 messageId) external;
 
   /**
-   * @dev Returns content of invalid message
+   * @notice Returns content of invalid message
    * @param messageId The id of message
    * @return message Message data
    */
