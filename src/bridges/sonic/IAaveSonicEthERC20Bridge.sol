@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.0;
 
-/// @title IAaveSonicEthERC20Bridge
-/// @author TokenLogic
-/// @notice Interface for AaveSonicEthERC20Bridge
+/**
+ * @title IAaveSonicEthERC20Bridge
+ * @author TokenLogic
+ * @notice Interface for AaveSonicEthERC20Bridge
+ */
 interface IAaveSonicEthERC20Bridge {
   /// @dev The called method is not available on this chain
   error InvalidChain();
@@ -12,17 +13,17 @@ interface IAaveSonicEthERC20Bridge {
   /// @dev Emitted when a bridge is initiated
   event Bridge(address indexed token, uint256 amount);
 
-  /// @dev Emitted when the bridge transaction is confirmed
-  event ConfirmExit(bytes proof);
-
   /// @dev Emitted when a token bridge is finalized
   event Claim(address indexed token, uint256 amount);
 
   /// @dev Emitted when token is withdrawn to the Aave Collector
   event WithdrawToCollector(address token, uint256 amount);
 
-  /// @dev The address of bridge contract
-  function BRIDGE() external view returns (address);
+  /// @dev The address of bridge contract on mainnet
+  function MAINNET_BRIDGE() external view returns (address);
+
+  /// @dev The address of bridge contract on sonic
+  function SONIC_BRIDGE() external view returns (address);
 
   /**
    * @dev This function deposits token from Ethereum to Sonic
