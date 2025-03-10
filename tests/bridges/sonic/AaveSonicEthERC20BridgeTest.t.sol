@@ -3,8 +3,11 @@ pragma solidity ^0.8.0;
 
 import 'forge-std/Test.sol';
 
+import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
+import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {IRescuable} from 'solidity-utils/contracts/utils/interfaces/IRescuable.sol';
 import {IWithGuardian} from 'solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol';
+import {AaveV3Ethereum} from 'aave-address-book/AaveV3Ethereum.sol';
 
 import {AaveSonicEthERC20Bridge, IAaveSonicEthERC20Bridge} from 'src/bridges/sonic/AaveSonicEthERC20Bridge.sol';
 
@@ -35,6 +38,8 @@ contract AaveSonicEthERC20BridgeTest is Test {
 
     sonicFork = vm.createSelectFork(vm.rpcUrl('sonic'));
     bridgeSonic = new AaveSonicEthERC20Bridge{salt: salt}(owner, guardian);
+
+    vm.selectFork(mainnetFork);
   }
 }
 
@@ -50,6 +55,7 @@ contract DepositTest is AaveSonicEthERC20BridgeTest {
 
   function test_revertsIf_InvalidChainId() public {
     vm.startPrank(guardian);
+    vm.selectFork(sonicFork);
     vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidChain.selector);
     bridgeMainnet.deposit(USDC, amount);
     vm.stopPrank();
@@ -130,5 +136,59 @@ contract WithdrawTest is AaveSonicEthERC20BridgeTest {
     emit Bridge(USDC, amount);
     bridgeMainnet.withdraw(USDC, amount);
     vm.stopPrank();
+  }
+}
+
+contract TransferOwnership is AaveSonicEthERC20BridgeTest {
+  function test_revertsIf_invalidCaller() public {
+    vm.expectRevert(
+      abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this))
+    );
+    bridgeMainnet.transferOwnership(makeAddr('new-admin'));
+  }
+
+  function test_successful() public {
+    address newAdmin = makeAddr('new-admin');
+    vm.startPrank(owner);
+    bridgeMainnet.transferOwnership(newAdmin);
+    vm.stopPrank();
+
+    assertEq(newAdmin, bridgeMainnet.owner());
+  }
+}
+
+contract UpdateGuardian is AaveSonicEthERC20BridgeTest {
+  function test_revertsIf_invalidCaller() public {
+    vm.expectRevert(
+      abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, address(this))
+    );
+    bridgeMainnet.updateGuardian(makeAddr('new-admin'));
+  }
+
+  function test_successful() public {
+    address newManager = makeAddr('new-admin');
+    vm.startPrank(owner);
+    bridgeMainnet.updateGuardian(newManager);
+    vm.stopPrank();
+
+    assertEq(newManager, bridgeMainnet.guardian());
+  }
+}
+
+contract EmergencyTokenTransfer is AaveSonicEthERC20BridgeTest {
+  uint256 amount = 1_000e18;
+
+  function test_successful() public {
+    uint256 initialCollectorBalance = IERC20(USDC).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+    deal(USDC, address(bridgeMainnet), amount);
+    vm.startPrank(owner);
+    bridgeMainnet.emergencyTokenTransfer(USDC, amount);
+    vm.stopPrank();
+
+    assertEq(
+      IERC20(USDC).balanceOf(address(AaveV3Ethereum.COLLECTOR)),
+      initialCollectorBalance + amount
+    );
+    assertEq(IERC20(USDC).balanceOf(address(bridgeMainnet)), 0);
   }
 }
