@@ -12,6 +12,8 @@ import {AaveV3Ethereum} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Sonic} from 'aave-address-book/AaveV3Sonic.sol';
 
 import {IBridge} from './interfaces/IBridge.sol';
+import {ITokenPairs} from './interfaces/ITokenPairs.sol';
+import {IBridgedAdapter} from './interfaces/IBridgedAdapter.sol';
 import {IAaveSonicEthERC20Bridge} from './IAaveSonicEthERC20Bridge.sol';
 
 /// @title AaveSonicEthERC20Bridge
@@ -27,7 +29,9 @@ contract AaveSonicEthERC20Bridge is
   // https://etherscan.io/address/0xa1E2481a9CD0Cb0447EeB1cbc26F1b3fff3bec20
   address public constant MAINNET_BRIDGE = 0xa1E2481a9CD0Cb0447EeB1cbc26F1b3fff3bec20;
   // https://sonicscan.org/address/0x9Ef7629F9B930168b76283AdD7120777b3c895b3
-  address public constant SONIC_BRIDGE = 0xa1E2481a9CD0Cb0447EeB1cbc26F1b3fff3bec20;
+  address public constant SONIC_BRIDGE = 0x9Ef7629F9B930168b76283AdD7120777b3c895b3;
+  // https://sonicscan.org/address/0x134E4c207aD5A13549DE1eBF8D43c1f49b00ba94
+  address public constant SONIC_TOKEN_PAIR = 0x134E4c207aD5A13549DE1eBF8D43c1f49b00ba94;
 
   constructor(address owner, address guardian) OwnableWithGuardian(owner, guardian) {}
 
@@ -42,13 +46,19 @@ contract AaveSonicEthERC20Bridge is
   }
 
   /// @inheritdoc IAaveSonicEthERC20Bridge
-  function withdraw(address token, uint256 amount) external onlyOwnerOrGuardian {
+  function withdraw(address originalToken, uint256 amount) external onlyOwnerOrGuardian {
     if (block.chainid != ChainIds.SONIC) revert InvalidChain();
 
-    IERC20(token).approve(SONIC_BRIDGE, amount);
-    IBridge(SONIC_BRIDGE).withdraw(uint96(block.timestamp), token, amount);
+    address mintedTokenAdapter = ITokenPairs(SONIC_TOKEN_PAIR).originalToMintedTerminable(
+      originalToken
+    );
+    if (mintedTokenAdapter == address(0)) revert InvalidToken();
 
-    emit Bridge(token, amount);
+    address mintedToken = IBridgedAdapter(mintedTokenAdapter).token();
+    IERC20(mintedToken).approve(mintedTokenAdapter, amount);
+    IBridge(SONIC_BRIDGE).withdraw(uint96(block.timestamp), originalToken, amount);
+
+    emit Bridge(originalToken, amount);
   }
 
   /// @inheritdoc IAaveSonicEthERC20Bridge

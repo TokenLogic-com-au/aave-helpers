@@ -10,6 +10,9 @@ interface IAaveSonicEthERC20Bridge {
   /// @dev The called method is not available on this chain
   error InvalidChain();
 
+  /// @dev The original token is invalid
+  error InvalidToken();
+
   /// @dev Emitted when a bridge is initiated
   event Bridge(address indexed token, uint256 amount);
 
@@ -17,7 +20,7 @@ interface IAaveSonicEthERC20Bridge {
   event Claim(address indexed token, uint256 amount);
 
   /// @dev Emitted when token is withdrawn to the Aave Collector
-  event WithdrawToCollector(address token, uint256 amount);
+  event WithdrawToCollector(address indexed token, uint256 amount);
 
   /// @dev The address of bridge contract on mainnet
   function MAINNET_BRIDGE() external view returns (address);
@@ -36,8 +39,8 @@ interface IAaveSonicEthERC20Bridge {
   /**
    * @dev This function withdraws token from Sonic to Ethereum
    * @notice Sonic only. Function will revert if called from other network.
-   * @param token The address of token to deposit
-   * @param amount Amount of tokens to deposit
+   * @param token The address of original token to withdraw
+   * @param amount Amount of tokens to withdraw
    */
   function withdraw(address token, uint256 amount) external;
 
