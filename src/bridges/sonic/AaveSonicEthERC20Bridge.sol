@@ -39,26 +39,45 @@ contract AaveSonicEthERC20Bridge is
   function deposit(address token, uint256 amount) external onlyOwnerOrGuardian {
     if (block.chainid != ChainIds.MAINNET) revert InvalidChain();
 
-    IERC20(token).approve(MAINNET_BRIDGE, amount);
-    IBridge(MAINNET_BRIDGE).deposit(uint96(block.timestamp), token, amount);
+    _deposit(uint96(block.timestamp), token, amount);
+  }
 
-    emit Bridge(token, amount);
+  /// @inheritdoc IAaveSonicEthERC20Bridge
+  function deposit(address[] memory tokens, uint256[] memory amounts) external onlyOwnerOrGuardian {
+    if (block.chainid != ChainIds.MAINNET) revert InvalidChain();
+    if (tokens.length != amounts.length) revert InvalidParam();
+
+    for (uint256 i = 0; i < tokens.length; ) {
+      _deposit(uint96(block.timestamp + i), tokens[i], amounts[i]);
+
+      unchecked {
+        ++i;
+      }
+    }
   }
 
   /// @inheritdoc IAaveSonicEthERC20Bridge
   function withdraw(address originalToken, uint256 amount) external onlyOwnerOrGuardian {
     if (block.chainid != ChainIds.SONIC) revert InvalidChain();
 
-    address mintedTokenAdapter = ITokenPairs(SONIC_TOKEN_PAIR).originalToMintedTerminable(
-      originalToken
-    );
-    if (mintedTokenAdapter == address(0)) revert InvalidToken();
+    _withdraw(uint96(block.timestamp), originalToken, amount);
+  }
 
-    address mintedToken = IBridgedAdapter(mintedTokenAdapter).token();
-    IERC20(mintedToken).approve(mintedTokenAdapter, amount);
-    IBridge(SONIC_BRIDGE).withdraw(uint96(block.timestamp), originalToken, amount);
+  /// @inheritdoc IAaveSonicEthERC20Bridge
+  function withdraw(
+    address[] memory originalTokens,
+    uint256[] memory amounts
+  ) external onlyOwnerOrGuardian {
+    if (block.chainid != ChainIds.SONIC) revert InvalidChain();
+    if (originalTokens.length != amounts.length) revert InvalidParam();
 
-    emit Bridge(originalToken, amount);
+    for (uint256 i = 0; i < originalTokens.length; ) {
+      _withdraw(uint96(block.timestamp + i), originalTokens[i], amounts[i]);
+
+      unchecked {
+        ++i;
+      }
+    }
   }
 
   /// @inheritdoc IAaveSonicEthERC20Bridge
@@ -86,6 +105,26 @@ contract AaveSonicEthERC20Bridge is
       revert InvalidChain();
     }
     emit WithdrawToCollector(token, balance);
+  }
+
+  function _deposit(uint96 uid, address token, uint256 amount) internal {
+    IERC20(token).forceApprove(MAINNET_BRIDGE, amount);
+    IBridge(MAINNET_BRIDGE).deposit(uid, token, amount);
+
+    emit Bridge(token, amount);
+  }
+
+  function _withdraw(uint96 uid, address originalToken, uint256 amount) internal {
+    address mintedTokenAdapter = ITokenPairs(SONIC_TOKEN_PAIR).originalToMintedTerminable(
+      originalToken
+    );
+    if (mintedTokenAdapter == address(0)) revert InvalidToken();
+
+    address mintedToken = IBridgedAdapter(mintedTokenAdapter).token();
+    IERC20(mintedToken).approve(mintedTokenAdapter, amount);
+    IBridge(SONIC_BRIDGE).withdraw(uid, originalToken, amount);
+
+    emit Bridge(originalToken, amount);
   }
 
   /// @inheritdoc IRescuableBase

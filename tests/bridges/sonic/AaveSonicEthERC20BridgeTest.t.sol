@@ -27,6 +27,8 @@ contract AaveSonicEthERC20BridgeTest is Test {
 
   address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
   address public bridgedUSDC = 0x29219dd400f2Bf60E5a23d13Be72B486D4038894;
+  address public USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+  address public bridgedUSDT = 0x6047828dc181963ba44974801FF68e538dA5eaF9;
 
   function setUp() public {
     owner = makeAddr('owner');
@@ -89,6 +91,47 @@ contract DepositTest is AaveSonicEthERC20BridgeTest {
     bridgeMainnet.deposit(USDC, testAmount);
     vm.stopPrank();
   }
+
+  function test_revertsIf_InvalidParam_batch() public {
+    vm.startPrank(guardian);
+    vm.selectFork(mainnetFork);
+
+    deal(USDC, address(bridgeMainnet), amount);
+    deal(USDT, address(bridgeMainnet), amount);
+
+    address[] memory tokens = new address[](2);
+    tokens[0] = USDC;
+    tokens[1] = USDT;
+
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = amount;
+
+    vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidParam.selector);
+    bridgeMainnet.deposit(tokens, amounts);
+    vm.stopPrank();
+  }
+
+  function test_success_batch() public {
+    vm.startPrank(guardian);
+    vm.selectFork(mainnetFork);
+
+    deal(USDC, address(bridgeMainnet), amount);
+    deal(USDT, address(bridgeMainnet), amount);
+
+    address[] memory tokens = new address[](2);
+    tokens[0] = USDC;
+    tokens[1] = USDT;
+
+    uint256[] memory amounts = new uint256[](2);
+    amounts[0] = amount;
+    amounts[1] = amount;
+
+    vm.expectEmit(true, true, false, true);
+    emit Bridge(USDC, amount);
+    emit Bridge(USDT, amount);
+    bridgeMainnet.deposit(tokens, amounts);
+    vm.stopPrank();
+  }
 }
 
 contract WithdrawTest is AaveSonicEthERC20BridgeTest {
@@ -135,6 +178,47 @@ contract WithdrawTest is AaveSonicEthERC20BridgeTest {
     vm.expectEmit(true, true, false, true);
     emit Bridge(USDC, amount);
     bridgeMainnet.withdraw(USDC, amount);
+    vm.stopPrank();
+  }
+
+  function test_revertsIf_InvalidParam_batch() public {
+    vm.startPrank(guardian);
+    vm.selectFork(sonicFork);
+
+    deal(bridgedUSDC, address(bridgeSonic), amount);
+    deal(bridgedUSDT, address(bridgeSonic), amount);
+
+    address[] memory tokens = new address[](2);
+    tokens[0] = USDC;
+    tokens[1] = USDT;
+
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = amount;
+
+    vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidParam.selector);
+    bridgeSonic.withdraw(tokens, amounts);
+    vm.stopPrank();
+  }
+
+  function test_success_batch() public {
+    vm.startPrank(guardian);
+    vm.selectFork(sonicFork);
+
+    deal(bridgedUSDC, address(bridgeSonic), amount);
+    deal(bridgedUSDT, address(bridgeSonic), amount);
+
+    address[] memory tokens = new address[](2);
+    tokens[0] = USDC;
+    tokens[1] = USDT;
+
+    uint256[] memory amounts = new uint256[](2);
+    amounts[0] = amount;
+    amounts[1] = amount;
+
+    vm.expectEmit(true, true, false, true);
+    emit Bridge(USDC, amount);
+    emit Bridge(USDT, amount);
+    bridgeSonic.withdraw(tokens, amounts);
     vm.stopPrank();
   }
 }

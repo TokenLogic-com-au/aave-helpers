@@ -13,6 +13,9 @@ interface IAaveSonicEthERC20Bridge {
   /// @dev The original token is invalid
   error InvalidToken();
 
+  /// @dev Parameter length is mismatched in batch mode
+  error InvalidParam();
+
   /// @dev Emitted when a bridge is initiated
   event Bridge(address indexed token, uint256 amount);
 
@@ -37,12 +40,28 @@ interface IAaveSonicEthERC20Bridge {
   function deposit(address token, uint256 amount) external;
 
   /**
+   * @dev This function deposits tokens from Ethereum to Sonic
+   * @notice Ethereum only. Function will revert if called from other network.
+   * @param tokens The addresses of token to deposit
+   * @param amounts Amounts of tokens to deposit
+   */
+  function deposit(address[] memory tokens, uint256[] memory amounts) external;
+
+  /**
    * @dev This function withdraws token from Sonic to Ethereum
    * @notice Sonic only. Function will revert if called from other network.
-   * @param token The address of original token to withdraw
+   * @param originalToken The address of original token to withdraw
    * @param amount Amount of tokens to withdraw
    */
-  function withdraw(address token, uint256 amount) external;
+  function withdraw(address originalToken, uint256 amount) external;
+
+  /**
+   * @dev This function withdraws tokens from Sonic to Ethereum
+   * @notice Sonic only. Function will revert if called from other network.
+   * @param originalTokens The addressese of original token to withdraw
+   * @param amounts Amounts of tokens to withdraw
+   */
+  function withdraw(address[] memory originalTokens, uint256[] memory amounts) external;
 
   /**
    * @dev This function claims bridged tokens
