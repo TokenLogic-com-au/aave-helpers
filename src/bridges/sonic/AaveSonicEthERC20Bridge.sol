@@ -107,6 +107,21 @@ contract AaveSonicEthERC20Bridge is
     emit WithdrawToCollector(token, balance);
   }
 
+  /// @inheritdoc IAaveSonicEthERC20Bridge
+  function withdrawEthToCollector() external {
+    uint256 balance = payable(address(this)).balance;
+
+    if (block.chainid == ChainIds.MAINNET) {
+      payable(address(AaveV3Ethereum.COLLECTOR)).call{value: balance}('');
+    } else if (block.chainid == ChainIds.SONIC) {
+      payable(address(AaveV3Sonic.COLLECTOR)).call{value: balance}('');
+    } else {
+      revert InvalidChain();
+    }
+
+    emit WithdrawToCollector(address(0), balance);
+  }
+
   function _deposit(uint96 uid, address token, uint256 amount) internal {
     IERC20(token).forceApprove(MAINNET_BRIDGE, amount);
     IBridge(MAINNET_BRIDGE).deposit(uid, token, amount);
@@ -138,4 +153,6 @@ contract AaveSonicEthERC20Bridge is
   function whoShouldReceiveFunds() public view override returns (address) {
     return address(AaveV3Ethereum.COLLECTOR);
   }
+
+  receive() external payable {}
 }
