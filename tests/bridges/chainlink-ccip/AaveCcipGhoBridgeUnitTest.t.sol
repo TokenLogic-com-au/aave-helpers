@@ -10,21 +10,9 @@ import {Internal} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Intern
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge, CCIPReceiver} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
 /// @dev forge test --match-path=tests/bridges/chainlink-ccip/AaveCcipGhoBridgeUnitTest.t.sol -vvv
-contract AaveCcipGhoBridgeTest is Test {
-  event TransferIssued(
-    bytes32 indexed messageId,
-    uint64 indexed destinationChainSelector,
-    address indexed from,
-    uint256 totalAmount
-  );
-  event TransferFinished(bytes32 indexed messageId, address indexed to, uint256 amount);
-  event DestinationUpdated(uint64 indexed chainSelector, address indexed bridge);
-  event CCIPSendRequested(Internal.EVM2EVMMessage message);
-  event ReceivedInvalidMessage(bytes32 indexed messageId);
-  event HandledInvalidMessage(bytes32 indexed messageId);
-
-  uint64 public constant sourceChainSelector = 5009297550715157269;
-  uint64 public constant destinationChainSelector = 4949039107694359620;
+contract AaveCcipGhoBridgeTestBase is Test {
+  uint64 public constant SOURCE_CHAIN_SELECTOR = 5009297550715157269;
+  uint64 public constant DESTINATION_CHAIN_SELECTOR = 4949039107694359620;
 
   uint256 public constant mockFee = 0.01 ether;
   uint256 public constant amount = 1_000 ether;
@@ -81,16 +69,16 @@ contract AaveCcipGhoBridgeTest is Test {
   }
 }
 
-contract BridgeToken is AaveCcipGhoBridgeTest {
+contract BridgeToken is AaveCcipGhoBridgeTestBase {
   function test_revertsIf_UnsupportedChain() external {
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    bridge.bridge(destinationChainSelector, amount, gasLimit, address(gho));
+    bridge.bridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
   }
 
-  function test_revertsIf_NotBridger() external {
+  function test_revertsIf_NoBridgerRole() external {
     vm.prank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
 
     vm.startPrank(alice);
     vm.expectRevert(
@@ -101,30 +89,32 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
         Strings.toHexString(uint256(bridge.BRIDGER_ROLE()), 32)
       )
     );
-    bridge.bridge(destinationChainSelector, amount, gasLimit, address(gho));
+    bridge.bridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
     vm.startPrank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
     vm.stopPrank();
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    bridge.bridge(destinationChainSelector, 0, 0, address(gho));
+    bridge.bridge(DESTINATION_CHAIN_SELECTOR, 0, 0, address(gho));
   }
 
   function test_success() external {
     vm.startPrank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
 
     vm.stopPrank();
 
-    uint256 fee = bridge.quoteBridge(destinationChainSelector, amount, gasLimit, address(gho));
+    uint256 fee = bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
     deal(address(gho), alice, amount + fee);
     deal(alice, 100);
+
+    uint256 beforeSenderBalance = gho.balanceOf(alice);
 
     vm.startPrank(alice);
 
@@ -133,11 +123,14 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
     // Expect call to CCIP send function
     vm.expectCall(
       address(ccipRouter),
-      abi.encodeWithSelector(ccipRouter.ccipSend.selector, destinationChainSelector, message)
+      abi.encodeWithSelector(ccipRouter.ccipSend.selector, DESTINATION_CHAIN_SELECTOR, message)
     );
     vm.expectEmit(false, true, true, true, address(bridge));
-    emit TransferIssued(bytes32(0), destinationChainSelector, alice, amount);
-    bridge.bridge{value: 100}(destinationChainSelector, amount, gasLimit, address(gho));
+    emit IAaveCcipGhoBridge.TransferIssued(bytes32(0), DESTINATION_CHAIN_SELECTOR, alice, amount);
+    bridge.bridge{value: 100}(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
+
+    uint256 afterSenderBalance = gho.balanceOf(alice);
+    assertEq(beforeSenderBalance, afterSenderBalance + amount + fee);
     vm.stopPrank();
   }
 
@@ -145,15 +138,16 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
     vm.assume(amount > 0 && amount < 1e32);
 
     vm.startPrank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
 
     vm.stopPrank();
 
-    uint256 fee = bridge.quoteBridge(destinationChainSelector, amount, gasLimit, address(gho));
+    uint256 fee = bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
     deal(address(gho), alice, amount + fee);
     deal(alice, 100);
 
+    uint256 beforeSenderBalance = gho.balanceOf(alice);
     vm.startPrank(alice);
 
     Client.EVM2AnyMessage memory message = _buildCCIPMessage(amount, gasLimit, address(gho));
@@ -161,26 +155,31 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
     // Expect call to CCIP send function
     vm.expectCall(
       address(ccipRouter),
-      abi.encodeWithSelector(ccipRouter.ccipSend.selector, destinationChainSelector, message)
+      abi.encodeWithSelector(ccipRouter.ccipSend.selector, DESTINATION_CHAIN_SELECTOR, message)
     );
     vm.expectEmit(false, true, true, true, address(bridge));
-    emit TransferIssued(bytes32(0), destinationChainSelector, alice, amount);
-    bridge.bridge{value: 100}(destinationChainSelector, amount, gasLimit, address(gho));
+    emit IAaveCcipGhoBridge.TransferIssued(bytes32(0), DESTINATION_CHAIN_SELECTOR, alice, amount);
+    bridge.bridge{value: 100}(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
+
+    uint256 afterSenderBalance = gho.balanceOf(alice);
+    assertEq(beforeSenderBalance, afterSenderBalance + amount + fee);
+    vm.stopPrank();
   }
 
   function testFuzz_success_nativeFee(uint256 amount) external {
     vm.assume(amount > 0 && amount < 1e32);
 
     vm.startPrank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
 
     vm.stopPrank();
 
-    uint256 fee = bridge.quoteBridge(destinationChainSelector, amount, gasLimit, address(0));
+    uint256 fee = bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(0));
     deal(address(gho), alice, amount + fee);
     deal(alice, fee);
 
+    uint256 beforeSenderBalance = gho.balanceOf(alice);
     vm.startPrank(alice);
 
     Client.EVM2AnyMessage memory message = _buildCCIPMessage(amount, gasLimit, address(0));
@@ -188,15 +187,19 @@ contract BridgeToken is AaveCcipGhoBridgeTest {
     // Expect call to CCIP send function
     vm.expectCall(
       address(ccipRouter),
-      abi.encodeWithSelector(ccipRouter.ccipSend.selector, destinationChainSelector, message)
+      abi.encodeWithSelector(ccipRouter.ccipSend.selector, DESTINATION_CHAIN_SELECTOR, message)
     );
     vm.expectEmit(false, true, true, true, address(bridge));
-    emit TransferIssued(bytes32(0), destinationChainSelector, alice, amount);
-    bridge.bridge{value: fee}(destinationChainSelector, amount, gasLimit, address(0));
+    emit IAaveCcipGhoBridge.TransferIssued(bytes32(0), DESTINATION_CHAIN_SELECTOR, alice, amount);
+    bridge.bridge{value: fee}(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(0));
+
+    uint256 afterSenderBalance = gho.balanceOf(alice);
+    assertEq(beforeSenderBalance, afterSenderBalance + amount);
+    vm.stopPrank();
   }
 }
 
-contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
+contract SetDestinationBridgeTest is AaveCcipGhoBridgeTestBase {
   function test_revertIf_NotOwner() external {
     vm.startPrank(alice);
 
@@ -208,7 +211,7 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
         Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
       )
     );
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     vm.stopPrank();
   }
 
@@ -216,11 +219,14 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
     vm.startPrank(owner);
 
     vm.expectEmit(address(bridge));
-    emit DestinationUpdated(destinationChainSelector, address(destinationBridge));
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    emit IAaveCcipGhoBridge.DestinationUpdated(
+      DESTINATION_CHAIN_SELECTOR,
+      address(destinationBridge)
+    );
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
 
     assertEq(
-      bridge.bridges(destinationChainSelector),
+      bridge.bridges(DESTINATION_CHAIN_SELECTOR),
       address(destinationBridge),
       'Destination bridge not set correctly in the mapping'
     );
@@ -228,7 +234,7 @@ contract SetDestinationBridgeTest is AaveCcipGhoBridgeTest {
   }
 }
 
-contract ProcessMessageTest is AaveCcipGhoBridgeTest {
+contract ProcessMessageTest is AaveCcipGhoBridgeTestBase {
   function test_reverts_OnlySelf() public {
     vm.startPrank(owner);
 
@@ -237,7 +243,7 @@ contract ProcessMessageTest is AaveCcipGhoBridgeTest {
     // build dummy message for test
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32(0),
-      sourceChainSelector: destinationChainSelector,
+      sourceChainSelector: DESTINATION_CHAIN_SELECTOR,
       sender: abi.encode(address(0)),
       data: '',
       destTokenAmounts: tokenAmounts
@@ -250,7 +256,7 @@ contract ProcessMessageTest is AaveCcipGhoBridgeTest {
   }
 }
 
-contract CcipReceiveTest is AaveCcipGhoBridgeTest {
+contract CcipReceiveTest is AaveCcipGhoBridgeTestBase {
   function test_reverts_InvalidRouter() public {
     vm.startPrank(owner);
 
@@ -259,7 +265,7 @@ contract CcipReceiveTest is AaveCcipGhoBridgeTest {
     // build dummy message for test
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32(0),
-      sourceChainSelector: destinationChainSelector,
+      sourceChainSelector: DESTINATION_CHAIN_SELECTOR,
       sender: abi.encode(address(0)),
       data: '',
       destTokenAmounts: tokenAmounts
@@ -272,62 +278,161 @@ contract CcipReceiveTest is AaveCcipGhoBridgeTest {
   }
 
   function test_successWith_ReceivedInvalidMessage() public {
-    vm.startPrank(owner);
+    vm.startPrank(bridge.ROUTER());
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
     // build dummy message for test
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: bytes32(0),
-      sourceChainSelector: destinationChainSelector,
+      sourceChainSelector: DESTINATION_CHAIN_SELECTOR,
       sender: abi.encode(address(0)),
       data: '',
       destTokenAmounts: tokenAmounts
     });
-    vm.stopPrank();
-
-    vm.startPrank(bridge.ROUTER());
 
     vm.expectEmit(address(bridge));
-    emit ReceivedInvalidMessage(bytes32(0));
+    emit IAaveCcipGhoBridge.ReceivedInvalidMessage(bytes32(0));
+    bridge.ccipReceive(message);
+
+    vm.stopPrank();
+  }
+
+  function test_success() public {
+    vm.startPrank(bridge.ROUTER());
+    // fund to bridge
+    deal(address(gho), address(bridge), amount);
+
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: address(gho), amount: amount});
+
+    // build dummy message for test
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32(0),
+      sourceChainSelector: DESTINATION_CHAIN_SELECTOR,
+      sender: abi.encode(address(0)),
+      data: '',
+      destTokenAmounts: tokenAmounts
+    });
+
+    vm.expectEmit(true, true, false, true, address(bridge));
+    emit IAaveCcipGhoBridge.TransferFinished(bytes32(0), collector, amount);
     bridge.ccipReceive(message);
 
     vm.stopPrank();
   }
 }
 
-contract QuoteTransferTest is AaveCcipGhoBridgeTest {
+contract HandleInvalidMessageTest is AaveCcipGhoBridgeTestBase {
+  address public feeToken = address(gho);
+
+  function _buildInvalidMessage() internal returns (Client.Any2EVMMessage memory) {
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: address(gho), amount: amount});
+
+    // build dummy message for test
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32(0),
+      sourceChainSelector: DESTINATION_CHAIN_SELECTOR,
+      sender: abi.encode(address(1)),
+      data: '',
+      destTokenAmounts: tokenAmounts
+    });
+
+    vm.startPrank(bridge.ROUTER());
+    bridge.ccipReceive(message);
+    vm.stopPrank();
+
+    return message;
+  }
+
+  function test_revertIf_NotOwner() external {
+    vm.startPrank(alice);
+
+    vm.expectRevert(
+      abi.encodePacked(
+        'AccessControl: account ',
+        Strings.toHexString(uint160(alice), 20),
+        ' is missing role ',
+        Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
+      )
+    );
+    bridge.handleInvalidMessage(bytes32(0));
+    vm.stopPrank();
+  }
+
+  function test_revertIf_MessageNotFound() external {
+    vm.startPrank(owner);
+
+    vm.expectRevert(IAaveCcipGhoBridge.MessageNotFound.selector);
+    bridge.handleInvalidMessage(bytes32('1'));
+    vm.stopPrank();
+  }
+
+  function test_success() external {
+    // fund to bridge
+    deal(address(gho), address(bridge), amount);
+    Client.Any2EVMMessage memory message = _buildInvalidMessage();
+
+    vm.startPrank(owner);
+
+    uint256 balanceBefore = gho.balanceOf(collector);
+
+    vm.expectEmit(true, false, false, false, address(bridge));
+    emit IAaveCcipGhoBridge.HandledInvalidMessage(message.messageId);
+    bridge.handleInvalidMessage(message.messageId);
+
+    uint256 balanceAfter = gho.balanceOf(collector);
+
+    assertEq(balanceAfter, balanceBefore + amount);
+
+    vm.stopPrank();
+  }
+}
+
+contract QuoteTransferTest is AaveCcipGhoBridgeTestBase {
   function test_revertsIf_UnsupportedChain() external {
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.UnsupportedChain.selector);
-    bridge.quoteBridge(destinationChainSelector, amount, gasLimit, address(gho));
+    bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
   }
 
   function test_revertsIf_InvalidTransferAmount() external {
     vm.startPrank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
     vm.stopPrank();
 
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
-    bridge.quoteBridge(destinationChainSelector, 0, 0, address(gho));
+    bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, 0, 0, address(gho));
   }
 
-  function test_success() external {
+  function test_revertsIf_InvalidFeeToken() external {
     vm.startPrank(owner);
-    bridge.setDestinationBridge(destinationChainSelector, address(destinationBridge));
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
     bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
     vm.stopPrank();
 
     vm.startPrank(alice);
-    uint256 fee = bridge.quoteBridge(destinationChainSelector, amount, gasLimit, address(gho));
+    vm.expectRevert(IAaveCcipGhoBridge.InvalidFeeToken.selector);
+    bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(1));
+  }
+
+  function test_success() external {
+    vm.startPrank(owner);
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
+    bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
+    vm.stopPrank();
+
+    vm.startPrank(alice);
+    uint256 fee = bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(gho));
 
     assertGt(fee, 0);
   }
 }
 
-contract RescuableTest is AaveCcipGhoBridgeTest {
+contract RescuableTest is AaveCcipGhoBridgeTestBase {
   function test_assert() external {
     assertEq(bridge.whoCanRescue(), owner);
     assertEq(bridge.maxRescue(address(0)), type(uint256).max);
