@@ -13,6 +13,21 @@ import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbi
 
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge, CCIPReceiver} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
+interface ILockReleaseTokenPool {
+  function getCurrentOutboundRateLimiterState(
+    uint64 remoteChainSelector
+  )
+    external
+    view
+    returns (uint128 tokens, uint32 lastUpdated, bool isEnabled, uint128 capacity, uint128 rate);
+  function getCurrentInboundRateLimiterState(
+    uint64 remoteChainSelector
+  )
+    external
+    view
+    returns (uint128 tokens, uint32 lastUpdated, bool isEnabled, uint128 capacity, uint128 rate);
+}
+
 /// @dev forge test --match-path=tests/bridges/chainlink-ccip/AaveCcipGhoBridgeForkTest.t.sol -vvv
 contract AaveCcipGhoBridgeTestBase is Test {
   uint64 public constant MAINNET_CHAIN_SELECTOR = 5009297550715157269;
@@ -224,7 +239,14 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
   }
 
   function testFuzz_revertsIf_exceedLimit(uint256 amount) external {
-    vm.assume(amount > 300_000e18 && amount < 1e32); // rate limit capacity is 300K gho and made top limit to prevent arithmetic overflow
+    vm.selectFork(mainnetFork);
+    // https://etherscan.io/address/0x06179f7C1be40863405f374E7f5F8806c728660A
+    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
+      0x06179f7C1be40863405f374E7f5F8806c728660A
+    );
+    (uint128 limit, , , , ) = ghoPool.getCurrentInboundRateLimiterState(ARBITRUM_CHAIN_SELECTOR);
+
+    vm.assume(amount > limit && amount < 1e32); // made top limit to prevent arithmetic overflow
 
     vm.startPrank(owner);
     vm.selectFork(mainnetFork);
@@ -248,7 +270,14 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
   }
 
   function testFuzz_success(uint256 amount) external {
-    vm.assume(amount > 0 && amount <= 300_000e18); // rate limit capacity is 300K gho
+    vm.selectFork(mainnetFork);
+    // https://etherscan.io/address/0x06179f7C1be40863405f374E7f5F8806c728660A
+    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
+      0x06179f7C1be40863405f374E7f5F8806c728660A
+    );
+    (uint128 limit, , , , ) = ghoPool.getCurrentInboundRateLimiterState(ARBITRUM_CHAIN_SELECTOR);
+
+    vm.assume(amount > 0 && amount <= limit);
     vm.selectFork(arbitrumFork);
 
     uint256 beforeBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(
@@ -457,11 +486,16 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTestBase {
   }
 
   function testFuzz_revertsIf_exceedLimit(uint256 amount) external {
-    vm.assume(amount > 300_000e18 && amount < 1e32); // rate limit capacity is 300K gho and made top limit to prevent arithmetic overflow
-    vm.selectFork(mainnetFork);
+    vm.selectFork(arbitrumFork);
+    // https://arbiscan.io/address/0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
+    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
+      0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
+    );
+    (uint128 limit, , , , ) = ghoPool.getCurrentOutboundRateLimiterState(MAINNET_CHAIN_SELECTOR);
+
+    vm.assume(amount > limit && amount < 1e32); // made top limit to prevent arithmetic overflow
 
     vm.startPrank(owner);
-    vm.selectFork(arbitrumFork);
     arbitrumBridge.setDestinationBridge(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
     arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
 
@@ -482,15 +516,22 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTestBase {
   }
 
   function testFuzz_success(uint256 amount) external {
-    vm.assume(amount > 0 && amount <= 300_000e18); // rate limit capacity is 300K gho
+    vm.selectFork(arbitrumFork);
+    // https://arbiscan.io/address/0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
+    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
+      0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
+    );
+    (uint128 limit, , , , ) = ghoPool.getCurrentOutboundRateLimiterState(MAINNET_CHAIN_SELECTOR);
+
+    vm.assume(amount > 0 && amount <= limit);
     vm.selectFork(mainnetFork);
 
     uint256 beforeBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
       address(AaveV3Ethereum.COLLECTOR)
     );
 
-    vm.startPrank(owner);
     vm.selectFork(arbitrumFork);
+    vm.startPrank(owner);
     arbitrumBridge.setDestinationBridge(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
     arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
 
