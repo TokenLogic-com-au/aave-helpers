@@ -434,7 +434,8 @@ contract QuoteTransferTest is AaveCcipGhoBridgeTestBase {
 
 contract RescuableTest is AaveCcipGhoBridgeTestBase {
   function test_assert() external {
+    deal(address(gho), address(bridge), amount);
     assertEq(bridge.whoCanRescue(), owner);
-    assertEq(bridge.maxRescue(address(0)), type(uint256).max);
+    assertEq(bridge.maxRescue(address(gho)), amount);
   }
 }

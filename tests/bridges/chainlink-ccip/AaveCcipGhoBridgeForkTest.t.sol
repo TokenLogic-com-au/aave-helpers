@@ -774,10 +774,13 @@ contract QuoteTransferTest is AaveCcipGhoBridgeTestBase {
 }
 
 contract RescuableTest is AaveCcipGhoBridgeTestBase {
+  uint256 amount = 1e18;
+
   function test_assert() external {
     vm.selectFork(mainnetFork);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, address(mainnetBridge), amount);
     assertEq(mainnetBridge.whoCanRescue(), owner);
-    assertEq(mainnetBridge.maxRescue(address(0)), type(uint256).max);
+    assertEq(mainnetBridge.maxRescue(AaveV3EthereumAssets.GHO_UNDERLYING), amount);
   }
 }
 

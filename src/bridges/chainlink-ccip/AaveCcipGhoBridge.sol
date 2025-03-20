@@ -248,9 +248,9 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
 
   /// @inheritdoc IRescuableBase
   function maxRescue(
-    address
-  ) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
-    return type(uint256).max;
+    address token
+  ) public view override(RescuableBase, IRescuableBase) returns (uint256) {
+    return IERC20(token).balanceOf(address(this));
   }
 
   /**
