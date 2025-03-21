@@ -13,7 +13,7 @@ evm_version = 'cancun'
 src = 'zksync/src'
 test = 'zksync/tests'
 libs = ['lib']
-solc = '0.8.24'
+solc = '0.8.26'
 fs_permissions = [{ access = "write", path = "./reports" }]
 ffi = true
 evm_version = 'shanghai'

@@ -78,4 +78,7 @@ interface IAaveSonicEthERC20Bridge {
    * @param token The address of token to withdraw
    */
   function withdrawToCollector(address token) external;
+
+  /// @dev Withdraws token to Aave V3 Collector.
+  function withdrawEthToCollector() external;
 }

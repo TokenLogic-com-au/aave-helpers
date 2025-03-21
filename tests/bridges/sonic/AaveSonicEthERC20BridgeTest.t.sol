@@ -8,24 +8,19 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {IRescuable} from 'solidity-utils/contracts/utils/interfaces/IRescuable.sol';
 import {IWithGuardian} from 'solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol';
 import {AaveV3Ethereum} from 'aave-address-book/AaveV3Ethereum.sol';
+import {AaveV3Sonic} from 'aave-address-book/AaveV3Sonic.sol';
 
 import {AaveSonicEthERC20Bridge, IAaveSonicEthERC20Bridge} from 'src/bridges/sonic/AaveSonicEthERC20Bridge.sol';
 
-/// forge test --match-path tests/bridges/sonic/AaveSonicEthERC20BridgeTest.t.sol -vvv
-contract AaveSonicEthERC20BridgeTest is Test {
-  event Bridge(address indexed token, uint256 amount);
-  event Claim(address indexed token, uint256 amount);
-  event WithdrawToCollector(address indexed token, uint256 amount);
-
-  // https://etherscan.io/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
-  AaveSonicEthERC20Bridge bridgeMainnet =
-    AaveSonicEthERC20Bridge(0xB7BD405f4a43E9DA2d5FbF3066C0C28E46F9306e);
-  // https://sonicscan.org/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
-  AaveSonicEthERC20Bridge bridgeSonic =
-    AaveSonicEthERC20Bridge(0xB7BD405f4a43E9DA2d5FbF3066C0C28E46F9306e);
+/// forge test --match-path tests/bridges/sonic/AaveSonicEthERC20BridgeTestBase.t.sol -vvv
+contract AaveSonicEthERC20BridgeTestBase is Test {
+  AaveSonicEthERC20Bridge bridgeMainnet;
+  AaveSonicEthERC20Bridge bridgeSonic;
   uint256 mainnetFork;
   uint256 sonicFork;
+  uint256 invalidChainFork;
 
+  // address of test deployer
   address public owner = 0x94A8518B76A3c45F5387B521695024379d43d715;
   address public guardian = 0x94A8518B76A3c45F5387B521695024379d43d715;
 
@@ -34,16 +29,21 @@ contract AaveSonicEthERC20BridgeTest is Test {
   address public USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
   address public bridgedUSDT = 0x6047828dc181963ba44974801FF68e538dA5eaF9;
 
-  function setUp() public {
+  function setUp() public virtual {
     bytes32 salt = keccak256(abi.encode(tx.origin, uint256(0)));
-    mainnetFork = vm.createSelectFork(vm.rpcUrl('mainnet'), 22081205);
-    sonicFork = vm.createSelectFork(vm.rpcUrl('sonic'), 14633881);
+    mainnetFork = vm.createFork(vm.rpcUrl('mainnet'), 22081205);
+    sonicFork = vm.createFork(vm.rpcUrl('sonic'), 14633881);
+    invalidChainFork = vm.createFork(vm.rpcUrl('arbitrum'), 318006219);
 
     vm.selectFork(mainnetFork);
+    bridgeMainnet = new AaveSonicEthERC20Bridge{salt: salt}(owner, guardian);
+
+    vm.selectFork(sonicFork);
+    bridgeSonic = new AaveSonicEthERC20Bridge{salt: salt}(owner, guardian);
   }
 }
 
-contract DepositTest is AaveSonicEthERC20BridgeTest {
+contract DepositTest is AaveSonicEthERC20BridgeTestBase {
   uint256 amount = 1_000e6;
 
   function test_revertsIf_notOwnerOrGuardian() public {
@@ -53,7 +53,7 @@ contract DepositTest is AaveSonicEthERC20BridgeTest {
     bridgeMainnet.deposit(USDC, amount);
   }
 
-  function test_revertsIf_InvalidChainId() public {
+  function test_revertsIf_InvalidChain() public {
     vm.startPrank(guardian);
     vm.selectFork(sonicFork);
     vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidChain.selector);
@@ -85,7 +85,7 @@ contract DepositTest is AaveSonicEthERC20BridgeTest {
     deal(USDC, address(bridgeMainnet), testAmount);
 
     vm.expectEmit(true, true, false, true);
-    emit Bridge(USDC, testAmount);
+    emit IAaveSonicEthERC20Bridge.Bridge(USDC, testAmount);
     bridgeMainnet.deposit(USDC, testAmount);
     vm.stopPrank();
   }
@@ -124,15 +124,15 @@ contract DepositTest is AaveSonicEthERC20BridgeTest {
     amounts[0] = amount;
     amounts[1] = amount;
 
-    vm.expectEmit(true, true, false, true);
-    emit Bridge(USDC, amount);
-    emit Bridge(USDT, amount);
+    vm.expectEmit(true, false, false, true, address(bridgeMainnet));
+    emit IAaveSonicEthERC20Bridge.Bridge(USDC, amount);
+    emit IAaveSonicEthERC20Bridge.Bridge(USDT, amount);
     bridgeMainnet.deposit(tokens, amounts);
     vm.stopPrank();
   }
 }
 
-contract WithdrawTest is AaveSonicEthERC20BridgeTest {
+contract WithdrawTest is AaveSonicEthERC20BridgeTestBase {
   uint256 amount = 1_000e6;
 
   function test_revertsIf_notOwnerOrGuardian() public {
@@ -142,7 +142,7 @@ contract WithdrawTest is AaveSonicEthERC20BridgeTest {
     bridgeMainnet.withdraw(USDC, amount);
   }
 
-  function test_revertsIf_InvalidChainId() public {
+  function test_revertsIf_InvalidChain() public {
     vm.startPrank(guardian);
     vm.selectFork(mainnetFork);
     vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidChain.selector);
@@ -174,7 +174,7 @@ contract WithdrawTest is AaveSonicEthERC20BridgeTest {
     deal(bridgedUSDC, address(bridgeMainnet), amount);
 
     vm.expectEmit(true, true, false, true);
-    emit Bridge(USDC, amount);
+    emit IAaveSonicEthERC20Bridge.Bridge(USDC, amount);
     bridgeMainnet.withdraw(USDC, amount);
     vm.stopPrank();
   }
@@ -213,22 +213,37 @@ contract WithdrawTest is AaveSonicEthERC20BridgeTest {
     amounts[0] = amount;
     amounts[1] = amount;
 
-    vm.expectEmit(true, true, false, true);
-    emit Bridge(USDC, amount);
-    emit Bridge(USDT, amount);
+    vm.expectEmit(true, false, false, true, address(bridgeSonic));
+    emit IAaveSonicEthERC20Bridge.Bridge(USDC, amount);
+    emit IAaveSonicEthERC20Bridge.Bridge(USDT, amount);
     bridgeSonic.withdraw(tokens, amounts);
     vm.stopPrank();
   }
 }
 
-contract ClaimTestOnSonic is AaveSonicEthERC20BridgeTest {
+contract ClaimTestOnSonic is AaveSonicEthERC20BridgeTestBase {
   uint256 depositId = 83107629666763039256896161050088999267967285591997717212311752767753132459771;
   address token = USDC;
   uint256 amount = 10_000_000;
 
-  function test_revertsIf_AlreadyClaimed() public {
+  function setUp() public override {
+    super.setUp();
     vm.selectFork(sonicFork);
+    // https://etherscan.io/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
+    bridgeSonic = AaveSonicEthERC20Bridge(payable(0xB7BD405f4a43E9DA2d5FbF3066C0C28E46F9306e));
+  }
 
+  function test_revertsIf_InvalidChain() public {
+    vm.selectFork(invalidChainFork);
+    IAaveSonicEthERC20Bridge invalidBridge = new AaveSonicEthERC20Bridge(owner, guardian);
+
+    bytes memory proof = hex'f91722b90f03f900';
+
+    vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidChain.selector);
+    invalidBridge.claim(depositId, token, amount, proof);
+  }
+
+  function test_revertsIf_AlreadyClaimed() public {
     bytes memory proof = hex'f91722b90f03f900';
 
     vm.expectRevert('Already claimed');
@@ -236,8 +251,6 @@ contract ClaimTestOnSonic is AaveSonicEthERC20BridgeTest {
   }
 
   function test_success() public {
-    vm.selectFork(sonicFork);
-
     bytes32 storageSlot = keccak256(abi.encode(depositId, uint256(2)));
     vm.store(bridgeSonic.SONIC_BRIDGE(), storageSlot, bytes32(uint256(0)));
 
@@ -247,7 +260,7 @@ contract ClaimTestOnSonic is AaveSonicEthERC20BridgeTest {
     uint256 balanceBefore = IERC20(bridgedUSDC).balanceOf(address(bridgeSonic));
 
     vm.expectEmit(true, false, false, true, address(bridgeSonic));
-    emit Claim(token, amount);
+    emit IAaveSonicEthERC20Bridge.Claim(token, amount);
     bridgeSonic.claim(depositId, token, amount, proof);
 
     uint256 balanceAfter = IERC20(bridgedUSDC).balanceOf(address(bridgeSonic));
@@ -255,14 +268,19 @@ contract ClaimTestOnSonic is AaveSonicEthERC20BridgeTest {
   }
 }
 
-contract ClaimTestOnMainnet is AaveSonicEthERC20BridgeTest {
+contract ClaimTestOnMainnet is AaveSonicEthERC20BridgeTestBase {
   uint256 depositId = 83107629666763039256896161050088999267967285591997717212311752767753133146999;
   address token = USDC;
   uint256 amount = 10_000_000;
 
-  function test_revertsIf_AlreadyClaimed() public {
+  function setUp() public override {
+    super.setUp();
     vm.selectFork(mainnetFork);
+    // https://sonicscan.org/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
+    bridgeMainnet = AaveSonicEthERC20Bridge(payable(0xB7BD405f4a43E9DA2d5FbF3066C0C28E46F9306e));
+  }
 
+  function test_revertsIf_AlreadyClaimed() public {
     bytes memory proof = hex'f91722b90f03f900';
 
     vm.expectRevert('Already claimed');
@@ -270,8 +288,6 @@ contract ClaimTestOnMainnet is AaveSonicEthERC20BridgeTest {
   }
 
   function test_success() public {
-    vm.selectFork(mainnetFork);
-
     bytes32 storageSlot = keccak256(abi.encode(depositId, uint256(8)));
     vm.store(bridgeMainnet.MAINNET_BRIDGE(), storageSlot, bytes32(uint256(0)));
 
@@ -281,7 +297,7 @@ contract ClaimTestOnMainnet is AaveSonicEthERC20BridgeTest {
     uint256 balanceBefore = IERC20(USDC).balanceOf(address(bridgeMainnet));
 
     vm.expectEmit(true, false, false, true, address(bridgeMainnet));
-    emit Claim(token, amount);
+    emit IAaveSonicEthERC20Bridge.Claim(token, amount);
     bridgeMainnet.claim(depositId, token, amount, proof);
 
     uint256 balanceAfter = IERC20(USDC).balanceOf(address(bridgeMainnet));
@@ -289,7 +305,98 @@ contract ClaimTestOnMainnet is AaveSonicEthERC20BridgeTest {
   }
 }
 
-contract TransferOwnership is AaveSonicEthERC20BridgeTest {
+contract WithdrawToCollectorTest is AaveSonicEthERC20BridgeTestBase {
+  uint256 usdcTestAmount = 1_000e6;
+  uint256 ethTestAmount = 1_000e18;
+
+  function test_revertsIf_InvalidChain() public {
+    vm.selectFork(invalidChainFork);
+    AaveSonicEthERC20Bridge invalidBridge = new AaveSonicEthERC20Bridge(owner, guardian);
+
+    vm.expectRevert(IAaveSonicEthERC20Bridge.InvalidChain.selector);
+    invalidBridge.withdrawEthToCollector();
+  }
+
+  function test_success_withdrawTokenOnMainnet() public {
+    vm.selectFork(mainnetFork);
+    deal(USDC, address(bridgeMainnet), usdcTestAmount);
+
+    uint256 balanceOfBridgeBefore = IERC20(USDC).balanceOf(address(bridgeMainnet));
+    uint256 balanceOfCollectorBefore = IERC20(USDC).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+
+    vm.expectEmit(true, false, false, true, address(bridgeMainnet));
+    emit IAaveSonicEthERC20Bridge.WithdrawToCollector(USDC, usdcTestAmount);
+    bridgeMainnet.withdrawToCollector(USDC);
+
+    uint256 balanceOfBridgeAfter = IERC20(USDC).balanceOf(address(bridgeMainnet));
+    uint256 balanceOfCollectorAfter = IERC20(USDC).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+
+    assertEq(balanceOfBridgeBefore, usdcTestAmount);
+    assertEq(balanceOfBridgeAfter, 0);
+    assertEq(balanceOfCollectorAfter, balanceOfCollectorBefore + usdcTestAmount);
+  }
+
+  function test_success_withdrawEthOnMainnet() public {
+    vm.selectFork(mainnetFork);
+    deal(address(bridgeMainnet), ethTestAmount);
+
+    uint256 balanceOfBridgeBefore = payable(address(bridgeMainnet)).balance;
+    uint256 balanceOfCollectorBefore = payable(address(AaveV3Ethereum.COLLECTOR)).balance;
+
+    vm.expectEmit(true, false, false, true, address(bridgeMainnet));
+    emit IAaveSonicEthERC20Bridge.WithdrawToCollector(address(0), ethTestAmount);
+    bridgeMainnet.withdrawEthToCollector();
+
+    uint256 balanceOfBridgeAfter = payable(address(bridgeMainnet)).balance;
+    uint256 balanceOfCollectorAfter = payable(address(AaveV3Ethereum.COLLECTOR)).balance;
+
+    assertEq(balanceOfBridgeBefore, ethTestAmount);
+    assertEq(balanceOfBridgeAfter, 0);
+    assertEq(balanceOfCollectorAfter, balanceOfCollectorBefore + ethTestAmount);
+  }
+
+  function test_success_withdrawTokenOnSonic() public {
+    vm.selectFork(sonicFork);
+    deal(bridgedUSDC, address(bridgeSonic), usdcTestAmount);
+
+    uint256 balanceOfBridgeBefore = IERC20(bridgedUSDC).balanceOf(address(bridgeSonic));
+    uint256 balanceOfCollectorBefore = IERC20(bridgedUSDC).balanceOf(
+      address(AaveV3Sonic.COLLECTOR)
+    );
+
+    vm.expectEmit(true, false, false, true, address(bridgeSonic));
+    emit IAaveSonicEthERC20Bridge.WithdrawToCollector(bridgedUSDC, usdcTestAmount);
+    bridgeSonic.withdrawToCollector(bridgedUSDC);
+
+    uint256 balanceOfBridgeAfter = IERC20(bridgedUSDC).balanceOf(address(bridgeSonic));
+    uint256 balanceOfCollectorAfter = IERC20(bridgedUSDC).balanceOf(address(AaveV3Sonic.COLLECTOR));
+
+    assertEq(balanceOfBridgeBefore, usdcTestAmount);
+    assertEq(balanceOfBridgeAfter, 0);
+    assertEq(balanceOfCollectorAfter, balanceOfCollectorBefore + usdcTestAmount);
+  }
+
+  function test_success_withdrawSOnSonic() public {
+    vm.selectFork(sonicFork);
+    deal(address(bridgeSonic), ethTestAmount);
+
+    uint256 balanceOfBridgeBefore = payable(address(bridgeSonic)).balance;
+    uint256 balanceOfCollectorBefore = payable(address(AaveV3Sonic.COLLECTOR)).balance;
+
+    vm.expectEmit(true, false, false, true, address(bridgeSonic));
+    emit IAaveSonicEthERC20Bridge.WithdrawToCollector(address(0), ethTestAmount);
+    bridgeSonic.withdrawEthToCollector();
+
+    uint256 balanceOfBridgeAfter = payable(address(bridgeSonic)).balance;
+    uint256 balanceOfCollectorAfter = payable(address(AaveV3Sonic.COLLECTOR)).balance;
+
+    assertEq(balanceOfBridgeBefore, ethTestAmount);
+    assertEq(balanceOfBridgeAfter, 0);
+    assertEq(balanceOfCollectorAfter, balanceOfCollectorBefore + ethTestAmount);
+  }
+}
+
+contract TransferOwnershipTest is AaveSonicEthERC20BridgeTestBase {
   function test_revertsIf_invalidCaller() public {
     vm.expectRevert(
       abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this))
@@ -307,7 +414,7 @@ contract TransferOwnership is AaveSonicEthERC20BridgeTest {
   }
 }
 
-contract UpdateGuardian is AaveSonicEthERC20BridgeTest {
+contract UpdateGuardianTest is AaveSonicEthERC20BridgeTestBase {
   function test_revertsIf_invalidCaller() public {
     vm.expectRevert(
       abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, address(this))
@@ -325,10 +432,11 @@ contract UpdateGuardian is AaveSonicEthERC20BridgeTest {
   }
 }
 
-contract EmergencyTokenTransfer is AaveSonicEthERC20BridgeTest {
+contract EmergencyTokenTransferTest is AaveSonicEthERC20BridgeTestBase {
   uint256 amount = 1_000e18;
 
   function test_successful() public {
+    vm.selectFork(mainnetFork);
     uint256 initialCollectorBalance = IERC20(USDC).balanceOf(address(AaveV3Ethereum.COLLECTOR));
     deal(USDC, address(bridgeMainnet), amount);
     vm.startPrank(owner);

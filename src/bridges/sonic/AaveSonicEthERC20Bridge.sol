@@ -35,6 +35,8 @@ contract AaveSonicEthERC20Bridge is
 
   constructor(address owner, address guardian) OwnableWithGuardian(owner, guardian) {}
 
+  receive() external payable {}
+
   /// @inheritdoc IAaveSonicEthERC20Bridge
   function deposit(address token, uint256 amount) external onlyOwnerOrGuardian {
     if (block.chainid != ChainIds.MAINNET) revert InvalidChain();
@@ -112,14 +114,26 @@ contract AaveSonicEthERC20Bridge is
     uint256 balance = payable(address(this)).balance;
 
     if (block.chainid == ChainIds.MAINNET) {
-      payable(address(AaveV3Ethereum.COLLECTOR)).call{value: balance}('');
+      address(AaveV3Ethereum.COLLECTOR).call{value: balance}('');
     } else if (block.chainid == ChainIds.SONIC) {
-      payable(address(AaveV3Sonic.COLLECTOR)).call{value: balance}('');
+      address(AaveV3Sonic.COLLECTOR).call{value: balance}('');
     } else {
       revert InvalidChain();
     }
 
     emit WithdrawToCollector(address(0), balance);
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(
+    address erc20Token
+  ) public view override(IRescuableBase, RescuableBase) returns (uint256) {
+    return type(uint256).max;
+  }
+
+  /// @inheritdoc IPermissionlessRescuable
+  function whoShouldReceiveFunds() public view override returns (address) {
+    return address(AaveV3Ethereum.COLLECTOR);
   }
 
   function _deposit(uint96 uid, address token, uint256 amount) internal {
@@ -141,18 +155,4 @@ contract AaveSonicEthERC20Bridge is
 
     emit Bridge(originalToken, amount);
   }
-
-  /// @inheritdoc IRescuableBase
-  function maxRescue(
-    address erc20Token
-  ) public view override(IRescuableBase, RescuableBase) returns (uint256) {
-    return type(uint256).max;
-  }
-
-  /// @inheritdoc IPermissionlessRescuable
-  function whoShouldReceiveFunds() public view override returns (address) {
-    return address(AaveV3Ethereum.COLLECTOR);
-  }
-
-  receive() external payable {}
 }
