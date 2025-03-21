@@ -64,7 +64,7 @@ The `AaveSonicEthERC20Bridge` is a smart contract designed to facilitate the bri
 ### Deployment
 
 The contract is deployed with an owner and guardian address. These addresses have special permissions to execute certain functions.
-*Note: Bridge contract should be deployed to same address on Mainnet and Sonic*
+_Note: Bridge contract should be deployed to same address on Mainnet and Sonic_
 
 ### Interactions
 
@@ -73,9 +73,11 @@ The contract is deployed with an owner and guardian address. These addresses hav
 3. **Generate Proof and Claim Tokens**: After calling `deposit` or `withdraw`, use the `aave-cli-tools` to generate a proof for the transaction. This proof is then used to claim the tokens on the destination chain.
 
    Example CLI command:
+
    ```bash
    yarn start sonic-claim <source_chain_id> <tx_hash> <bridge>
    ```
+
    - `<source_chain_id>`: The chain ID of the source chain (e.g., Ethereum Mainnet(1) or Sonic(146). Otherwise it returns error).
    - `<tx_hash>`: The transaction hash of the deposit or withdraw transaction.
    - `<bridge>`: The address of the bridge contract on the chain (this address is the same on both chains).
@@ -84,14 +86,14 @@ The contract is deployed with an owner and guardian address. These addresses hav
 
 4. **Withdraw to Collector**: Call `withdrawToCollector` or `withdrawEthToCollector` to move funds to the Aave collector.
 
-
 ## Onchain Tests
+
 Bridge contracts are deployed on [Mainnet](https://etherscan.io/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e) and [Sonic](https://sonicscan.org/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e)
 
-| Direct | Tx on Source Chain | Tx on Destination Chain |
-| :-: | :-:|:-:|
-| Ethereum -> Sonic | [0x039a60a00dc22689e35c51dbee9672fd6a0e354157dcc172753ac0a85bfa7ae7](https://etherscan.io/tx/0x039a60a00dc22689e35c51dbee9672fd6a0e354157dcc172753ac0a85bfa7ae7) | [0x9dad15790260d4c254683775d2371697f44716fb5d2c7dbb7aa2c1499011bf77](https://sonicscan.org/tx/0x9dad15790260d4c254683775d2371697f44716fb5d2c7dbb7aa2c1499011bf77) |
-| Sonic -> Ethereum | [0xebca94b24ede54ec762c585b45d687f9e796da7c656cde433df3d0698d013ae2](https://sonicscan.org/tx/0xebca94b24ede54ec762c585b45d687f9e796da7c656cde433df3d0698d013ae2) | [0x4c600df9566fbfef72cc88d3af8cd3157cff1cd35ba6303136cfc8b592c7d721](https://etherscan.io/tx/0x4c600df9566fbfef72cc88d3af8cd3157cff1cd35ba6303136cfc8b592c7d721) |
+|      Direct       |                                                                        Tx on Source Chain                                                                         |                                                                      Tx on Destination Chain                                                                      |
+| :---------------: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| Ethereum -> Sonic | [0x039a60a00dc22689e35c51dbee9672fd6a0e354157dcc172753ac0a85bfa7ae7](https://etherscan.io/tx/0x039a60a00dc22689e35c51dbee9672fd6a0e354157dcc172753ac0a85bfa7ae7)  | [0x9dad15790260d4c254683775d2371697f44716fb5d2c7dbb7aa2c1499011bf77](https://sonicscan.org/tx/0x9dad15790260d4c254683775d2371697f44716fb5d2c7dbb7aa2c1499011bf77) |
+| Sonic -> Ethereum | [0xebca94b24ede54ec762c585b45d687f9e796da7c656cde433df3d0698d013ae2](https://sonicscan.org/tx/0xebca94b24ede54ec762c585b45d687f9e796da7c656cde433df3d0698d013ae2) | [0x4c600df9566fbfef72cc88d3af8cd3157cff1cd35ba6303136cfc8b592c7d721](https://etherscan.io/tx/0x4c600df9566fbfef72cc88d3af8cd3157cff1cd35ba6303136cfc8b592c7d721)  |
 
 ## Supported Tokens
 
@@ -103,8 +105,8 @@ Currently Sonic Gateway supports FTM, USDT, USDC, EURC, WETH, DOLA, SILO, UNI, G
 | :-------: | :---------------: | :---------------: |
 |  Deposit  |    15 minutes     |     1 second      |
 | Heartbeat |      15 min       |      1 hour       |
-|   Claim   |    immediate      |    immediate      |
-| Fast Lane |    0.0002 S       |    0.0065 ETH     |
+|   Claim   |     immediate     |     immediate     |
+| Fast Lane |     0.0002 S      |    0.0065 ETH     |
 
 ## Security Considerations
 
