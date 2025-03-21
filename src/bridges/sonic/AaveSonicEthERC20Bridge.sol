@@ -18,7 +18,7 @@ import {IAaveSonicEthERC20Bridge} from './IAaveSonicEthERC20Bridge.sol';
 
 /// @title AaveSonicEthERC20Bridge
 /// @author TokenLogic
-/// @notice Interface for AaveSonicEthERC20Bridge
+/// @notice Helper contract to bridge assets between mainnet and sonic
 contract AaveSonicEthERC20Bridge is
   IAaveSonicEthERC20Bridge,
   OwnableWithGuardian,

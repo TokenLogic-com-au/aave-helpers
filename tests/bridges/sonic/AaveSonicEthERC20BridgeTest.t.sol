@@ -229,7 +229,7 @@ contract ClaimTestOnSonic is AaveSonicEthERC20BridgeTestBase {
   function setUp() public override {
     super.setUp();
     vm.selectFork(sonicFork);
-    // https://etherscan.io/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
+    // https://sonicscan.org/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
     bridgeSonic = AaveSonicEthERC20Bridge(payable(0xB7BD405f4a43E9DA2d5FbF3066C0C28E46F9306e));
   }
 
@@ -276,7 +276,7 @@ contract ClaimTestOnMainnet is AaveSonicEthERC20BridgeTestBase {
   function setUp() public override {
     super.setUp();
     vm.selectFork(mainnetFork);
-    // https://sonicscan.org/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
+    // https://etherscan.io/address/0xb7bd405f4a43e9da2d5fbf3066c0c28e46f9306e
     bridgeMainnet = AaveSonicEthERC20Bridge(payable(0xB7BD405f4a43E9DA2d5FbF3066C0C28E46F9306e));
   }
 
