@@ -134,6 +134,41 @@ contract BridgeToken is AaveCcipGhoBridgeTestBase {
     vm.stopPrank();
   }
 
+  function test_success_ReturnNativeFee() external {
+    vm.startPrank(owner);
+    bridge.setDestinationBridge(DESTINATION_CHAIN_SELECTOR, address(destinationBridge));
+    bridge.grantRole(bridge.BRIDGER_ROLE(), alice);
+
+    vm.stopPrank();
+
+    uint256 fee = bridge.quoteBridge(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(0));
+    deal(address(gho), alice, amount);
+    deal(alice, fee + 100);
+
+    uint256 beforeSenderBalance = gho.balanceOf(alice);
+    uint256 beforeNativeBalance = payable(alice).balance;
+
+    vm.startPrank(alice);
+
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(amount, gasLimit, address(0));
+
+    // Expect call to CCIP send function
+    vm.expectCall(
+      address(ccipRouter),
+      abi.encodeWithSelector(ccipRouter.ccipSend.selector, DESTINATION_CHAIN_SELECTOR, message)
+    );
+    vm.expectEmit(false, true, true, true, address(bridge));
+    emit IAaveCcipGhoBridge.TransferIssued(bytes32(0), DESTINATION_CHAIN_SELECTOR, alice, amount);
+    bridge.bridge{value: fee + 100}(DESTINATION_CHAIN_SELECTOR, amount, gasLimit, address(0));
+
+    uint256 afterSenderBalance = gho.balanceOf(alice);
+    uint256 afterNativeBalance = payable(alice).balance;
+    assertEq(beforeSenderBalance, afterSenderBalance + amount);
+    assertEq(beforeNativeBalance, afterNativeBalance + fee);
+
+    vm.stopPrank();
+  }
+
   function testFuzz_success(uint256 amount) external {
     vm.assume(amount > 0 && amount < 1e32);
 
