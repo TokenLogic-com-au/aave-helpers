@@ -10,8 +10,9 @@ import {AccessControl, IAccessControl} from 'aave-v3-origin/contracts/dependenci
 import {CCIPReceiver, IAny2EVMMessageReceiver, IERC165} from '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol';
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
+import {IRouter} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouter.sol';
 
-import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
+import {IAaveCcipGhoBridge, IOnRampClient, ITokenPool} from './IAaveCcipGhoBridge.sol';
 
 /**
  * @title AaveCcipGhoBridge
@@ -42,10 +43,15 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
   /// @dev Saves state of invalid message.
   mapping(bytes32 messageId => bool failed) public isInvalidMessage;
 
-  /// @dev Checks if the destination bridge has been set up
-  modifier checkDestination(uint64 chainSelector) {
+  /// @dev Checks if the destination bridge has been set up and amount is exceed rate limit
+  modifier checkDestinationAndLimit(uint64 chainSelector, uint256 amount) {
     if (bridges[chainSelector] == address(0)) {
       revert UnsupportedChain();
+    }
+
+    uint128 limit = getRateLimit(chainSelector);
+    if (amount > limit) {
+      revert ExceedRateLimit(limit);
     }
     _;
   }
@@ -96,7 +102,7 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
   )
     external
     payable
-    checkDestination(destinationChainSelector)
+    checkDestinationAndLimit(destinationChainSelector, amount)
     onlyRole(BRIDGER_ROLE)
     returns (bytes32 messageId)
   {
@@ -147,7 +153,7 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
     uint256 amount,
     uint256 gasLimit,
     address feeToken
-  ) external view checkDestination(destinationChainSelector) returns (uint256 fee) {
+  ) external view checkDestinationAndLimit(destinationChainSelector, amount) returns (uint256 fee) {
     if (feeToken != address(0) && feeToken != GHO) {
       revert InvalidFeeToken();
     }
@@ -239,6 +245,18 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
       interfaceId == type(IAccessControl).interfaceId ||
       interfaceId == type(IAny2EVMMessageReceiver).interfaceId ||
       interfaceId == type(IERC165).interfaceId;
+  }
+
+  function getRateLimit(uint64 _destinationChainSelector) public view returns (uint128 limit) {
+    address onRamp = IRouter(ROUTER).getOnRamp(_destinationChainSelector);
+    ITokenPool tokenPool = ITokenPool(
+      IOnRampClient(onRamp).getPoolBySourceToken(_destinationChainSelector, GHO)
+    );
+    if (block.chainid == 1) {
+      (limit, , , , ) = tokenPool.getCurrentInboundRateLimiterState(_destinationChainSelector);
+    } else {
+      (limit, , , , ) = tokenPool.getCurrentOutboundRateLimiterState(_destinationChainSelector);
+    }
   }
 
   /// @inheritdoc Rescuable

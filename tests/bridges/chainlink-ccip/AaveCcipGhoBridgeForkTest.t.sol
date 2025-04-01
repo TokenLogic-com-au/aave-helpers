@@ -13,21 +13,6 @@ import {AaveV3Arbitrum, AaveV3ArbitrumAssets} from 'aave-address-book/AaveV3Arbi
 
 import {AaveCcipGhoBridge, IAaveCcipGhoBridge, CCIPReceiver} from 'src/bridges/chainlink-ccip/AaveCcipGhoBridge.sol';
 
-interface ILockReleaseTokenPool {
-  function getCurrentOutboundRateLimiterState(
-    uint64 remoteChainSelector
-  )
-    external
-    view
-    returns (uint128 tokens, uint32 lastUpdated, bool isEnabled, uint128 capacity, uint128 rate);
-  function getCurrentInboundRateLimiterState(
-    uint64 remoteChainSelector
-  )
-    external
-    view
-    returns (uint128 tokens, uint32 lastUpdated, bool isEnabled, uint128 capacity, uint128 rate);
-}
-
 /// @dev forge test --match-path=tests/bridges/chainlink-ccip/AaveCcipGhoBridgeForkTest.t.sol -vvv
 contract AaveCcipGhoBridgeTestBase is Test {
   uint64 public constant MAINNET_CHAIN_SELECTOR = 5009297550715157269;
@@ -240,11 +225,7 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
 
   function testFuzz_revertsIf_exceedLimit(uint256 amount) external {
     vm.selectFork(mainnetFork);
-    // https://etherscan.io/address/0x06179f7C1be40863405f374E7f5F8806c728660A
-    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
-      0x06179f7C1be40863405f374E7f5F8806c728660A
-    );
-    (uint128 limit, , , , ) = ghoPool.getCurrentInboundRateLimiterState(ARBITRUM_CHAIN_SELECTOR);
+    uint128 limit = mainnetBridge.getRateLimit(ARBITRUM_CHAIN_SELECTOR);
 
     vm.assume(amount > limit && amount < 1e32); // made top limit to prevent arithmetic overflow
 
@@ -259,23 +240,19 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
     vm.stopPrank();
 
     vm.selectFork(mainnetFork);
-    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
+    uint256 fee = 1 ether; // set static fee because quoteBridge reverts if amount exceed limit
     deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amount + fee);
     deal(alice, 100);
 
     vm.startPrank(alice);
-    vm.expectRevert();
+    vm.expectRevert(abi.encodeWithSelector(IAaveCcipGhoBridge.ExceedRateLimit.selector, limit));
     mainnetBridge.bridge{value: 100}(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
     vm.stopPrank();
   }
 
   function testFuzz_success(uint256 amount) external {
     vm.selectFork(mainnetFork);
-    // https://etherscan.io/address/0x06179f7C1be40863405f374E7f5F8806c728660A
-    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
-      0x06179f7C1be40863405f374E7f5F8806c728660A
-    );
-    (uint128 limit, , , , ) = ghoPool.getCurrentInboundRateLimiterState(ARBITRUM_CHAIN_SELECTOR);
+    uint128 limit = mainnetBridge.getRateLimit(ARBITRUM_CHAIN_SELECTOR);
 
     vm.assume(amount > 0 && amount <= limit);
     vm.selectFork(arbitrumFork);
@@ -297,12 +274,11 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
     vm.selectFork(mainnetFork);
     uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
     deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amount + fee);
-    deal(alice, 100);
 
     vm.startPrank(alice);
     vm.expectEmit(false, true, true, true, address(mainnetBridge));
     emit IAaveCcipGhoBridge.TransferIssued(bytes32(0), ARBITRUM_CHAIN_SELECTOR, alice, amount);
-    mainnetBridge.bridge{value: 100}(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
+    mainnetBridge.bridge(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -317,6 +293,32 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
       address(AaveV3Arbitrum.COLLECTOR)
     );
     assertEq(afterBalance, beforeBalance + amount, 'Bridged amount not updated correctly');
+    vm.stopPrank();
+  }
+
+  function test_success_ReturnEth() external {
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(mainnetFork);
+    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, amountToSend, 0, feeToken);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, alice, amountToSend + fee);
+    deal(alice, 100);
+
+    uint256 ethBalanceBefore = payable(alice).balance;
+
+    vm.startPrank(alice);
+    mainnetBridge.bridge{value: 100}(ARBITRUM_CHAIN_SELECTOR, amountToSend, 0, feeToken);
+
+    uint256 ethBalanceAfter = payable(alice).balance;
+    assertEq(ethBalanceAfter, ethBalanceAfter);
     vm.stopPrank();
   }
 }
@@ -487,11 +489,7 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTestBase {
 
   function testFuzz_revertsIf_exceedLimit(uint256 amount) external {
     vm.selectFork(arbitrumFork);
-    // https://arbiscan.io/address/0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
-    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
-      0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
-    );
-    (uint128 limit, , , , ) = ghoPool.getCurrentOutboundRateLimiterState(MAINNET_CHAIN_SELECTOR);
+    uint128 limit = arbitrumBridge.getRateLimit(MAINNET_CHAIN_SELECTOR);
 
     vm.assume(amount > limit && amount < 1e32); // made top limit to prevent arithmetic overflow
 
@@ -505,23 +503,19 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTestBase {
     vm.stopPrank();
 
     vm.selectFork(arbitrumFork);
-    uint256 fee = arbitrumBridge.quoteBridge(MAINNET_CHAIN_SELECTOR, amount, 300000, feeToken);
+    uint256 fee = 1 ether; // set static fee to avoid reverts of quote bridge
     deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amount);
     deal(alice, fee);
 
     vm.startPrank(alice);
-    vm.expectRevert();
+    vm.expectRevert(abi.encodeWithSelector(IAaveCcipGhoBridge.ExceedRateLimit.selector, limit));
     arbitrumBridge.bridge{value: fee}(MAINNET_CHAIN_SELECTOR, amount, 300000, feeToken);
     vm.stopPrank();
   }
 
   function testFuzz_success(uint256 amount) external {
     vm.selectFork(arbitrumFork);
-    // https://arbiscan.io/address/0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
-    ILockReleaseTokenPool ghoPool = ILockReleaseTokenPool(
-      0xB94Ab28c6869466a46a42abA834ca2B3cECCA5eB
-    );
-    (uint128 limit, , , , ) = ghoPool.getCurrentOutboundRateLimiterState(MAINNET_CHAIN_SELECTOR);
+    uint128 limit = arbitrumBridge.getRateLimit(MAINNET_CHAIN_SELECTOR);
 
     vm.assume(amount > 0 && amount <= limit);
     vm.selectFork(mainnetFork);
@@ -563,6 +557,36 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTestBase {
       address(AaveV3Ethereum.COLLECTOR)
     );
     assertEq(afterBalance, beforeBalance + amount, 'Bridged amount not updated correctly');
+    vm.stopPrank();
+  }
+
+  function test_success_ReturnEth() external {
+    vm.selectFork(arbitrumFork);
+    vm.startPrank(owner);
+    arbitrumBridge.setDestinationBridge(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
+    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(arbitrumFork);
+    uint256 fee = arbitrumBridge.quoteBridge(
+      MAINNET_CHAIN_SELECTOR,
+      amountToSend,
+      300000,
+      feeToken
+    );
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, alice, amountToSend);
+    deal(alice, fee + 100);
+
+    uint256 ethBalanceBefore = payable(alice).balance;
+    vm.startPrank(alice);
+    arbitrumBridge.bridge{value: fee + 100}(MAINNET_CHAIN_SELECTOR, amountToSend, 300000, feeToken);
+
+    uint256 ethBalanceAfter = payable(alice).balance;
+    assertEq(ethBalanceBefore, ethBalanceAfter + fee);
     vm.stopPrank();
   }
 }
@@ -745,6 +769,19 @@ contract QuoteTransferTest is AaveCcipGhoBridgeTestBase {
     vm.startPrank(alice);
     vm.expectRevert(IAaveCcipGhoBridge.InvalidTransferAmount.selector);
     mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, 0, 0, feeToken);
+  }
+
+  function test_revertsIf_ExceedRateLimit() external {
+    vm.selectFork(mainnetFork);
+    vm.startPrank(owner);
+    mainnetBridge.setDestinationBridge(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+    vm.stopPrank();
+
+    vm.startPrank(alice);
+    uint128 limit = mainnetBridge.getRateLimit(ARBITRUM_CHAIN_SELECTOR);
+    vm.expectRevert(abi.encodeWithSelector(IAaveCcipGhoBridge.ExceedRateLimit.selector, limit));
+    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, limit + 1, 0, feeToken);
   }
 
   function test_revertsIf_InvalidFeeToken() external {
