@@ -318,7 +318,32 @@ contract BridgeTokenEthToArbWithGhoFee is AaveCcipGhoBridgeTestBase {
     mainnetBridge.bridge{value: 100}(ARBITRUM_CHAIN_SELECTOR, amountToSend, 0, feeToken);
 
     uint256 ethBalanceAfter = payable(alice).balance;
-    assertEq(ethBalanceAfter, ethBalanceAfter);
+    assertEq(ethBalanceBefore, ethBalanceAfter);
+    vm.stopPrank();
+  }
+
+  function test_success_FundFromBridge() external {
+    vm.startPrank(owner);
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(arbitrumFork);
+    arbitrumBridge.setDestinationBridge(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(mainnetFork);
+    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, amountToSend, 0, feeToken);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, address(mainnetBridge), amountToSend + fee);
+
+    uint256 ghoBalanceBefore = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(alice);
+
+    vm.startPrank(alice);
+    mainnetBridge.bridge(ARBITRUM_CHAIN_SELECTOR, amountToSend, 0, feeToken);
+
+    uint256 ghoBalanceAfter = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(alice);
+    assertEq(ghoBalanceBefore, ghoBalanceAfter);
     vm.stopPrank();
   }
 }
@@ -587,6 +612,36 @@ contract BridgeTokenArbToEthWithNativeFee is AaveCcipGhoBridgeTestBase {
 
     uint256 ethBalanceAfter = payable(alice).balance;
     assertEq(ethBalanceBefore, ethBalanceAfter + fee);
+    vm.stopPrank();
+  }
+
+  function test_success_FundFromBridge() external {
+    vm.selectFork(arbitrumFork);
+    vm.startPrank(owner);
+    arbitrumBridge.setDestinationBridge(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
+    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), alice);
+
+    vm.selectFork(mainnetFork);
+    mainnetBridge.setDestinationBridge(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+
+    vm.stopPrank();
+
+    vm.selectFork(arbitrumFork);
+    uint256 fee = arbitrumBridge.quoteBridge(
+      MAINNET_CHAIN_SELECTOR,
+      amountToSend,
+      300000,
+      feeToken
+    );
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, address(arbitrumBridge), amountToSend);
+    deal(alice, fee);
+
+    uint256 ghoBalanceBefore = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(alice);
+    vm.startPrank(alice);
+    arbitrumBridge.bridge{value: fee}(MAINNET_CHAIN_SELECTOR, amountToSend, 300000, feeToken);
+
+    uint256 ghoBalanceAfter = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(alice);
+    assertEq(ghoBalanceBefore, ghoBalanceAfter);
     vm.stopPrank();
   }
 }

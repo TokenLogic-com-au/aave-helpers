@@ -12,7 +12,9 @@ import {IRouterClient} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 import {IRouter} from '@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouter.sol';
 
-import {IAaveCcipGhoBridge, IOnRampClient, ITokenPool} from './IAaveCcipGhoBridge.sol';
+import {IAaveCcipGhoBridge} from './IAaveCcipGhoBridge.sol';
+import {IOnRampClient} from './IOnRampClient.sol';
+import {ITokenPool} from './ITokenPool.sol';
 
 /**
  * @title AaveCcipGhoBridge

@@ -4,32 +4,6 @@ pragma solidity ^0.8.0;
 
 import {Client} from '@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol';
 
-interface IOnRampClient {
-  /// @notice Get the pool for a specific token
-  function getPoolBySourceToken(
-    uint64 destChainSelector,
-    address sourceToken
-  ) external view returns (address);
-}
-
-interface ITokenPool {
-  /// @notice Gets the token bucket with its values for the block it was requested at.
-  function getCurrentOutboundRateLimiterState(
-    uint64 remoteChainSelector
-  )
-    external
-    view
-    returns (uint128 tokens, uint32 lastUpdated, bool isEnabled, uint128 capacity, uint128 rate);
-
-  /// @notice Gets the token bucket with its values for the block it was requested at.
-  function getCurrentInboundRateLimiterState(
-    uint64 remoteChainSelector
-  )
-    external
-    view
-    returns (uint128 tokens, uint32 lastUpdated, bool isEnabled, uint128 capacity, uint128 rate);
-}
-
 /**
  * @title IAaveCcipBridge
  * @dev Interface of AaveCcipGhoBridge
