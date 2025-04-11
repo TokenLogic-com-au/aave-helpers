@@ -149,27 +149,6 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
     emit TransferIssued(messageId, destinationChainSelector, msg.sender, amount);
   }
 
-  /// @inheritdoc IAaveCcipGhoBridge
-  function quoteBridge(
-    uint64 destinationChainSelector,
-    uint256 amount,
-    uint256 gasLimit,
-    address feeToken
-  ) external view checkDestinationAndLimit(destinationChainSelector, amount) returns (uint256 fee) {
-    if (feeToken != address(0) && feeToken != GHO) {
-      revert InvalidFeeToken();
-    }
-
-    Client.EVM2AnyMessage memory message = _buildCCIPMessage(
-      destinationChainSelector,
-      amount,
-      gasLimit,
-      feeToken
-    );
-
-    fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
-  }
-
   /// @inheritdoc CCIPReceiver
   function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
     try this.processMessage(message) {} catch {
@@ -183,23 +162,6 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
       isInvalidMessage[messageId] = true;
 
       emit ReceivedInvalidMessage(messageId);
-    }
-  }
-
-  /// @inheritdoc IAaveCcipGhoBridge
-  function getInvalidMessage(
-    bytes32 messageId
-  )
-    external
-    view
-    checkInvalidMessage(messageId)
-    returns (Client.EVMTokenAmount[] memory tokenAmounts)
-  {
-    uint256 length = invalidTokenTransfers[messageId].length;
-    tokenAmounts = new Client.EVMTokenAmount[](length);
-
-    for (uint256 i = 0; i < length; ++i) {
-      tokenAmounts[i] = invalidTokenTransfers[messageId][i];
     }
   }
 
@@ -237,6 +199,44 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
     _ccipReceive(message);
   }
 
+  /// @inheritdoc IAaveCcipGhoBridge
+  function quoteBridge(
+    uint64 destinationChainSelector,
+    uint256 amount,
+    uint256 gasLimit,
+    address feeToken
+  ) external view checkDestinationAndLimit(destinationChainSelector, amount) returns (uint256 fee) {
+    if (feeToken != address(0) && feeToken != GHO) {
+      revert InvalidFeeToken();
+    }
+
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(
+      destinationChainSelector,
+      amount,
+      gasLimit,
+      feeToken
+    );
+
+    fee = IRouterClient(ROUTER).getFee(destinationChainSelector, message);
+  }
+
+  /// @inheritdoc IAaveCcipGhoBridge
+  function getInvalidMessage(
+    bytes32 messageId
+  )
+    external
+    view
+    checkInvalidMessage(messageId)
+    returns (Client.EVMTokenAmount[] memory tokenAmounts)
+  {
+    uint256 length = invalidTokenTransfers[messageId].length;
+    tokenAmounts = new Client.EVMTokenAmount[](length);
+
+    for (uint256 i = 0; i < length; ++i) {
+      tokenAmounts[i] = invalidTokenTransfers[messageId][i];
+    }
+  }
+
   /**
    * @dev See {IERC165-supportsInterface}.
    */
@@ -254,11 +254,7 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
     ITokenPool tokenPool = ITokenPool(
       IOnRampClient(onRamp).getPoolBySourceToken(_destinationChainSelector, GHO)
     );
-    if (block.chainid == 1) {
-      (limit, , , , ) = tokenPool.getCurrentInboundRateLimiterState(_destinationChainSelector);
-    } else {
-      (limit, , , , ) = tokenPool.getCurrentOutboundRateLimiterState(_destinationChainSelector);
-    }
+    (limit, , , , ) = tokenPool.getCurrentOutboundRateLimiterState(_destinationChainSelector);
   }
 
   /// @inheritdoc Rescuable
@@ -271,6 +267,15 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
     address token
   ) public view override(RescuableBase, IRescuableBase) returns (uint256) {
     return IERC20(token).balanceOf(address(this));
+  }
+
+  /// @inheritdoc CCIPReceiver
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
+    uint256 ghoAmount = message.destTokenAmounts[0].amount;
+
+    IERC20(GHO).transfer(COLLECTOR, ghoAmount);
+
+    emit TransferFinished(message.messageId, COLLECTOR, ghoAmount);
   }
 
   /**
@@ -304,14 +309,5 @@ contract AaveCcipGhoBridge is CCIPReceiver, AccessControl, Rescuable, IAaveCcipG
         ),
       feeToken: feeToken
     });
-  }
-
-  /// @inheritdoc CCIPReceiver
-  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
-    uint256 ghoAmount = message.destTokenAmounts[0].amount;
-
-    IERC20(GHO).transfer(COLLECTOR, ghoAmount);
-
-    emit TransferFinished(message.messageId, COLLECTOR, ghoAmount);
   }
 }
