@@ -6,44 +6,27 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ERC20Mock} from "openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import {Strings} from "aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Strings.sol";
 
+import {Constants} from "./Constants.sol";
 import {CCIPReceiver} from "src/bridges/ccip/CCIPReceiver.sol";
 import {MockCCIPRouter, Client, IRouterClient} from "./mocks/MockRouter.sol";
 import {AaveGhoCcipBridge} from "src/bridges/ccip/AaveGhoCcipBridge.sol";
 import {IAaveGhoCcipBridge} from "src/bridges/ccip/interfaces/IAaveGhoCcipBridge.sol";
 
-contract AaveGhoCcipBridgeTestBase is Test {
-    /// @dev Query for a nonexistent map key.
-    /// @dev From EnumerableMap
-    error EnumerableMapNonexistentKey(bytes32 key);
-
-    // Panic(uint256).selector
-    bytes public constant PANIC_SELECTOR = hex"4e487b710000000000000000000000000000000000000000000000000000000000000032";
-
-    // https://docs.chain.link/ccip/directory/mainnet/chain/mainnet
-    uint64 public constant MAINNET_CHAIN_SELECTOR = 5009297550715157269;
-
-    // https://docs.chain.link/ccip/directory/mainnet/chain/ethereum-mainnet-arbitrum-1
-    uint64 public constant ARBITRUM_CHAIN_SELECTOR = 4949039107694359620;
-
+contract AaveGhoCcipBridgeTestBase is Test, Constants {
     uint256 public constant mockFee = 0.01 ether;
     uint256 public constant amount = 1_000 ether;
     uint256 public constant gasLimit = 0; // use default gasLimit
 
     IRouterClient public ccipRouter;
     IERC20 public gho;
-    address public collector;
-    address public admin;
-    address public alice;
-    address public destinationBridge;
+    address public collector = makeAddr("collector");
+    address public admin = makeAddr("admin");
+    address public alice = makeAddr("alice");
+    address public destinationBridge = makeAddr("destination-bridge");
 
     AaveGhoCcipBridge bridge;
 
     function setUp() public {
-        collector = makeAddr("collector");
-        admin = makeAddr("admin");
-        alice = makeAddr("alice");
-        destinationBridge = makeAddr("destination-bridge");
-
         MockCCIPRouter mockRouter = new MockCCIPRouter();
         ccipRouter = IRouterClient(address(mockRouter));
         mockRouter.setFee(mockFee);
