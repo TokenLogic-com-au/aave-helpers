@@ -2,10 +2,6 @@
 pragma solidity ^0.8.0;
 
 contract Constants {
-    /// @dev Query for a nonexistent map key.
-    /// @dev From EnumerableMap
-    error EnumerableMapNonexistentKey(bytes32 key);
-
     // Panic(uint256).selector
     bytes public constant PANIC_SELECTOR = hex"4e487b710000000000000000000000000000000000000000000000000000000000000032";
 

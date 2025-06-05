@@ -183,6 +183,13 @@ interface IAaveGhoCcipBridge {
     function getInvalidMessage(bytes32 messageId) external view returns (Client.EVMTokenAmount[] memory);
 
     /**
+     * @dev Returns the bridge rate limit for a given chain.
+     * @param chainSelector The chain selector of the destination chain
+     * @return The rate limit of the chain
+     */
+    function getRateLimit(uint64 chainSelector) external view returns (uint128);
+
+    /**
      * @notice Returns the fee amount cost to execute the bridge transfer.
      * @param chainSelector The chain selector of the destination chain
      * @param amount The amount of GHO to transfer

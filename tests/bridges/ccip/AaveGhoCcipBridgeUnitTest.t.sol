@@ -212,7 +212,7 @@ contract HandleInvalidMessageTest is AaveGhoCcipBridgeTestBase {
 
     function test_revertIf_MessageNotFound() external {
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(EnumerableMapNonexistentKey.selector, bytes32("1")));
+        vm.expectRevert(abi.encodeWithSelector(IAaveGhoCcipBridge.MessageNotFound.selector, bytes32("1")));
         bridge.recoverFailedMessageTokens(bytes32("1"));
     }
 

@@ -8,7 +8,6 @@ import {
     AccessControl,
     IAccessControl
 } from "aave-v3-origin/contracts/dependencies/openzeppelin/contracts/AccessControl.sol";
-import {EnumerableMap} from "openzeppelin-contracts/contracts/utils/structs/EnumerableMap.sol";
 import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
@@ -20,6 +19,8 @@ import {IRouter} from "./interfaces/IRouter.sol";
 import {IRouterClient} from "./interfaces/IRouterClient.sol";
 import {ITokenPool} from "./interfaces/ITokenPool.sol";
 import {IAaveGhoCcipBridge} from "./interfaces/IAaveGhoCcipBridge.sol";
+
+import {console2} from "forge-std/Test.sol";
 
 /**
  * @title AaveGhoCcipBridge
@@ -43,20 +44,9 @@ import {IAaveGhoCcipBridge} from "./interfaces/IAaveGhoCcipBridge.sol";
  * https://docs.chain.link/ccip/directory/mainnet
  */
 contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCcipBridge {
-    using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
     using SafeERC20 for IERC20;
 
-    /**
-     * @dev Enum representing the different statuses a failed message can have
-     * RESOLVED is when tokens have been recovered
-     * FAILED is when a message has failed and is yet to be recovered
-     */
-    enum ErrorCode {
-        RESOLVED,
-        FAILED
-    }
-
-    /// @dev This role defines which users can call bridge functions.
+    /// @inheritdoc IAaveGhoCcipBridge
     bytes32 public constant BRIDGER_ROLE = keccak256("BRIDGER_ROLE");
 
     /// @inheritdoc IAaveGhoCcipBridge
@@ -78,7 +68,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     mapping(bytes32 messageId => Client.Any2EVMMessage message) private failedTokenTransfers;
 
     /// @dev Map containing failed messages and their status
-    EnumerableMap.Bytes32ToUintMap private failedMessages;
+    mapping(bytes32 messageId => bool isFailed) private failedMessages;
 
     /**
      * @dev Modifier to allow only the contract itself to execute a function.
@@ -120,11 +110,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
             if (msg.value < fee) revert InsufficientFee();
         } else {
             IERC20(feeToken).transferFrom(msg.sender, address(this), fee);
-            IERC20(feeToken).approve(ROUTER, fee);
+            IERC20(feeToken).safeIncreaseAllowance(ROUTER, fee);
         }
 
         IERC20(GHO_TOKEN).transferFrom(msg.sender, address(this), amount);
-        IERC20(GHO_TOKEN).approve(ROUTER, amount);
+        IERC20(GHO_TOKEN).safeIncreaseAllowance(ROUTER, amount);
 
         bytes32 messageId =
             IRouterClient(ROUTER).ccipSend{value: feeToken == address(0) ? fee : 0}(chainSelector, message);
@@ -138,7 +128,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
         try this.processMessage(message) {}
         catch (bytes memory err) {
-            failedMessages.set(message.messageId, uint256(ErrorCode.FAILED));
+            failedMessages[message.messageId] = true;
             failedTokenTransfers[message.messageId] = message;
 
             emit FailedToFinalizeBridge(message.messageId, err);
@@ -157,12 +147,12 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     /// @inheritdoc IAaveGhoCcipBridge
     function recoverFailedMessageTokens(bytes32 messageId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _validateMessageExists(messageId);
-        failedMessages.set(messageId, uint256(ErrorCode.RESOLVED));
+        failedMessages[messageId] = false;
 
         Client.Any2EVMMessage memory message = failedTokenTransfers[messageId];
 
         uint256 length = message.destTokenAmounts.length;
-        for (uint256 i = 0; i < length; ++i) {
+        for (uint256 i = 0; i < length; i++) {
             IERC20(message.destTokenAmounts[i].token).safeTransfer(COLLECTOR, message.destTokenAmounts[i].amount);
         }
 
@@ -191,6 +181,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     function getInvalidMessage(bytes32 messageId) external view returns (Client.EVMTokenAmount[] memory) {
         _validateMessageExists(messageId);
         return failedTokenTransfers[messageId].destTokenAmounts;
+    }
+
+    /// @inheritdoc IAaveGhoCcipBridge
+    function getRateLimit(uint64 chainSelector) external view returns (uint128) {
+        return _getRateLimit(chainSelector);
     }
 
     /// @inheritdoc IAaveGhoCcipBridge
@@ -236,7 +231,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
      * @param amount The amount of GHO to transfer
      * @param gasLimit The gas limit on the destination chain
      * @param feeToken The address of the fee token
-     * @return message EVM2EVMMessage to transfer GHO cross-chain
+     * @return message EVM2AnyMessage to transfer GHO cross-chain
      */
     function _buildCCIPMessage(uint64 chainSelector, uint256 amount, uint256 gasLimit, address feeToken)
         internal
@@ -246,6 +241,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
         if (amount == 0) {
             revert InvalidZeroAmount();
         }
+
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({token: GHO_TOKEN, amount: amount});
 
@@ -305,6 +301,6 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
      * @param messageId The message ID to validate
      */
     function _validateMessageExists(bytes32 messageId) internal view {
-        if (failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFound();
+        if (!failedMessages[messageId]) revert MessageNotFound();
     }
 }
