@@ -20,8 +20,6 @@ import {IRouterClient} from "./interfaces/IRouterClient.sol";
 import {ITokenPool} from "./interfaces/ITokenPool.sol";
 import {IAaveGhoCcipBridge} from "./interfaces/IAaveGhoCcipBridge.sol";
 
-import {console2} from "forge-std/Test.sol";
-
 /**
  * @title AaveGhoCcipBridge
  * @author TokenLogic
@@ -230,7 +228,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
      * @param chainSelector The chain selector of the destination chain
      * @param amount The amount of GHO to transfer
      * @param gasLimit The gas limit on the destination chain
-     * @param feeToken The address of the fee token
+     * @param feeToken The address of the fee token (use address(0) for fee in native token)
      * @return message EVM2AnyMessage to transfer GHO cross-chain
      */
     function _buildCCIPMessage(uint64 chainSelector, uint256 amount, uint256 gasLimit, address feeToken)

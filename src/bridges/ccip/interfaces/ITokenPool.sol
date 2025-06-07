@@ -2,6 +2,9 @@
 pragma solidity ^0.8.0;
 
 interface ITokenPool {
+    /// @notice Mint an amount of tokens with no additional logic.
+    function directMint(address to, uint256 amount) external;
+
     /// @notice Gets the token bucket with its values for the block it was requested at.
     function getCurrentOutboundRateLimiterState(uint64 remoteChainSelector)
         external
