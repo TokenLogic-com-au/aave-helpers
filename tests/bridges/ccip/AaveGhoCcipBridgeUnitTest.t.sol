@@ -36,9 +36,8 @@ contract AaveGhoCcipBridgeTestBase is Test, Constants {
 
         bridge = new AaveGhoCcipBridge(address(mockRouter), address(mockGho), collector, admin);
 
-        vm.startPrank(alice);
+        vm.prank(alice);
         gho.approve(address(bridge), type(uint256).max);
-        vm.stopPrank();
     }
 
     function _buildCCIPMessage(uint256 _amount, uint256 _gasLimit, address feeToken)

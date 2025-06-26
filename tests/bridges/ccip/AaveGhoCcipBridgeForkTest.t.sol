@@ -210,7 +210,8 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
         vm.selectFork(mainnetFork);
         uint128 limit = mainnetBridge.getRateLimit(ARBITRUM_CHAIN_SELECTOR);
 
-        vm.assume(amount > limit && amount < 1e32); // made top limit to prevent arithmetic overflow
+        // vm.assume(amount > limit && amount < 1e32); // made top limit to prevent arithmetic overflow
+        amount = bound(amount, limit + 1, 1e32 - 1);
         uint256 fee = 1 ether; // set static fee because quoteBridge reverts if amount exceed limit
         deal(AaveV3EthereumAssets.GHO_UNDERLYING, facilitator, amount + fee);
         deal(facilitator, 100);
