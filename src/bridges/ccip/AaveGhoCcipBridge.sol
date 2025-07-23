@@ -112,7 +112,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
         try this.processMessage(message) {}
         catch (bytes memory err) {
             failedMessages[message.messageId] = true;
-            failedTokenTransfers[message.messageId] = message.destTokenAmounts;
+
+            uint256 amountsLength = message.destTokenAmounts.length;
+            for (uint256 i = 0; i < amountsLength; i++) {
+                failedTokenTransfers[message.messageId].push(message.destTokenAmounts[i]);
+            }
 
             emit FailedToFinalizeBridge(message.messageId, err);
         }
