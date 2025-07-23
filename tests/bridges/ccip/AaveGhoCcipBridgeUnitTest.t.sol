@@ -7,7 +7,7 @@ import {ERC20Mock} from "openzeppelin-contracts/contracts/mocks/token/ERC20Mock.
 import {Strings} from "aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Strings.sol";
 
 import {Constants} from "./Constants.sol";
-import {CCIPReceiver} from "src/bridges/ccip/CCIPReceiver.sol";
+import {CCIPReceiver} from "src/bridges/ccip/chainlink/CCIPReceiver.sol";
 import {MockCCIPRouter, Client, IRouterClient} from "./mocks/MockRouter.sol";
 import {AaveGhoCcipBridge} from "src/bridges/ccip/AaveGhoCcipBridge.sol";
 import {IAaveGhoCcipBridge} from "src/bridges/ccip/interfaces/IAaveGhoCcipBridge.sol";
@@ -140,7 +140,7 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
         );
 
         vm.expectEmit(address(bridge));
-        emit IAaveGhoCcipBridge.DestinationChainRemoved(MAINNET_CHAIN_SELECTOR);
+        emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(0));
         bridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
 
         assertEq(bridge.destinations(MAINNET_CHAIN_SELECTOR), address(0), "Unexpected bridge after removal");

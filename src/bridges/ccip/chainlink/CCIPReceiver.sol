@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC165} from "openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
 
-import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
+import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
 import {Client} from "./libraries/Client.sol";
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.

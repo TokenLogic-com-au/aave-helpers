@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "src/bridges/ccip/libraries/Client.sol";
-import {CCIPReceiver} from "src/bridges/ccip/CCIPReceiver.sol";
+import {Client} from "src/bridges/ccip/chainlink/libraries/Client.sol";
+import {CCIPReceiver} from "src/bridges/ccip/chainlink/CCIPReceiver.sol";
 import {IAny2EVMMessageReceiver} from "src/bridges/ccip/interfaces/IAny2EVMMessageReceiver.sol";
 
 import {IRouter} from "src/bridges/ccip/interfaces/IRouter.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "../libraries/Client.sol";
+import {Client} from "../chainlink/libraries/Client.sol";
 
 /**
  * @title IAaveGhoCcipBridge
@@ -74,12 +74,6 @@ interface IAaveGhoCcipBridge {
      * @param bridge The address of the bridge on the destination chain
      */
     event DestinationChainSet(uint64 indexed chainSelector, address indexed bridge);
-
-    /**
-     * @dev Emitted when a destination chain is removed
-     * @param chainSelector The selector of the destination chain
-     */
-    event DestinationChainRemoved(uint64 indexed chainSelector);
 
     /**
      * @dev Emitted when an invalid message is received by the bridge

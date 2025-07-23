@@ -12,8 +12,8 @@ import {IRescuable} from "solidity-utils/contracts/utils/interfaces/IRescuable.s
 
 import {CCIPLocalSimulatorFork, Register, Internal} from "./mocks/CCIPLocalSimulatorFork.sol";
 import {Constants} from "./Constants.sol";
-import {Client} from "src/bridges/ccip/libraries/Client.sol";
-import {CCIPReceiver} from "src/bridges/ccip/CCIPReceiver.sol";
+import {Client} from "src/bridges/ccip/chainlink/libraries/Client.sol";
+import {CCIPReceiver} from "src/bridges/ccip/chainlink/CCIPReceiver.sol";
 import {IGhoToken} from "./IGhoToken.sol";
 import {IRouterClient} from "src/bridges/ccip/interfaces/IRouterClient.sol";
 import {ITokenPool} from "src/bridges/ccip/interfaces/ITokenPool.sol";
@@ -574,7 +574,7 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
         );
 
         vm.expectEmit(address(mainnetBridge));
-        emit IAaveGhoCcipBridge.DestinationChainRemoved(ARBITRUM_CHAIN_SELECTOR);
+        emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(0));
         mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
 
         assertEq(

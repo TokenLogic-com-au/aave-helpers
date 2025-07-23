@@ -11,8 +11,8 @@ import {
 import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
-import {Client} from "./libraries/Client.sol";
-import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {Client} from "./chainlink/libraries/Client.sol";
+import {CCIPReceiver} from "./chainlink/CCIPReceiver.sol";
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
 import {IOnRampClient} from "./interfaces/IOnRampClient.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
@@ -24,22 +24,6 @@ import {IAaveGhoCcipBridge} from "./interfaces/IAaveGhoCcipBridge.sol";
  * @title AaveGhoCcipBridge
  * @author TokenLogic
  * @notice It provides bridging capabilities for the GHO token across networks.
- *
- * -- Permissions
- * The contract implements AccessControl for permissioned functions.
- * The DEFAULT_ADMIN will always be the respective network's Short Executor (Governance).
- * The BRIDGER_ROLE will be given to "Facilitator" type contracts to mint and then bridge GHO.
- *
- * -- Security Considerations
- * A new destination chain and corresponding bridge contract must be previously pre-approved by governance.
- * The contract inherits from `Rescuable`. Using the inherited functions it can transfer tokens out from this contract.
- * In the case of malformed or invalid messages, the contract implements a rescue mechanism to send tokens to the Collector contract,
- * following CCIP's defensive approach as shown here:
- * https://github.com/smartcontractkit/chainlink/blob/62c23768cd483b179301625603a785dd773f2c78/contracts/src/v0.8/ccip/applications/DefensiveExample.sol
- *
- * -- Destination Chains
- * The chain selector for a given chain is defined by CCIP. The list of chain selectors can be found here:
- * https://docs.chain.link/ccip/directory/mainnet
  */
 contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCcipBridge {
     using SafeERC20 for IERC20;
@@ -63,7 +47,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     mapping(uint64 chainSelector => address bridge) public destinations;
 
     /// @dev Map containing failed token transfer amounts for a message
-    mapping(bytes32 messageId => Client.Any2EVMMessage message) private failedTokenTransfers;
+    mapping(bytes32 messageId => Client.EVMTokenAmount[] destTokenAmounts) private failedTokenTransfers;
 
     /// @dev Map containing failed messages and their status
     mapping(bytes32 messageId => bool isFailed) private failedMessages;
@@ -78,18 +62,19 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     }
 
     /**
+     * @dev Constructor
      * @param router The address of the Chainlink CCIP router
      * @param gho The address of the GHO token
-     * @param collector The address of collector on same chain
-     * @param executor The address of the contract executor
+     * @param collector The address of the Aave Collector
+     * @param initialAdmin The address of the initial admin
      */
-    constructor(address router, address gho, address collector, address executor) CCIPReceiver(router) {
+    constructor(address router, address gho, address collector, address initialAdmin) CCIPReceiver(router) {
         ROUTER = router;
         GHO_TOKEN = gho;
         COLLECTOR = collector;
-        EXECUTOR = executor;
+        EXECUTOR = initialAdmin;
 
-        _setupRole(DEFAULT_ADMIN_ROLE, executor);
+        _setupRole(DEFAULT_ADMIN_ROLE, initialAdmin);
     }
 
     /// @inheritdoc IAaveGhoCcipBridge
@@ -127,7 +112,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
         try this.processMessage(message) {}
         catch (bytes memory err) {
             failedMessages[message.messageId] = true;
-            failedTokenTransfers[message.messageId] = message;
+            failedTokenTransfers[message.messageId] = message.destTokenAmounts;
 
             emit FailedToFinalizeBridge(message.messageId, err);
         }
@@ -147,11 +132,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
         _validateMessageExists(messageId);
         failedMessages[messageId] = false;
 
-        Client.Any2EVMMessage memory message = failedTokenTransfers[messageId];
+        Client.EVMTokenAmount[] memory destTokenAmounts = failedTokenTransfers[messageId];
 
-        uint256 length = message.destTokenAmounts.length;
+        uint256 length = destTokenAmounts.length;
         for (uint256 i = 0; i < length; i++) {
-            IERC20(message.destTokenAmounts[i].token).safeTransfer(COLLECTOR, message.destTokenAmounts[i].amount);
+            IERC20(destTokenAmounts[i].token).safeTransfer(COLLECTOR, destTokenAmounts[i].amount);
         }
 
         emit RecoveredInvalidMessage(messageId);
@@ -172,13 +157,13 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     function removeDestinationChain(uint64 chainSelector) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete destinations[chainSelector];
 
-        emit DestinationChainRemoved(chainSelector);
+        emit DestinationChainSet(chainSelector, address(0));
     }
 
     /// @inheritdoc IAaveGhoCcipBridge
     function getInvalidMessage(bytes32 messageId) external view returns (Client.EVMTokenAmount[] memory) {
         _validateMessageExists(messageId);
-        return failedTokenTransfers[messageId].destTokenAmounts;
+        return failedTokenTransfers[messageId];
     }
 
     /// @inheritdoc IAaveGhoCcipBridge
