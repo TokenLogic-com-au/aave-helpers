@@ -190,13 +190,13 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), ARBITRUM_CHAIN_SELECTOR, facilitator, AMOUNT_TO_SEND);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), ARBITRUM_CHAIN_SELECTOR, facilitator, AMOUNT_TO_SEND);
         mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, false, false, false, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.FailedToFinalizeBridge(message.messageId, bytes(hex"5ea23900"));
+        emit IAaveGhoCcipBridge.BridgeMessageFailed(message.messageId, bytes(hex"5ea23900"));
         ccipLocalSimulatorFork.switchChainAndRouteMessage(arbitrumFork);
 
         Client.EVMTokenAmount[] memory messageData = arbitrumBridge.getInvalidMessage(message.messageId);
@@ -237,13 +237,13 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), ARBITRUM_CHAIN_SELECTOR, facilitator, amount);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), ARBITRUM_CHAIN_SELECTOR, facilitator, amount);
         mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, true, false, true, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.BridgeFinalized(message.messageId, address(AaveV3Arbitrum.COLLECTOR), amount);
+        emit IAaveGhoCcipBridge.BridgeMessageFinalized(message.messageId, address(AaveV3Arbitrum.COLLECTOR), amount);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(arbitrumFork);
         uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(address(AaveV3Arbitrum.COLLECTOR));
         assertEq(afterBalance, beforeBalance + amount, "Bridged amount not updated correctly");
@@ -266,13 +266,13 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), ARBITRUM_CHAIN_SELECTOR, facilitator, amount);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), ARBITRUM_CHAIN_SELECTOR, facilitator, amount);
         mainnetBridge.send{value: fee}(ARBITRUM_CHAIN_SELECTOR, amount, 0, address(0));
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, true, false, true, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.BridgeFinalized(message.messageId, address(AaveV3Arbitrum.COLLECTOR), amount);
+        emit IAaveGhoCcipBridge.BridgeMessageFinalized(message.messageId, address(AaveV3Arbitrum.COLLECTOR), amount);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(arbitrumFork);
         uint256 afterBalance = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(address(AaveV3Arbitrum.COLLECTOR));
         assertEq(afterBalance, beforeBalance + amount, "Bridged amount not updated correctly");
@@ -344,13 +344,13 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amountToSend);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amountToSend);
         arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amountToSend, 0, feeToken);
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, false, false, false, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.FailedToFinalizeBridge(message.messageId, bytes(hex"5ea23900"));
+        emit IAaveGhoCcipBridge.BridgeMessageFailed(message.messageId, bytes(hex"5ea23900"));
         ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
 
         Client.EVMTokenAmount[] memory messageData = mainnetBridge.getInvalidMessage(message.messageId);
@@ -372,13 +372,13 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amountToSend);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amountToSend);
         arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amountToSend, customGasLimit, feeToken);
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, true, false, true, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.BridgeFinalized(message.messageId, address(AaveV3Ethereum.COLLECTOR), amountToSend);
+        emit IAaveGhoCcipBridge.BridgeMessageFinalized(message.messageId, address(AaveV3Ethereum.COLLECTOR), amountToSend);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
         uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(address(AaveV3Ethereum.COLLECTOR));
         assertEq(afterBalance, beforeBalance + amountToSend, "Bridged amount not updated correctly");
@@ -420,13 +420,13 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amount);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amount);
         arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amount, 300_000, feeToken);
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, true, false, true, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.BridgeFinalized(message.messageId, address(AaveV3Ethereum.COLLECTOR), amount);
+        emit IAaveGhoCcipBridge.BridgeMessageFinalized(message.messageId, address(AaveV3Ethereum.COLLECTOR), amount);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
         uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(address(AaveV3Ethereum.COLLECTOR));
         assertEq(afterBalance, beforeBalance + amount, "Bridged amount not updated correctly");
@@ -450,13 +450,13 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(facilitator);
         vm.expectEmit(false, true, true, true, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.BridgeInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amount);
+        emit IAaveGhoCcipBridge.BridgeMessageInitiated(bytes32(0), MAINNET_CHAIN_SELECTOR, facilitator, amount);
         arbitrumBridge.send{value: fee}(MAINNET_CHAIN_SELECTOR, amount, 0, address(0));
 
         Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
         vm.expectEmit(true, true, false, true, address(mainnetBridge));
-        emit IAaveGhoCcipBridge.BridgeFinalized(message.messageId, address(AaveV3Ethereum.COLLECTOR), amount);
+        emit IAaveGhoCcipBridge.BridgeMessageFinalized(message.messageId, address(AaveV3Ethereum.COLLECTOR), amount);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
         uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(address(AaveV3Ethereum.COLLECTOR));
         assertEq(afterBalance, beforeBalance + amount, "Bridged amount not updated correctly");
@@ -500,7 +500,7 @@ contract RecoverFailedMessageTokensTest is AaveGhoCcipBridgeForkTestBase {
 
         vm.startPrank(admin);
         vm.expectEmit(true, false, false, false, address(arbitrumBridge));
-        emit IAaveGhoCcipBridge.RecoveredInvalidMessage(message.messageId);
+        emit IAaveGhoCcipBridge.BridgeMessageRecovered(message.messageId);
         arbitrumBridge.recoverFailedMessageTokens(message.messageId);
 
         uint256 balanceAfter = IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).balanceOf(address(AaveV3Arbitrum.COLLECTOR));
@@ -649,7 +649,7 @@ contract CcipReceiveTest is AaveGhoCcipBridgeForkTestBase {
         vm.startPrank(mainnetBridge.ROUTER());
 
         vm.expectEmit(address(mainnetBridge));
-        emit IAaveGhoCcipBridge.FailedToFinalizeBridge(bytes32(0), hex"5ea23900");
+        emit IAaveGhoCcipBridge.BridgeMessageFailed(bytes32(0), hex"5ea23900");
         mainnetBridge.ccipReceive(message);
 
         vm.stopPrank();

@@ -165,7 +165,7 @@ contract CcipReceiveTest is AaveGhoCcipBridgeTestBase {
     function test_successful_receivedInvalidMessage() public {
         vm.startPrank(bridge.ROUTER());
         vm.expectEmit(address(bridge));
-        emit IAaveGhoCcipBridge.FailedToFinalizeBridge(bytes32(0), PANIC_SELECTOR);
+        emit IAaveGhoCcipBridge.BridgeMessageFailed(bytes32(0), PANIC_SELECTOR);
         bridge.ccipReceive(_buildDummyMessage());
     }
 
@@ -186,7 +186,7 @@ contract CcipReceiveTest is AaveGhoCcipBridgeTestBase {
         });
 
         vm.expectEmit(true, true, false, true, address(bridge));
-        emit IAaveGhoCcipBridge.BridgeFinalized(bytes32(0), collector, amount);
+        emit IAaveGhoCcipBridge.BridgeMessageFinalized(bytes32(0), collector, amount);
         bridge.ccipReceive(message);
 
         vm.stopPrank();
@@ -225,7 +225,7 @@ contract HandleInvalidMessageTest is AaveGhoCcipBridgeTestBase {
         uint256 balanceBefore = gho.balanceOf(collector);
 
         vm.expectEmit(true, false, false, false, address(bridge));
-        emit IAaveGhoCcipBridge.RecoveredInvalidMessage(message.messageId);
+        emit IAaveGhoCcipBridge.BridgeMessageRecovered(message.messageId);
         bridge.recoverFailedMessageTokens(message.messageId);
 
         uint256 balanceAfter = gho.balanceOf(collector);

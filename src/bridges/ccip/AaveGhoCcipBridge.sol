@@ -102,7 +102,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
         bytes32 messageId =
             IRouterClient(ROUTER).ccipSend{value: feeToken == address(0) ? fee : 0}(chainSelector, message);
 
-        emit BridgeInitiated(messageId, chainSelector, msg.sender, amount);
+        emit BridgeMessageInitiated(messageId, chainSelector, msg.sender, amount);
 
         return messageId;
     }
@@ -118,7 +118,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
                 failedTokenTransfers[message.messageId].push(message.destTokenAmounts[i]);
             }
 
-            emit FailedToFinalizeBridge(message.messageId, err);
+            emit BridgeMessageFailed(message.messageId, err);
         }
     }
 
@@ -143,7 +143,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
             IERC20(destTokenAmounts[i].token).safeTransfer(COLLECTOR, destTokenAmounts[i].amount);
         }
 
-        emit RecoveredInvalidMessage(messageId);
+        emit BridgeMessageRecovered(messageId);
     }
 
     /// @inheritdoc IAaveGhoCcipBridge
@@ -251,7 +251,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
 
         IERC20(GHO_TOKEN).transfer(COLLECTOR, ghoAmount);
 
-        emit BridgeFinalized(message.messageId, COLLECTOR, ghoAmount);
+        emit BridgeMessageFinalized(message.messageId, COLLECTOR, ghoAmount);
     }
 
     /**

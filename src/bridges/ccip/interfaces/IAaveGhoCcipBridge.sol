@@ -56,7 +56,7 @@ interface IAaveGhoCcipBridge {
      * @param from The address of sender on source chain
      * @param amount The total amount of GHO transfered
      */
-    event BridgeInitiated(
+    event BridgeMessageInitiated(
         bytes32 indexed messageId, uint64 indexed destinationChainSelector, address indexed from, uint256 amount
     );
 
@@ -66,7 +66,7 @@ interface IAaveGhoCcipBridge {
      * @param to The address of receiver on destination chain
      * @param amount The amount of token to translated
      */
-    event BridgeFinalized(bytes32 indexed messageId, address indexed to, uint256 amount);
+    event BridgeMessageFinalized(bytes32 indexed messageId, address indexed to, uint256 amount);
 
     /**
      * @dev Emitted when the destination bridge data is updated
@@ -80,51 +80,13 @@ interface IAaveGhoCcipBridge {
      * @param messageId The ID of message
      * @param err The error on why the transfer failed
      */
-    event FailedToFinalizeBridge(bytes32 indexed messageId, bytes err);
+    event BridgeMessageFailed(bytes32 indexed messageId, bytes err);
 
     /**
      * @dev Emits when receive invalid message
      * @param messageId The id of message
      */
-    event RecoveredInvalidMessage(bytes32 indexed messageId);
-
-    /**
-     * @notice This role defines which users can call the send() function.
-     * @return The bytes32 role identifier
-     */
-    function BRIDGER_ROLE() external view returns (bytes32);
-
-    /**
-     * @notice Returns the Chainlink CCIP router address
-     * @return The address of the Chainlink CCIP router
-     */
-    function ROUTER() external view returns (address);
-
-    /**
-     * @notice Returns the GHO token address on the deployed chain.
-     * @return The address of the GHO token contract
-     */
-    function GHO_TOKEN() external view returns (address);
-
-    /**
-     * @notice Returns the AaveCollector address on the deployed chain.
-     * @return The address of the Collector contract
-     */
-    function COLLECTOR() external view returns (address);
-
-    /**
-     * @notice Returns the executor (governance) address on the deployed chain
-     * @dev The executor has the DEFAULT_ADMIN_ROLE
-     * @return The address of the Executor contract
-     */
-    function EXECUTOR() external view returns (address);
-
-    /**
-     * @notice Returns the address of the corresponding bridge for a specified chain selector.
-     * @param chainSelector The chain selector of destination chain
-     * @return The address of AaveGhoCcipBridge on destination chain
-     */
-    function destinations(uint64 chainSelector) external view returns (address);
+    event BridgeMessageRecovered(bytes32 indexed messageId);
 
     /**
      * @notice Transfers tokens to specified destination chain.
@@ -195,4 +157,42 @@ interface IAaveGhoCcipBridge {
         external
         view
         returns (uint256);
+
+    /**
+     * @notice This role defines which users can call the send() function.
+     * @return The bytes32 role identifier
+     */
+    function BRIDGER_ROLE() external view returns (bytes32);
+
+    /**
+     * @notice Returns the Chainlink CCIP router address
+     * @return The address of the Chainlink CCIP router
+     */
+    function ROUTER() external view returns (address);
+
+    /**
+     * @notice Returns the GHO token address on the deployed chain.
+     * @return The address of the GHO token contract
+     */
+    function GHO_TOKEN() external view returns (address);
+
+    /**
+     * @notice Returns the AaveCollector address on the deployed chain.
+     * @return The address of the Collector contract
+     */
+    function COLLECTOR() external view returns (address);
+
+    /**
+     * @notice Returns the executor (governance) address on the deployed chain
+     * @dev The executor has the DEFAULT_ADMIN_ROLE
+     * @return The address of the Executor contract
+     */
+    function EXECUTOR() external view returns (address);
+
+    /**
+     * @notice Returns the address of the corresponding bridge for a specified chain selector.
+     * @param chainSelector The chain selector of destination chain
+     * @return The address of AaveGhoCcipBridge on destination chain
+     */
+    function destinations(uint64 chainSelector) external view returns (address);
 }

@@ -1,6 +1,6 @@
 # AaveGhoCcipBridge
 
-The AaveGhoCcipBridge is a contract to facilitate moving GHO from Ethereum Mainnet to various L2 networks utilizing the underlying CCIP infrastructure from Chainlink.
+The AaveGhoCcipBridge is a contract to facilitate moving GHO from Ethereum Mainnet to other networks utilizing the underlying CCIP infrastructure from Chainlink.
 
 # Permissions
 
