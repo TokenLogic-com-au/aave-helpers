@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from '../chainlink/libraries/Client.sol';
+import {Client} from '../../../dependencies/chainlink/libraries/Client.sol';
 
 /**
  * @title IAaveGhoCcipBridge

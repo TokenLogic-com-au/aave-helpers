@@ -7,7 +7,7 @@ import {ERC20Mock} from 'openzeppelin-contracts/contracts/mocks/token/ERC20Mock.
 import {Strings} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Strings.sol';
 
 import {Constants} from './Constants.sol';
-import {CCIPReceiver} from 'src/bridges/ccip/chainlink/CCIPReceiver.sol';
+import {CCIPReceiver} from 'src/dependencies/chainlink/CCIPReceiver.sol';
 import {MockCCIPRouter, Client, IRouterClient} from './mocks/MockRouter.sol';
 import {AaveGhoCcipBridge} from 'src/bridges/ccip/AaveGhoCcipBridge.sol';
 import {IAaveGhoCcipBridge} from 'src/bridges/ccip/interfaces/IAaveGhoCcipBridge.sol';

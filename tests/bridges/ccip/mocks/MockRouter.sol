@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from 'src/bridges/ccip/chainlink/libraries/Client.sol';
-import {CCIPReceiver} from 'src/bridges/ccip/chainlink/CCIPReceiver.sol';
-import {IAny2EVMMessageReceiver} from 'src/bridges/ccip/interfaces/IAny2EVMMessageReceiver.sol';
-
-import {IRouter} from 'src/bridges/ccip/interfaces/IRouter.sol';
-import {IRouterClient} from 'src/bridges/ccip/interfaces/IRouterClient.sol';
+import {Client} from 'src/dependencies/chainlink/libraries/Client.sol';
+import {CCIPReceiver} from 'src/dependencies/chainlink/CCIPReceiver.sol';
+import {IGhoToken} from '../IGhoToken.sol';
+import {IRouter} from 'src/dependencies/chainlink/interfaces/IRouter.sol';
+import {IRouterClient} from 'src/dependencies/chainlink/interfaces/IRouterClient.sol';
+import {ITokenPool} from 'src/dependencies/chainlink/interfaces/ITokenPool.sol';
+import {IAny2EVMMessageReceiver} from 'src/dependencies/chainlink/interfaces/IAny2EVMMessageReceiver.sol';
 
 import {CallWithExactGas} from './CallWithExactGas.sol';
 

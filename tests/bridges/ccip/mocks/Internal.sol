@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {Client} from 'src/bridges/ccip/chainlink/libraries/Client.sol';
+import {Client} from 'src/dependencies/chainlink/libraries/Client.sol';
 
 interface Internal {
   /// @notice A collection of token price and gas price updates.

@@ -12,11 +12,11 @@ import {IRescuable} from 'solidity-utils/contracts/utils/interfaces/IRescuable.s
 
 import {CCIPLocalSimulatorFork, Register, Internal} from './mocks/CCIPLocalSimulatorFork.sol';
 import {Constants} from './Constants.sol';
-import {Client} from 'src/bridges/ccip/chainlink/libraries/Client.sol';
-import {CCIPReceiver} from 'src/bridges/ccip/chainlink/CCIPReceiver.sol';
+import {Client} from 'src/dependencies/chainlink/libraries/Client.sol';
+import {CCIPReceiver} from 'src/dependencies/chainlink/CCIPReceiver.sol';
 import {IGhoToken} from './IGhoToken.sol';
-import {IRouterClient} from 'src/bridges/ccip/interfaces/IRouterClient.sol';
-import {ITokenPool} from 'src/bridges/ccip/interfaces/ITokenPool.sol';
+import {IRouterClient} from 'src/dependencies/chainlink/interfaces/IRouterClient.sol';
+import {ITokenPool} from 'src/dependencies/chainlink/interfaces/ITokenPool.sol';
 import {AaveGhoCcipBridge} from 'src/bridges/ccip/AaveGhoCcipBridge.sol';
 import {IAaveGhoCcipBridge} from 'src/bridges/ccip/interfaces/IAaveGhoCcipBridge.sol';
 

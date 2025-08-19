@@ -8,13 +8,13 @@ import {AccessControl, IAccessControl} from 'aave-v3-origin/contracts/dependenci
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 
-import {Client} from './chainlink/libraries/Client.sol';
-import {CCIPReceiver} from './chainlink/CCIPReceiver.sol';
-import {IAny2EVMMessageReceiver} from './interfaces/IAny2EVMMessageReceiver.sol';
-import {IOnRampClient} from './interfaces/IOnRampClient.sol';
-import {IRouter} from './interfaces/IRouter.sol';
-import {IRouterClient} from './interfaces/IRouterClient.sol';
-import {ITokenPool} from './interfaces/ITokenPool.sol';
+import {Client} from '../../dependencies/chainlink/libraries/Client.sol';
+import {CCIPReceiver} from '../../dependencies/chainlink/CCIPReceiver.sol';
+import {IAny2EVMMessageReceiver} from '../../dependencies/chainlink/interfaces/IAny2EVMMessageReceiver.sol';
+import {IOnRampClient} from '../../dependencies/chainlink/interfaces/IOnRampClient.sol';
+import {IRouter} from '../../dependencies/chainlink/interfaces/IRouter.sol';
+import {IRouterClient} from '../../dependencies/chainlink/interfaces/IRouterClient.sol';
+import {ITokenPool} from '../../dependencies/chainlink/interfaces/ITokenPool.sol';
 import {IAaveGhoCcipBridge} from './interfaces/IAaveGhoCcipBridge.sol';
 
 /**
