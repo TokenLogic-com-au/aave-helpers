@@ -284,7 +284,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
     uint256 ghoAmount = message.destTokenAmounts[0].amount;
 
-    IERC20(GHO_TOKEN).transfer(COLLECTOR, ghoAmount);
+    IERC20(GHO_TOKEN).safeTransfer(COLLECTOR, ghoAmount);
 
     emit BridgeMessageFinalized(message.messageId, COLLECTOR, ghoAmount);
   }
