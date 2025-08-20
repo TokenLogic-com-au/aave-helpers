@@ -58,8 +58,7 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
       arbitrumNetworkDetails.routerAddress,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
-      admin,
-      false
+      admin
     );
 
     vm.startPrank(facilitator);
@@ -84,12 +83,11 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
       mainnetDetails.routerAddress,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
-      admin,
-      false
+      admin
     );
 
     vm.startPrank(admin);
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge), false);
     mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), facilitator);
     vm.stopPrank();
 
@@ -99,7 +97,7 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
 
     vm.selectFork(arbitrumFork);
     vm.startPrank(admin);
-    arbitrumBridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
+    arbitrumBridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(mainnetBridge), false);
     arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), facilitator);
     vm.stopPrank();
   }
@@ -628,7 +626,7 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
         Strings.toHexString(uint256(mainnetBridge.DEFAULT_ADMIN_ROLE()), 32)
       )
     );
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge), false);
   }
 
   function test_successful() public {
@@ -636,14 +634,18 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     vm.startPrank(admin);
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-
-    assertEq(
-      mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR),
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      ARBITRUM_CHAIN_SELECTOR,
       address(arbitrumBridge),
-      'Destination bridge not set correctly in the mapping'
+      false
     );
+    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge), false);
+
+    (address dest, bool allow) = mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR);
+
+    assertEq(dest, address(arbitrumBridge), 'Destination bridge not set correctly in the mapping');
+
+    assertFalse(allow, 'Allow out of order execution not set correctly in the mapping');
   }
 }
 
@@ -668,24 +670,28 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     vm.startPrank(admin);
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-
-    assertEq(
-      mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR),
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      ARBITRUM_CHAIN_SELECTOR,
       address(arbitrumBridge),
-      'Destination bridge not set correctly in the mapping'
+      true
     );
+    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge), true);
+
+    (address dest, bool allow) = mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR);
+
+    assertEq(dest, address(arbitrumBridge), 'Destination bridge not set correctly in the mapping');
+
+    assertTrue(allow, 'Allow out of order execution not set correctly in the mapping');
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(0));
+    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(0), false);
     mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
 
-    assertEq(
-      mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR),
-      address(0),
-      'Destination bridge not removed correctly in the mapping'
-    );
+    (dest, allow) = mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR);
+
+    assertEq(dest, address(0), 'Destination bridge not removed correctly in the mapping');
+
+    assertFalse(allow, 'Allow out of order execution not set correctly in the mapping');
   }
 }
 

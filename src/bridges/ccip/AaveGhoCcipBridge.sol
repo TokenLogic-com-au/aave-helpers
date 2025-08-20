@@ -41,10 +41,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   address public immutable EXECUTOR;
 
   /// @inheritdoc IAaveGhoCcipBridge
-  bool public immutable ALLOW_OUT_OF_ORDER_EXECUTION;
-
-  /// @inheritdoc IAaveGhoCcipBridge
-  mapping(uint64 chainSelector => address bridge) public destinations;
+  mapping(uint64 chainSelector => Destinations bridgeInfo) public destinations;
 
   /// @dev Map containing failed token transfer amounts for a message
   mapping(bytes32 messageId => Client.EVMTokenAmount[] destTokenAmounts)
@@ -68,20 +65,17 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * @param gho The address of the GHO token
    * @param collector The address of the Aave Collector
    * @param initialAdmin The address of the initial admin
-   * @param allowOutOfOrderExecution Whether to allow out of order execution
    */
   constructor(
     address router,
     address gho,
     address collector,
-    address initialAdmin,
-    bool allowOutOfOrderExecution
+    address initialAdmin
   ) CCIPReceiver(router) {
     ROUTER = router;
     GHO_TOKEN = gho;
     COLLECTOR = collector;
     EXECUTOR = initialAdmin;
-    ALLOW_OUT_OF_ORDER_EXECUTION = allowOutOfOrderExecution;
 
     _setupRole(DEFAULT_ADMIN_ROLE, initialAdmin);
   }
@@ -94,6 +88,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     address feeToken
   ) external payable onlyRole(BRIDGER_ROLE) returns (bytes32) {
     _validateDestinationAndLimit(chainSelector, amount);
+
     Client.EVM2AnyMessage memory message = _buildCCIPMessage(
       chainSelector,
       amount,
@@ -139,7 +134,9 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
 
   /// @inheritdoc IAaveGhoCcipBridge
   function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
-    if (destinations[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
+    if (
+      destinations[message.sourceChainSelector].destination != abi.decode(message.sender, (address))
+    ) {
       revert UnknownSourceDestination();
     }
 
@@ -164,22 +161,26 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   /// @inheritdoc IAaveGhoCcipBridge
   function setDestinationChain(
     uint64 chainSelector,
-    address bridge
+    address bridge,
+    bool allowOutOfOrderExecution
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
     if (bridge == address(0)) {
       revert InvalidZeroAddress();
     }
 
-    destinations[chainSelector] = bridge;
+    destinations[chainSelector] = Destinations({
+      destination: bridge,
+      allowOutOfOrderExecution: allowOutOfOrderExecution
+    });
 
-    emit DestinationChainSet(chainSelector, bridge);
+    emit DestinationChainSet(chainSelector, bridge, allowOutOfOrderExecution);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
   function removeDestinationChain(uint64 chainSelector) external onlyRole(DEFAULT_ADMIN_ROLE) {
     delete destinations[chainSelector];
 
-    emit DestinationChainSet(chainSelector, address(0));
+    emit DestinationChainSet(chainSelector, address(0), false);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -256,11 +257,13 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
       revert InvalidZeroAmount();
     }
 
+    Destinations memory destinationInfo = destinations[chainSelector];
+
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: GHO_TOKEN, amount: amount});
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(destinations[chainSelector]),
+      receiver: abi.encode(destinationInfo.destination),
       data: '',
       tokenAmounts: tokenAmounts,
       extraArgs: gasLimit == 0
@@ -268,7 +271,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
         : Client._argsToBytes(
           Client.EVMExtraArgsV2({
             gasLimit: gasLimit,
-            allowOutOfOrderExecution: ALLOW_OUT_OF_ORDER_EXECUTION
+            allowOutOfOrderExecution: destinationInfo.allowOutOfOrderExecution
           })
         ),
       feeToken: feeToken
@@ -307,7 +310,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * @param amount The amount of GHO to transfer
    */
   function _validateDestinationAndLimit(uint64 chainSelector, uint256 amount) internal view {
-    if (destinations[chainSelector] == address(0)) {
+    if (destinations[chainSelector].destination == address(0)) {
       revert UnsupportedChain();
     }
 

@@ -34,7 +34,7 @@ contract AaveGhoCcipBridgeTestBase is Test, Constants {
     ERC20Mock mockGho = new ERC20Mock();
     gho = IERC20(address(mockGho));
 
-    bridge = new AaveGhoCcipBridge(address(mockRouter), address(mockGho), collector, admin, false);
+    bridge = new AaveGhoCcipBridge(address(mockRouter), address(mockGho), collector, admin);
 
     vm.prank(alice);
     gho.approve(address(bridge), type(uint256).max);
@@ -105,20 +105,24 @@ contract SetDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
         Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
       )
     );
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge), false);
   }
 
   function test_successful() external {
     vm.startPrank(admin);
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
-
-    assertEq(
-      bridge.destinations(MAINNET_CHAIN_SELECTOR),
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      MAINNET_CHAIN_SELECTOR,
       address(destinationBridge),
-      'Unexpected bridge'
+      false
     );
+    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge), false);
+
+    (address dest, bool allow) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
+
+    assertEq(dest, address(destinationBridge), 'Unexpected bridge');
+
+    assertFalse(allow, 'Unexpected allow out of order execution');
   }
 }
 
@@ -139,24 +143,28 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
   function test_successful() external {
     vm.startPrank(admin);
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
-
-    assertEq(
-      bridge.destinations(MAINNET_CHAIN_SELECTOR),
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      MAINNET_CHAIN_SELECTOR,
       address(destinationBridge),
-      'Unexpected bridge after setting'
+      true
     );
+    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge), true);
+
+    (address dest, bool allow) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
+
+    assertEq(dest, address(destinationBridge), 'Unexpected bridge after setting');
+
+    assertTrue(allow, 'Unexpected allow out of order execution');
 
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(0));
+    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(0), false);
     bridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
 
-    assertEq(
-      bridge.destinations(MAINNET_CHAIN_SELECTOR),
-      address(0),
-      'Unexpected bridge after removal'
-    );
+    (dest, allow) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
+
+    assertEq(dest, address(0), 'Unexpected bridge after removal');
+
+    assertFalse(allow, 'Unexpected allow out of order execution');
   }
 }
 
