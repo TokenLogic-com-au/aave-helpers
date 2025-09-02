@@ -23,7 +23,7 @@ library Client {
     bytes data; // Data payload.
     EVMTokenAmount[] tokenAmounts; // Token transfers.
     address feeToken; // Address of feeToken. address(0) means you will send msg.value.
-    bytes extraArgs; // Populate this with _argsToBytes(EVMExtraArgsV2).
+    bytes extraArgs; // Populate this with _argsToBytes(GenericExtraArgs).
   }
 
   // bytes4(keccak256("CCIP EVMExtraArgsV1"));
@@ -44,12 +44,14 @@ library Client {
   /// @param allowOutOfOrderExecution: if true, it indicates that the message can be executed in any order relative to
   /// other messages from the same sender. This value's default varies by chain. On some chains, a particular value is
   /// enforced, meaning if the expected value is not set, the message request will revert.
-  struct EVMExtraArgsV2 {
+  struct GenericExtraArgs {
     uint256 gasLimit;
     bool allowOutOfOrderExecution;
   }
 
-  function _argsToBytes(EVMExtraArgsV2 memory extraArgs) internal pure returns (bytes memory bts) {
+  function _argsToBytes(
+    GenericExtraArgs memory extraArgs
+  ) internal pure returns (bytes memory bts) {
     return abi.encodeWithSelector(EVM_EXTRA_ARGS_V2_TAG, extraArgs);
   }
 }

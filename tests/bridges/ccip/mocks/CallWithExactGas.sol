@@ -3,8 +3,7 @@ pragma solidity ^0.8.0;
 
 /// @notice This library contains various callWithExactGas functions. All of them are
 /// safe from gas bomb attacks.
-/// @dev There is code duplication in this library. This is done to not leave the assembly
-/// the blocks.
+/// @dev There is code duplication in this library. This is done to not leave the assembly blocks.
 library CallWithExactGas {
   error NoContract();
   error NoGasForCallExactCheck();
@@ -54,7 +53,6 @@ library CallWithExactGas {
       }
 
       // call and return whether we succeeded. ignore return data
-      // call(gas,addr,value,argsOffset,argsLength,retOffset,retLength)
       success := call(gasLimit, target, 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
     }
     return success;

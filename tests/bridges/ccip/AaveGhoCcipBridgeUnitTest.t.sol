@@ -6,9 +6,9 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {ERC20Mock} from 'openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol';
 import {Strings} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Strings.sol';
 
-import {Constants} from './Constants.sol';
+import {Constants} from 'tests/bridges/ccip/Constants.sol';
 import {CCIPReceiver} from 'src/dependencies/chainlink/CCIPReceiver.sol';
-import {MockCCIPRouter, Client, IRouterClient} from './mocks/MockRouter.sol';
+import {MockCCIPRouter, Client, IRouterClient} from 'tests/bridges/ccip/mocks/MockRouter.sol';
 import {AaveGhoCcipBridge} from 'src/bridges/ccip/AaveGhoCcipBridge.sol';
 import {IAaveGhoCcipBridge} from 'src/bridges/ccip/interfaces/IAaveGhoCcipBridge.sol';
 
@@ -38,27 +38,6 @@ contract AaveGhoCcipBridgeTestBase is Test, Constants {
 
     vm.prank(alice);
     gho.approve(address(bridge), type(uint256).max);
-  }
-
-  function _buildCCIPMessage(
-    uint256 _amount,
-    uint256 _gasLimit,
-    address feeToken
-  ) internal view returns (Client.EVM2AnyMessage memory message) {
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0] = Client.EVMTokenAmount({token: address(gho), amount: _amount});
-
-    message = Client.EVM2AnyMessage({
-      receiver: abi.encode(destinationBridge),
-      data: '',
-      tokenAmounts: tokenAmounts,
-      extraArgs: _gasLimit == 0
-        ? bytes('')
-        : Client._argsToBytes(
-          Client.EVMExtraArgsV2({gasLimit: _gasLimit, allowOutOfOrderExecution: false})
-        ),
-      feeToken: feeToken
-    });
   }
 
   /// Builds dummy message for test
@@ -105,24 +84,20 @@ contract SetDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
         Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
       )
     );
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge), false);
+    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
   }
 
   function test_successful() external {
     vm.startPrank(admin);
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(
-      MAINNET_CHAIN_SELECTOR,
+    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+
+    assertEq(
+      bridge.destinations(MAINNET_CHAIN_SELECTOR),
       address(destinationBridge),
-      false
+      'Unexpected bridge'
     );
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge), false);
-
-    (address dest, bool allow) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
-
-    assertEq(dest, address(destinationBridge), 'Unexpected bridge');
-
-    assertFalse(allow, 'Unexpected allow out of order execution');
   }
 }
 
@@ -143,28 +118,24 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
   function test_successful() external {
     vm.startPrank(admin);
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(
-      MAINNET_CHAIN_SELECTOR,
+    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+
+    assertEq(
+      bridge.destinations(MAINNET_CHAIN_SELECTOR),
       address(destinationBridge),
-      true
+      'Unexpected bridge after setting'
     );
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge), true);
-
-    (address dest, bool allow) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
-
-    assertEq(dest, address(destinationBridge), 'Unexpected bridge after setting');
-
-    assertTrue(allow, 'Unexpected allow out of order execution');
 
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(0), false);
+    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(0));
     bridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
 
-    (dest, allow) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
-
-    assertEq(dest, address(0), 'Unexpected bridge after removal');
-
-    assertFalse(allow, 'Unexpected allow out of order execution');
+    assertEq(
+      bridge.destinations(MAINNET_CHAIN_SELECTOR),
+      address(0),
+      'Unexpected bridge after removal'
+    );
   }
 }
 

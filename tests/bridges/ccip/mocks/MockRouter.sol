@@ -156,19 +156,20 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
   function _fromBytes(
     bytes calldata extraArgs
-  ) internal pure returns (Client.EVMExtraArgsV2 memory) {
+  ) internal pure returns (Client.GenericExtraArgs memory) {
     if (extraArgs.length == 0) {
-      return Client.EVMExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false});
+      return
+        Client.GenericExtraArgs({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false});
     }
 
     bytes4 extraArgsTag = bytes4(extraArgs);
     if (extraArgsTag == Client.EVM_EXTRA_ARGS_V2_TAG) {
-      return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV2));
+      return abi.decode(extraArgs[4:], (Client.GenericExtraArgs));
     } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
       // EVMExtraArgsV1 originally included a second boolean (strict) field which has been deprecated.
       // Clients may still include it but it will be ignored.
       return
-        Client.EVMExtraArgsV2({
+        Client.GenericExtraArgs({
           gasLimit: abi.decode(extraArgs[4:], (uint256)),
           allowOutOfOrderExecution: false
         });

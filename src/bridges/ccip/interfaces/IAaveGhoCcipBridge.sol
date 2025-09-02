@@ -10,16 +10,6 @@ import {Client} from '../../../dependencies/chainlink/libraries/Client.sol';
  */
 interface IAaveGhoCcipBridge {
   /**
-   * Struct representing a destination chain
-   * @return The address of the destination bridge
-   * @return True if out of order execution is allowed, false if not
-   */
-  struct Destinations {
-    address destination;
-    bool allowOutOfOrderExecution;
-  }
-
-  /**
    * @dev Insufficient fee paid for transfer
    */
   error InsufficientFee();
@@ -77,7 +67,7 @@ interface IAaveGhoCcipBridge {
    * @dev Emitted when the token transfer is executed on the destination chain
    * @param messageId The ID of the cross-chain message
    * @param to The address of receiver on destination chain
-   * @param amount The amount of token to translated
+   * @param amount The amount of token transferred
    */
   event BridgeMessageFinalized(bytes32 indexed messageId, address indexed to, uint256 amount);
 
@@ -85,13 +75,8 @@ interface IAaveGhoCcipBridge {
    * @dev Emitted when the destination bridge data is updated
    * @param chainSelector The selector of the destination chain
    * @param bridge The address of the bridge on the destination chain
-   * @param allowOutOfOrderExecution Whether out of order execution is allowed
    */
-  event DestinationChainSet(
-    uint64 indexed chainSelector,
-    address indexed bridge,
-    bool allowOutOfOrderExecution
-  );
+  event DestinationChainSet(uint64 indexed chainSelector, address indexed bridge);
 
   /**
    * @dev Emitted when an invalid message is received by the bridge
@@ -139,17 +124,10 @@ interface IAaveGhoCcipBridge {
   /**
    * @notice Sets a destination chain and corresponding bridge address.
    * @dev Only callable by ADMIN.
-   * @dev Some lanes must allow out of order execution due to technical constraints
-   * See: https://docs.chain.link/ccip/concepts/best-practices/evm#setting-allowoutoforderexecution
    * @param chainSelector The chain selector of the destination chain
    * @param bridge The address of the bridge on the destination chain
-   * @param allowOutOfOrderExecution Whether out of order execution is allowed
    */
-  function setDestinationChain(
-    uint64 chainSelector,
-    address bridge,
-    bool allowOutOfOrderExecution
-  ) external;
+  function setDestinationChain(uint64 chainSelector, address bridge) external;
 
   /**
    * @notice Removes a destination chain and corresponding bridge address.
@@ -196,6 +174,12 @@ interface IAaveGhoCcipBridge {
   function BRIDGER_ROLE() external view returns (bytes32);
 
   /**
+   * @notice Returns the default gas limit for CCIP bridges.
+   * @return The gas limit
+   */
+  function DEFAULT_GAS_LIMIT() external view returns (uint256);
+
+  /**
    * @notice Returns the Chainlink CCIP router address
    * @return The address of the Chainlink CCIP router
    */
@@ -222,9 +206,8 @@ interface IAaveGhoCcipBridge {
 
   /**
    * @notice Returns the address of the corresponding bridge for a specified chain selector.
-   * It also returns whether out of order execution is allowed.
    * @param chainSelector The chain selector of destination chain
-   * @return The struct containing AaveGhoCcipBridge information on destination chain
+   * @return The address of AaveGhoCcipBridge information on destination chain
    */
-  function destinations(uint64 chainSelector) external view returns (address, bool);
+  function destinations(uint64 chainSelector) external view returns (address);
 }

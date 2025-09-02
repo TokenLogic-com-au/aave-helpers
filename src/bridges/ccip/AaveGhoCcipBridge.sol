@@ -29,6 +29,9 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   bytes32 public constant BRIDGER_ROLE = keccak256('BRIDGER_ROLE');
 
   /// @inheritdoc IAaveGhoCcipBridge
+  uint256 public constant DEFAULT_GAS_LIMIT = 200_000;
+
+  /// @inheritdoc IAaveGhoCcipBridge
   address public immutable GHO_TOKEN;
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -41,14 +44,14 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   address public immutable EXECUTOR;
 
   /// @inheritdoc IAaveGhoCcipBridge
-  mapping(uint64 chainSelector => Destinations bridgeInfo) public destinations;
+  mapping(uint64 chainSelector => address bridge) public destinations;
 
   /// @dev Map containing failed token transfer amounts for a message
   mapping(bytes32 messageId => Client.EVMTokenAmount[] destTokenAmounts)
-    private failedTokenTransfers;
+    private _failedTokenTransfers;
 
   /// @dev Map containing failed messages and their status
-  mapping(bytes32 messageId => bool isFailed) private failedMessages;
+  mapping(bytes32 messageId => bool isFailed) private _failedMessages;
 
   /**
    * @dev Modifier to allow only the contract itself to execute a function.
@@ -121,11 +124,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   /// @inheritdoc CCIPReceiver
   function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
     try this.processMessage(message) {} catch (bytes memory err) {
-      failedMessages[message.messageId] = true;
+      _failedMessages[message.messageId] = true;
 
       uint256 amountsLength = message.destTokenAmounts.length;
       for (uint256 i = 0; i < amountsLength; i++) {
-        failedTokenTransfers[message.messageId].push(message.destTokenAmounts[i]);
+        _failedTokenTransfers[message.messageId].push(message.destTokenAmounts[i]);
       }
 
       emit BridgeMessageFailed(message.messageId, err);
@@ -134,9 +137,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
 
   /// @inheritdoc IAaveGhoCcipBridge
   function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
-    if (
-      destinations[message.sourceChainSelector].destination != abi.decode(message.sender, (address))
-    ) {
+    if (destinations[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
       revert UnknownSourceDestination();
     }
 
@@ -146,9 +147,9 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   /// @inheritdoc IAaveGhoCcipBridge
   function recoverFailedMessageTokens(bytes32 messageId) external onlyRole(DEFAULT_ADMIN_ROLE) {
     _validateMessageExists(messageId);
-    failedMessages[messageId] = false;
+    _failedMessages[messageId] = false;
 
-    Client.EVMTokenAmount[] memory destTokenAmounts = failedTokenTransfers[messageId];
+    Client.EVMTokenAmount[] memory destTokenAmounts = _failedTokenTransfers[messageId];
 
     uint256 length = destTokenAmounts.length;
     for (uint256 i = 0; i < length; i++) {
@@ -161,26 +162,22 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   /// @inheritdoc IAaveGhoCcipBridge
   function setDestinationChain(
     uint64 chainSelector,
-    address bridge,
-    bool allowOutOfOrderExecution
+    address bridge
   ) external onlyRole(DEFAULT_ADMIN_ROLE) {
     if (bridge == address(0)) {
       revert InvalidZeroAddress();
     }
 
-    destinations[chainSelector] = Destinations({
-      destination: bridge,
-      allowOutOfOrderExecution: allowOutOfOrderExecution
-    });
+    destinations[chainSelector] = bridge;
 
-    emit DestinationChainSet(chainSelector, bridge, allowOutOfOrderExecution);
+    emit DestinationChainSet(chainSelector, bridge);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
   function removeDestinationChain(uint64 chainSelector) external onlyRole(DEFAULT_ADMIN_ROLE) {
     delete destinations[chainSelector];
 
-    emit DestinationChainSet(chainSelector, address(0), false);
+    emit DestinationChainSet(chainSelector, address(0));
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -188,7 +185,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     bytes32 messageId
   ) external view returns (Client.EVMTokenAmount[] memory) {
     _validateMessageExists(messageId);
-    return failedTokenTransfers[messageId];
+    return _failedTokenTransfers[messageId];
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -241,6 +238,8 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
 
   /**
    * @dev Builds ccip message for token transfer
+   * @dev Some lanes must allow out of order execution due to technical constraints. Always best to allow.
+   * See: https://docs.chain.link/ccip/concepts/best-practices/evm#setting-allowoutoforderexecution
    * @param chainSelector The chain selector of the destination chain
    * @param amount The amount of GHO to transfer
    * @param gasLimit The gas limit on the destination chain
@@ -257,22 +256,17 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
       revert InvalidZeroAmount();
     }
 
-    Destinations memory destinationInfo = destinations[chainSelector];
-
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: GHO_TOKEN, amount: amount});
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(destinationInfo.destination),
+      receiver: abi.encode(destinations[chainSelector]),
       data: '',
       tokenAmounts: tokenAmounts,
-      extraArgs: gasLimit == 0
+      extraArgs: gasLimit == DEFAULT_GAS_LIMIT
         ? bytes('')
         : Client._argsToBytes(
-          Client.EVMExtraArgsV2({
-            gasLimit: gasLimit,
-            allowOutOfOrderExecution: destinationInfo.allowOutOfOrderExecution
-          })
+          Client.GenericExtraArgs({gasLimit: gasLimit, allowOutOfOrderExecution: true})
         ),
       feeToken: feeToken
     });
@@ -310,7 +304,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * @param amount The amount of GHO to transfer
    */
   function _validateDestinationAndLimit(uint64 chainSelector, uint256 amount) internal view {
-    if (destinations[chainSelector].destination == address(0)) {
+    if (destinations[chainSelector] == address(0)) {
       revert UnsupportedChain();
     }
 
@@ -325,6 +319,6 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * @param messageId The message ID to validate
    */
   function _validateMessageExists(bytes32 messageId) internal view {
-    if (!failedMessages[messageId]) revert MessageNotFound();
+    if (!_failedMessages[messageId]) revert MessageNotFound();
   }
 }
