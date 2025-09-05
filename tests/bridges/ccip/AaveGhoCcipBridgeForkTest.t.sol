@@ -89,7 +89,7 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
     vm.startPrank(owner);
     mainnetBridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(address(arbitrumBridge)),
       bytes(''),
       DEFAULT_GAS_LIMIT
     );
@@ -103,7 +103,7 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
     vm.startPrank(owner);
     arbitrumBridge.setDestinationChain(
       MAINNET_CHAIN_SELECTOR,
-      abi.encodePacked(mainnetBridge),
+      abi.encode(address(mainnetBridge)),
       bytes(''),
       DEFAULT_GAS_LIMIT
     );
@@ -179,14 +179,7 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
     vm.selectFork(mainnetFork);
     address caller = makeAddr('random-caller');
     vm.startPrank(caller);
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(caller), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(mainnetBridge.BRIDGER_ROLE()), 32)
-      )
-    );
+    vm.expectRevert('Ownable: caller is not the owner');
     mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
@@ -350,14 +343,7 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
     vm.selectFork(arbitrumFork);
     address caller = makeAddr('random-caller');
     vm.startPrank(caller);
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(caller), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(arbitrumBridge.BRIDGER_ROLE()), 32)
-      )
-    );
+    vm.expectRevert('Ownable: caller is not the owner');
     arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
@@ -578,8 +564,6 @@ contract RecoverFailedMessageTokensTest is AaveGhoCcipBridgeForkTestBase {
 
   function test_revertIf_callerNotOwner() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(owner);
-
     vm.expectRevert('Ownable: caller is not the owner');
     mainnetBridge.recoverFailedMessageTokens(bytes32(0));
     vm.stopPrank();
@@ -619,12 +603,10 @@ contract RecoverFailedMessageTokensTest is AaveGhoCcipBridgeForkTestBase {
 contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
   function test_revertIf_callerNotOwner() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(owner);
-
     vm.expectRevert('Ownable: caller is not the owner');
     mainnetBridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       bytes(''),
       DEFAULT_GAS_LIMIT
     );
@@ -637,12 +619,12 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     vm.expectEmit(address(mainnetBridge));
     emit IAaveGhoCcipBridge.DestinationChainSet(
       ARBITRUM_CHAIN_SELECTOR,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       DEFAULT_GAS_LIMIT
     );
     mainnetBridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       bytes(''),
       DEFAULT_GAS_LIMIT
     );
@@ -651,7 +633,7 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
 
     assertEq(
       dest,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       'Destination bridge not set correctly in the mapping'
     );
     vm.stopPrank();
@@ -661,8 +643,6 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
 contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
   function test_revertIf_callerNotOwner() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(owner);
-
     vm.expectRevert('Ownable: caller is not the owner');
     mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
     vm.stopPrank();
@@ -675,12 +655,12 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     vm.expectEmit(address(mainnetBridge));
     emit IAaveGhoCcipBridge.DestinationChainSet(
       ARBITRUM_CHAIN_SELECTOR,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       DEFAULT_GAS_LIMIT
     );
     mainnetBridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       bytes(''),
       DEFAULT_GAS_LIMIT
     );
@@ -689,7 +669,7 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
 
     assertEq(
       dest,
-      abi.encodePacked(arbitrumBridge),
+      abi.encode(arbitrumBridge),
       'Destination bridge not set correctly in the mapping'
     );
 
@@ -855,19 +835,18 @@ contract RescuableTest is AaveGhoCcipBridgeForkTestBase {
   }
 }
 
-contract GetInvalidMessage is AaveGhoCcipBridgeForkTestBase {
+contract GetInvalidMessageTest is AaveGhoCcipBridgeForkTestBase {
   address public feeToken = AaveV3EthereumAssets.GHO_UNDERLYING;
 
   function test_revertIf_messageNotFound() external {
     vm.selectFork(mainnetFork);
     vm.startPrank(owner);
-
     vm.expectRevert(IAaveGhoCcipBridge.MessageNotFound.selector);
     mainnetBridge.getInvalidMessage(bytes32(0));
     vm.stopPrank();
   }
 
-  function test_success() external {
+  function test_successful() external {
     Internal.EVM2EVMMessage memory message = _buildInvalidMessage();
 
     vm.selectFork(arbitrumFork);

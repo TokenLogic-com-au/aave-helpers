@@ -51,11 +51,7 @@ interface IAaveGhoCcipBridge {
    * @param destination The address of the bridge on the destination chain
    * @param gasLimit The gas limit on the ccipReceive() function on the destination chain
    */
-  event DestinationChainSet(
-    uint64 indexed chainSelector,
-    bytes indexed destination,
-    uint32 gasLimit
-  );
+  event DestinationChainSet(uint64 indexed chainSelector, bytes destination, uint32 gasLimit);
 
   /**
    * @dev Emitted when an invalid message is received by the bridge

@@ -31,3 +31,5 @@ The chain selector for a given chain is defined by CCIP. The list of chain selec
 https://docs.chain.link/ccip/directory/mainnet
 
 Non-EVM chains are supported.
+
+The destination chain address must be provided as bytes. For EVM chains, convert the address to bytes with `abi.encode(address)`, where address if an EVM address. For Solana/Aptos, `abi.encode(bytes32)` where bytes32 is the Aptos/Solana address.

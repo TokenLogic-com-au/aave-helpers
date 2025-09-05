@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {IERC165} from 'openzeppelin-contracts/contracts/utils/introspection/IERC165.sol';
 import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
-import {AccessControl, IAccessControl} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/AccessControl.sol';
 import {Ownable} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
@@ -132,7 +131,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   /// @inheritdoc IAaveGhoCcipBridge
   function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
     if (
-      keccak256(destinations[message.sourceChainSelector].destination) == keccak256(message.sender)
+      keccak256(destinations[message.sourceChainSelector].destination) != keccak256(message.sender)
     ) {
       revert UnknownSourceDestination();
     }
