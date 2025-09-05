@@ -76,27 +76,36 @@ contract AaveGhoCcipBridgeTestBase is Test, Constants {
 contract SetDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
   function test_revertsIf_callerNotAdmin() external {
     vm.startPrank(alice);
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(alice), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
-      )
+    vm.expectRevert('Ownable: caller is not the owner');
+    bridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(destinationBridge),
+      bytes(''),
+      200_000
     );
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
   }
 
   function test_successful() external {
     vm.startPrank(admin);
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      MAINNET_CHAIN_SELECTOR,
+      abi.encodePacked(destinationBridge),
+      200_000
+    );
+    bridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(destinationBridge),
+      bytes(''),
+      200_000
+    );
+
+    (bytes memory dest, , ) = bridge.destinations(ARBITRUM_CHAIN_SELECTOR);
 
     assertEq(
-      bridge.destinations(MAINNET_CHAIN_SELECTOR),
-      address(destinationBridge),
-      'Unexpected bridge'
+      dest,
+      abi.encodePacked(destinationBridge),
+      'Destination bridge not set correctly in the mapping'
     );
   }
 }
@@ -104,38 +113,40 @@ contract SetDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
 contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
   function test_revertsIf_callerNotAdmin() external {
     vm.startPrank(alice);
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(alice), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
-      )
-    );
+    vm.expectRevert('Ownable: caller is not the owner');
     bridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
   }
 
   function test_successful() external {
     vm.startPrank(admin);
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
-    bridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(destinationBridge));
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      MAINNET_CHAIN_SELECTOR,
+      abi.encodePacked(destinationBridge),
+      200_000
+    );
+    bridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(destinationBridge),
+      bytes(''),
+      200_000
+    );
+
+    (bytes memory dest, , ) = bridge.destinations(ARBITRUM_CHAIN_SELECTOR);
 
     assertEq(
-      bridge.destinations(MAINNET_CHAIN_SELECTOR),
-      address(destinationBridge),
-      'Unexpected bridge after setting'
+      dest,
+      abi.encodePacked(destinationBridge),
+      'Destination bridge not set correctly in the mapping'
     );
 
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, address(0));
+    emit IAaveGhoCcipBridge.DestinationChainSet(MAINNET_CHAIN_SELECTOR, bytes(''), 0);
     bridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
 
-    assertEq(
-      bridge.destinations(MAINNET_CHAIN_SELECTOR),
-      address(0),
-      'Unexpected bridge after removal'
-    );
+    (dest, , ) = bridge.destinations(ARBITRUM_CHAIN_SELECTOR);
+
+    assertEq(dest, bytes(''), 'Destination bridge not set correctly in the mapping');
   }
 }
 
@@ -190,14 +201,7 @@ contract HandleInvalidMessageTest is AaveGhoCcipBridgeTestBase {
 
   function test_revertIf_callerNotOwner() external {
     vm.startPrank(alice);
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(alice), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(bridge.DEFAULT_ADMIN_ROLE()), 32)
-      )
-    );
+    vm.expectRevert('Ownable: caller is not the owner');
     bridge.recoverFailedMessageTokens(bytes32(0));
   }
 

@@ -10,6 +10,67 @@ import {Client} from '../../../dependencies/chainlink/libraries/Client.sol';
  */
 interface IAaveGhoCcipBridge {
   /**
+   * Struct representing a destination chain
+   * @return extraArgsOverride Any extra arguments to pass with message to the destination chain
+   * @return bridge The bytes representation of an address (EVM or non-EVM)
+   * @return gasLimit The gas limit to set for the destination chain's ccipReceive() function
+   */
+  struct RemoteChainConfig {
+    bytes destination; // Can be non-EVM address
+    // If set, extraArgsOverride overrides the default extraArgs. This enables both sending to non-EVM chains and
+    // allows supporting future extraArgs without needing to redeploy this contract.
+    bytes extraArgsOverride;
+    uint32 gasLimit;
+  }
+
+  /**
+   * @dev Emitted when a new GHO transfer is issued
+   * @param messageId The ID of the cross-chain message
+   * @param destinationChainSelector The selector of the destination chain
+   * @param from The address of sender on source chain
+   * @param amount The total amount of GHO transfered
+   */
+  event BridgeMessageInitiated(
+    bytes32 indexed messageId,
+    uint64 indexed destinationChainSelector,
+    address indexed from,
+    uint256 amount
+  );
+
+  /**
+   * @dev Emitted when the token transfer is executed on the destination chain
+   * @param messageId The ID of the cross-chain message
+   * @param to The address of receiver on destination chain
+   * @param amount The amount of token transferred
+   */
+  event BridgeMessageFinalized(bytes32 indexed messageId, address indexed to, uint256 amount);
+
+  /**
+   * @dev Emitted when the destination bridge data is updated
+   * @param chainSelector The selector of the destination chain
+   * @param destination The address of the bridge on the destination chain
+   * @param gasLimit The gas limit on the ccipReceive() function on the destination chain
+   */
+  event DestinationChainSet(
+    uint64 indexed chainSelector,
+    bytes indexed destination,
+    uint32 gasLimit
+  );
+
+  /**
+   * @dev Emitted when an invalid message is received by the bridge
+   * @param messageId The ID of message
+   * @param err The error on why the transfer failed
+   */
+  event BridgeMessageFailed(bytes32 indexed messageId, bytes err);
+
+  /**
+   * @dev Emits when receive invalid message
+   * @param messageId The id of message
+   */
+  event BridgeMessageRecovered(bytes32 indexed messageId);
+
+  /**
    * @dev Insufficient fee paid for transfer
    */
   error InsufficientFee();
@@ -50,60 +111,16 @@ interface IAaveGhoCcipBridge {
   error UnsupportedChain();
 
   /**
-   * @dev Emitted when a new GHO transfer is issued
-   * @param messageId The ID of the cross-chain message
-   * @param destinationChainSelector The selector of the destination chain
-   * @param from The address of sender on source chain
-   * @param amount The total amount of GHO transfered
-   */
-  event BridgeMessageInitiated(
-    bytes32 indexed messageId,
-    uint64 indexed destinationChainSelector,
-    address indexed from,
-    uint256 amount
-  );
-
-  /**
-   * @dev Emitted when the token transfer is executed on the destination chain
-   * @param messageId The ID of the cross-chain message
-   * @param to The address of receiver on destination chain
-   * @param amount The amount of token transferred
-   */
-  event BridgeMessageFinalized(bytes32 indexed messageId, address indexed to, uint256 amount);
-
-  /**
-   * @dev Emitted when the destination bridge data is updated
-   * @param chainSelector The selector of the destination chain
-   * @param bridge The address of the bridge on the destination chain
-   */
-  event DestinationChainSet(uint64 indexed chainSelector, address indexed bridge);
-
-  /**
-   * @dev Emitted when an invalid message is received by the bridge
-   * @param messageId The ID of message
-   * @param err The error on why the transfer failed
-   */
-  event BridgeMessageFailed(bytes32 indexed messageId, bytes err);
-
-  /**
-   * @dev Emits when receive invalid message
-   * @param messageId The id of message
-   */
-  event BridgeMessageRecovered(bytes32 indexed messageId);
-
-  /**
    * @notice Transfers tokens to specified destination chain.
    * @dev chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
    * @param chainSelector The chain selector of the destination chain
    * @param amount The amount of GHO to transfer
-   * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, default value is used
    * @param feeToken The address of the fee token to pay transfer with
    * @return The ID of the cross-chain message
    */
   function send(
     uint64 chainSelector,
     uint256 amount,
-    uint256 gasLimit,
     address feeToken
   ) external payable returns (bytes32);
 
@@ -125,9 +142,18 @@ interface IAaveGhoCcipBridge {
    * @notice Sets a destination chain and corresponding bridge address.
    * @dev Only callable by ADMIN.
    * @param chainSelector The chain selector of the destination chain
-   * @param bridge The address of the bridge on the destination chain
+   * @param destination The address of the bridge on the destination chain
+   * @param extraArgs Any extra arguments to pass with message to the destination chain
+   * @param gasLimit The gas limit to set for the destination chain's ccipReceive() function
+   * @dev The bridge address refers to an instance of this contract deployed
+   * by the Aave DAO on the remote chain specified by the chainSelector.
    */
-  function setDestinationChain(uint64 chainSelector, address bridge) external;
+  function setDestinationChain(
+    uint64 chainSelector,
+    bytes calldata destination,
+    bytes calldata extraArgs,
+    uint32 gasLimit
+  ) external;
 
   /**
    * @notice Removes a destination chain and corresponding bridge address.
@@ -146,7 +172,7 @@ interface IAaveGhoCcipBridge {
   ) external view returns (Client.EVMTokenAmount[] memory);
 
   /**
-   * @dev Returns the bridge rate limit for a given chain.
+   * @notice Returns the bridge rate limit for a given chain.
    * @param chainSelector The chain selector of the destination chain
    * @return The rate limit of the chain
    */
@@ -156,14 +182,12 @@ interface IAaveGhoCcipBridge {
    * @notice Returns the fee amount cost to execute the bridge transfer.
    * @param chainSelector The chain selector of the destination chain
    * @param amount The amount of GHO to transfer
-   * @param gasLimit Gas limit for the callback on the destination chain. If this value is 0, default value is used
    * @param feeToken The address of fee token to pay transfer with
    * @return The amount of fee tokens required
    */
   function quoteBridge(
     uint64 chainSelector,
     uint256 amount,
-    uint256 gasLimit,
     address feeToken
   ) external view returns (uint256);
 
@@ -180,16 +204,16 @@ interface IAaveGhoCcipBridge {
   function DEFAULT_GAS_LIMIT() external view returns (uint256);
 
   /**
-   * @notice Returns the Chainlink CCIP router address
-   * @return The address of the Chainlink CCIP router
-   */
-  function ROUTER() external view returns (address);
-
-  /**
    * @notice Returns the GHO token address on the deployed chain.
    * @return The address of the GHO token contract
    */
   function GHO_TOKEN() external view returns (address);
+
+  /**
+   * @notice Returns the Chainlink CCIP router address
+   * @return The address of the Chainlink CCIP router
+   */
+  function ROUTER() external view returns (address);
 
   /**
    * @notice Returns the AaveCollector address on the deployed chain.
@@ -198,16 +222,13 @@ interface IAaveGhoCcipBridge {
   function COLLECTOR() external view returns (address);
 
   /**
-   * @notice Returns the executor (governance) address on the deployed chain
-   * @dev The executor has the DEFAULT_ADMIN_ROLE
-   * @return The address of the Executor contract
-   */
-  function EXECUTOR() external view returns (address);
-
-  /**
    * @notice Returns the address of the corresponding bridge for a specified chain selector.
    * @param chainSelector The chain selector of destination chain
-   * @return The address of AaveGhoCcipBridge information on destination chain
+   * @return The bytes representation of the address of AaveGhoCcipBridge on the destination chain
+   * @return The extra arguments to send to the destination chain in the bridge message
+   * @return The gas limit to send to the destination chain
    */
-  function destinations(uint64 chainSelector) external view returns (address);
+  function destinations(
+    uint64 chainSelector
+  ) external view returns (bytes memory, bytes memory, uint32);
 }

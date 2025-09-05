@@ -5,24 +5,28 @@ import {IERC165} from 'openzeppelin-contracts/contracts/utils/introspection/IERC
 import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {AccessControl, IAccessControl} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/AccessControl.sol';
+import {Ownable} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 
-import {Client} from '../../dependencies/chainlink/libraries/Client.sol';
-import {CCIPReceiver} from '../../dependencies/chainlink/CCIPReceiver.sol';
-import {IAny2EVMMessageReceiver} from '../../dependencies/chainlink/interfaces/IAny2EVMMessageReceiver.sol';
-import {IOnRampClient} from '../../dependencies/chainlink/interfaces/IOnRampClient.sol';
-import {IRouter} from '../../dependencies/chainlink/interfaces/IRouter.sol';
-import {IRouterClient} from '../../dependencies/chainlink/interfaces/IRouterClient.sol';
-import {ITokenPool} from '../../dependencies/chainlink/interfaces/ITokenPool.sol';
-import {IAaveGhoCcipBridge} from './interfaces/IAaveGhoCcipBridge.sol';
+import {Client} from 'src/dependencies/chainlink/libraries/Client.sol';
+import {CCIPReceiver} from 'src/dependencies/chainlink/CCIPReceiver.sol';
+import {IAny2EVMMessageReceiver} from 'src/dependencies/chainlink/interfaces/IAny2EVMMessageReceiver.sol';
+import {IOnRampClient} from 'src/dependencies/chainlink/interfaces/IOnRampClient.sol';
+import {IRouter} from 'src/dependencies/chainlink/interfaces/IRouter.sol';
+import {IRouterClient} from 'src/dependencies/chainlink/interfaces/IRouterClient.sol';
+import {ITokenPool} from 'src/dependencies/chainlink/interfaces/ITokenPool.sol';
+import {IAaveGhoCcipBridge} from 'src/bridges/ccip/interfaces/IAaveGhoCcipBridge.sol';
 
 /**
  * @title AaveGhoCcipBridge
  * @author TokenLogic
- * @notice It provides bridging capabilities for the GHO token across networks.
+ * @notice Provides bridging capabilities for the GHO token across networks.
+ * @dev The fee token must be pre-funded for the bridge message to be sent. When doing a governance
+ * proposal ensure funds are present on this contract beforehand (GHO/LINK) or transfer funds from the
+ * treasury as part of the proposal.
  */
-contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCcipBridge {
+contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBridge {
   using SafeERC20 for IERC20;
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -41,10 +45,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   address public immutable COLLECTOR;
 
   /// @inheritdoc IAaveGhoCcipBridge
-  address public immutable EXECUTOR;
-
-  /// @inheritdoc IAaveGhoCcipBridge
-  mapping(uint64 chainSelector => address bridge) public destinations;
+  mapping(uint64 chainSelector => RemoteChainConfig remoteConfig) public destinations;
 
   /// @dev Map containing failed token transfer amounts for a message
   mapping(bytes32 messageId => Client.EVMTokenAmount[] destTokenAmounts)
@@ -67,37 +68,30 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * @param router The address of the Chainlink CCIP router
    * @param gho The address of the GHO token
    * @param collector The address of the Aave Collector
-   * @param initialAdmin The address of the initial admin
+   * @param initialOwner The address of the initial admin
    */
   constructor(
     address router,
     address gho,
     address collector,
-    address initialAdmin
+    address initialOwner
   ) CCIPReceiver(router) {
     ROUTER = router;
     GHO_TOKEN = gho;
     COLLECTOR = collector;
-    EXECUTOR = initialAdmin;
 
-    _setupRole(DEFAULT_ADMIN_ROLE, initialAdmin);
+    transferOwnership(initialOwner);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
   function send(
     uint64 chainSelector,
     uint256 amount,
-    uint256 gasLimit,
     address feeToken
-  ) external payable onlyRole(BRIDGER_ROLE) returns (bytes32) {
+  ) external payable onlyOwner returns (bytes32) {
     _validateDestinationAndLimit(chainSelector, amount);
 
-    Client.EVM2AnyMessage memory message = _buildCCIPMessage(
-      chainSelector,
-      amount,
-      gasLimit,
-      feeToken
-    );
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(chainSelector, amount, feeToken);
 
     uint256 fee = IRouterClient(ROUTER).getFee(chainSelector, message);
 
@@ -137,15 +131,20 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
 
   /// @inheritdoc IAaveGhoCcipBridge
   function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
-    if (destinations[message.sourceChainSelector] != abi.decode(message.sender, (address))) {
+    if (
+      keccak256(destinations[message.sourceChainSelector].destination) == keccak256(message.sender)
+    ) {
       revert UnknownSourceDestination();
     }
 
-    _ccipReceive(message);
+    uint256 ghoAmount = message.destTokenAmounts[0].amount;
+    IERC20(GHO_TOKEN).safeTransfer(COLLECTOR, ghoAmount);
+
+    emit BridgeMessageFinalized(message.messageId, COLLECTOR, ghoAmount);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
-  function recoverFailedMessageTokens(bytes32 messageId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+  function recoverFailedMessageTokens(bytes32 messageId) external onlyOwner {
     _validateMessageExists(messageId);
     _failedMessages[messageId] = false;
 
@@ -162,22 +161,28 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   /// @inheritdoc IAaveGhoCcipBridge
   function setDestinationChain(
     uint64 chainSelector,
-    address bridge
-  ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    if (bridge == address(0)) {
+    bytes calldata destination,
+    bytes calldata extraArgs,
+    uint32 gasLimit
+  ) external onlyOwner {
+    if (destination.length == 0) {
       revert InvalidZeroAddress();
     }
 
-    destinations[chainSelector] = bridge;
+    destinations[chainSelector] = RemoteChainConfig({
+      destination: destination,
+      extraArgsOverride: extraArgs,
+      gasLimit: gasLimit
+    });
 
-    emit DestinationChainSet(chainSelector, bridge);
+    emit DestinationChainSet(chainSelector, destination, gasLimit);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
-  function removeDestinationChain(uint64 chainSelector) external onlyRole(DEFAULT_ADMIN_ROLE) {
+  function removeDestinationChain(uint64 chainSelector) external onlyOwner {
     delete destinations[chainSelector];
 
-    emit DestinationChainSet(chainSelector, address(0));
+    emit DestinationChainSet(chainSelector, bytes(''), 0);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -197,17 +202,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
   function quoteBridge(
     uint64 chainSelector,
     uint256 amount,
-    uint256 gasLimit,
     address feeToken
   ) external view returns (uint256) {
     _validateDestinationAndLimit(chainSelector, amount);
 
-    Client.EVM2AnyMessage memory message = _buildCCIPMessage(
-      chainSelector,
-      amount,
-      gasLimit,
-      feeToken
-    );
+    Client.EVM2AnyMessage memory message = _buildCCIPMessage(chainSelector, amount, feeToken);
 
     return IRouterClient(ROUTER).getFee(chainSelector, message);
   }
@@ -221,7 +220,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
 
   /// @inheritdoc Rescuable
   function whoCanRescue() public view override returns (address) {
-    return EXECUTOR;
+    return owner();
   }
 
   /**
@@ -229,12 +228,15 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    */
   function supportsInterface(
     bytes4 interfaceId
-  ) public pure virtual override(AccessControl, CCIPReceiver) returns (bool) {
+  ) public pure virtual override(CCIPReceiver) returns (bool) {
     return
-      interfaceId == type(IAccessControl).interfaceId ||
       interfaceId == type(IAny2EVMMessageReceiver).interfaceId ||
       interfaceId == type(IERC165).interfaceId;
   }
+
+  /// @inheritdoc CCIPReceiver
+  /// @dev Intentionally left blank
+  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {}
 
   /**
    * @dev Builds ccip message for token transfer
@@ -242,14 +244,12 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * See: https://docs.chain.link/ccip/concepts/best-practices/evm#setting-allowoutoforderexecution
    * @param chainSelector The chain selector of the destination chain
    * @param amount The amount of GHO to transfer
-   * @param gasLimit The gas limit on the destination chain
    * @param feeToken The address of the fee token (use address(0) for fee in native token)
    * @return message EVM2AnyMessage to transfer GHO cross-chain
    */
   function _buildCCIPMessage(
     uint64 chainSelector,
     uint256 amount,
-    uint256 gasLimit,
     address feeToken
   ) internal view returns (Client.EVM2AnyMessage memory) {
     if (amount == 0) {
@@ -259,28 +259,21 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: GHO_TOKEN, amount: amount});
 
+    RemoteChainConfig memory remoteConfig = destinations[chainSelector];
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(destinations[chainSelector]),
+      receiver: remoteConfig.destination,
       data: '',
       tokenAmounts: tokenAmounts,
-      extraArgs: gasLimit == DEFAULT_GAS_LIMIT
-        ? bytes('')
+      extraArgs: remoteConfig.extraArgsOverride.length > 0
+        ? remoteConfig.extraArgsOverride
         : Client._argsToBytes(
-          Client.GenericExtraArgs({gasLimit: gasLimit, allowOutOfOrderExecution: true})
+          Client.GenericExtraArgs({gasLimit: remoteConfig.gasLimit, allowOutOfOrderExecution: true})
         ),
       feeToken: feeToken
     });
 
     return message;
-  }
-
-  /// @inheritdoc CCIPReceiver
-  function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
-    uint256 ghoAmount = message.destTokenAmounts[0].amount;
-
-    IERC20(GHO_TOKEN).safeTransfer(COLLECTOR, ghoAmount);
-
-    emit BridgeMessageFinalized(message.messageId, COLLECTOR, ghoAmount);
   }
 
   /**
@@ -304,7 +297,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, AccessControl, Rescuable, IAaveGhoCc
    * @param amount The amount of GHO to transfer
    */
   function _validateDestinationAndLimit(uint64 chainSelector, uint256 amount) internal view {
-    if (destinations[chainSelector] == address(0)) {
+    if (destinations[chainSelector].destination.length == 0) {
       revert UnsupportedChain();
     }
 

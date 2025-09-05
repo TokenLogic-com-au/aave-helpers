@@ -24,12 +24,11 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
   /// @dev Error from CCIP
   error NotAFeeToken(address token);
 
-  uint256 public constant DEFAULT_GAS_LIMIT = 200_000;
+  uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
   uint256 public constant AMOUNT_TO_SEND = 1_000_000 ether;
   uint256 public mainnetFork;
   uint256 public arbitrumFork;
-  address public admin = makeAddr('admin');
-  address public facilitator = makeAddr('facilitator');
+  address public owner = makeAddr('owner');
 
   CCIPLocalSimulatorFork public ccipLocalSimulatorFork;
   AaveGhoCcipBridge mainnetBridge;
@@ -59,10 +58,10 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
       arbitrumNetworkDetails.routerAddress,
       AaveV3ArbitrumAssets.GHO_UNDERLYING,
       address(AaveV3Arbitrum.COLLECTOR),
-      admin
+      owner
     );
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     IERC20(AaveV3ArbitrumAssets.GHO_UNDERLYING).approve(address(arbitrumBridge), type(uint256).max);
     vm.stopPrank();
 
@@ -84,22 +83,30 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
       mainnetDetails.routerAddress,
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
-      admin
+      owner
     );
 
-    vm.startPrank(admin);
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-    mainnetBridge.grantRole(mainnetBridge.BRIDGER_ROLE(), facilitator);
+    vm.startPrank(owner);
+    mainnetBridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(arbitrumBridge),
+      bytes(''),
+      DEFAULT_GAS_LIMIT
+    );
     vm.stopPrank();
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).approve(address(mainnetBridge), type(uint256).max);
     vm.stopPrank();
 
     vm.selectFork(arbitrumFork);
-    vm.startPrank(admin);
-    arbitrumBridge.setDestinationChain(MAINNET_CHAIN_SELECTOR, address(mainnetBridge));
-    arbitrumBridge.grantRole(arbitrumBridge.BRIDGER_ROLE(), facilitator);
+    vm.startPrank(owner);
+    arbitrumBridge.setDestinationChain(
+      MAINNET_CHAIN_SELECTOR,
+      abi.encodePacked(mainnetBridge),
+      bytes(''),
+      DEFAULT_GAS_LIMIT
+    );
     vm.stopPrank();
   }
 
@@ -120,7 +127,7 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
   }
 
   function _buildInvalidMessage() internal returns (Internal.EVM2EVMMessage memory) {
-    vm.startPrank(admin);
+    vm.startPrank(owner);
     vm.selectFork(arbitrumFork);
     arbitrumBridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
     vm.stopPrank();
@@ -129,16 +136,14 @@ contract AaveGhoCcipBridgeForkTestBase is Test, Constants {
     uint256 fee = mainnetBridge.quoteBridge(
       ARBITRUM_CHAIN_SELECTOR,
       AMOUNT_TO_SEND,
-      DEFAULT_GAS_LIMIT,
       AaveV3EthereumAssets.GHO_UNDERLYING
     );
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, facilitator, AMOUNT_TO_SEND + fee);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, AMOUNT_TO_SEND + fee);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     mainnetBridge.send(
       ARBITRUM_CHAIN_SELECTOR,
       AMOUNT_TO_SEND,
-      DEFAULT_GAS_LIMIT,
       AaveV3EthereumAssets.GHO_UNDERLYING
     );
     vm.stopPrank();
@@ -164,9 +169,9 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
 
   function test_revertsIf_unsupportedChain() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.UnsupportedChain.selector);
-    mainnetBridge.send(BLAST_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
+    mainnetBridge.send(BLAST_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
 
@@ -182,42 +187,37 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
         Strings.toHexString(uint256(mainnetBridge.BRIDGER_ROLE()), 32)
       )
     );
-    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
+    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_invalidTransferAmount() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.InvalidZeroAmount.selector);
-    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, 0, 0, feeToken);
+    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, 0, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_sourceChainNotConfigured() public {
-    vm.startPrank(admin);
+    vm.startPrank(owner);
     vm.selectFork(arbitrumFork);
     arbitrumBridge.removeDestinationChain(MAINNET_CHAIN_SELECTOR);
     vm.stopPrank();
 
     vm.selectFork(mainnetFork);
-    uint256 fee = mainnetBridge.quoteBridge(
-      ARBITRUM_CHAIN_SELECTOR,
-      AMOUNT_TO_SEND,
-      DEFAULT_GAS_LIMIT,
-      feeToken
-    );
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, facilitator, AMOUNT_TO_SEND + fee);
+    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, AMOUNT_TO_SEND + fee);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectEmit(false, true, true, true, address(mainnetBridge));
     emit IAaveGhoCcipBridge.BridgeMessageInitiated(
       bytes32(0),
       ARBITRUM_CHAIN_SELECTOR,
-      facilitator,
+      owner,
       AMOUNT_TO_SEND
     );
-    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, DEFAULT_GAS_LIMIT, feeToken);
+    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -242,12 +242,12 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
 
     amount = bound(amount, limit + 1, 1e32 - 1); // made top limit to prevent arithmetic overflow
     uint256 fee = 1 ether; // set static fee because quoteBridge reverts if amount exceeds limit
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, facilitator, amount + fee);
-    deal(facilitator, 100);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, amount + fee);
+    deal(owner, 100);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(abi.encodeWithSelector(IAaveGhoCcipBridge.RateLimitExceeded.selector, limit));
-    mainnetBridge.send{value: 100}(ARBITRUM_CHAIN_SELECTOR, amount, 0, feeToken);
+    mainnetBridge.send{value: 100}(ARBITRUM_CHAIN_SELECTOR, amount, feeToken);
     vm.stopPrank();
   }
 
@@ -263,23 +263,18 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
     );
 
     vm.selectFork(mainnetFork);
-    uint256 fee = mainnetBridge.quoteBridge(
-      ARBITRUM_CHAIN_SELECTOR,
-      amount,
-      DEFAULT_GAS_LIMIT,
-      feeToken
-    );
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, facilitator, amount + fee);
+    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, amount, feeToken);
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, amount + fee);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectEmit(false, true, true, true, address(mainnetBridge));
     emit IAaveGhoCcipBridge.BridgeMessageInitiated(
       bytes32(0),
       ARBITRUM_CHAIN_SELECTOR,
-      facilitator,
+      owner,
       amount
     );
-    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, amount, DEFAULT_GAS_LIMIT, feeToken);
+    mainnetBridge.send(ARBITRUM_CHAIN_SELECTOR, amount, feeToken);
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -309,24 +304,19 @@ contract SendMainnetToArbitrum is AaveGhoCcipBridgeForkTestBase {
     );
 
     vm.selectFork(mainnetFork);
-    uint256 fee = mainnetBridge.quoteBridge(
-      ARBITRUM_CHAIN_SELECTOR,
-      amount,
-      DEFAULT_GAS_LIMIT,
-      address(0)
-    );
-    deal(AaveV3EthereumAssets.GHO_UNDERLYING, facilitator, amount);
-    deal(facilitator, 100 ether);
+    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, amount, address(0));
+    deal(AaveV3EthereumAssets.GHO_UNDERLYING, owner, amount);
+    deal(owner, 100 ether);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectEmit(false, true, true, true, address(mainnetBridge));
     emit IAaveGhoCcipBridge.BridgeMessageInitiated(
       bytes32(0),
       ARBITRUM_CHAIN_SELECTOR,
-      facilitator,
+      owner,
       amount
     );
-    mainnetBridge.send{value: fee}(ARBITRUM_CHAIN_SELECTOR, amount, DEFAULT_GAS_LIMIT, address(0));
+    mainnetBridge.send{value: fee}(ARBITRUM_CHAIN_SELECTOR, amount, address(0));
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -350,9 +340,9 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
 
   function test_revertsIf_unsupportedChain() public {
     vm.selectFork(arbitrumFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.UnsupportedChain.selector);
-    arbitrumBridge.send(BLAST_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
+    arbitrumBridge.send(BLAST_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
 
@@ -368,62 +358,57 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
         Strings.toHexString(uint256(arbitrumBridge.BRIDGER_ROLE()), 32)
       )
     );
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
+    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_invalidTransferAmount() public {
     vm.selectFork(arbitrumFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.InvalidZeroAmount.selector);
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, 0, 0, feeToken);
+    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, 0, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_insufficientNativeFee() public {
     vm.selectFork(arbitrumFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.InsufficientFee.selector);
-    arbitrumBridge.send{value: 0}(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, address(0));
+    arbitrumBridge.send{value: 0}(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, address(0));
     vm.stopPrank();
   }
 
   function test_revertsIf_invalidFeeToken() public {
     address invalidFeeToken = makeAddr('new erc20');
     vm.selectFork(arbitrumFork);
-    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, facilitator, AMOUNT_TO_SEND);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, owner, AMOUNT_TO_SEND);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(abi.encodeWithSelector(NotAFeeToken.selector, invalidFeeToken));
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, invalidFeeToken);
+    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, AMOUNT_TO_SEND, invalidFeeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_sourceChainNotConfigured() public {
-    vm.startPrank(admin);
+    vm.startPrank(owner);
     vm.selectFork(mainnetFork);
     mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
     vm.stopPrank();
 
     vm.selectFork(arbitrumFork);
     uint256 amountToSend = 1_000 ether;
-    uint256 fee = arbitrumBridge.quoteBridge(
-      MAINNET_CHAIN_SELECTOR,
-      amountToSend,
-      DEFAULT_GAS_LIMIT,
-      feeToken
-    );
-    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, facilitator, AMOUNT_TO_SEND + fee);
+    uint256 fee = arbitrumBridge.quoteBridge(MAINNET_CHAIN_SELECTOR, amountToSend, feeToken);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, owner, AMOUNT_TO_SEND + fee);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectEmit(false, true, true, true, address(arbitrumBridge));
     emit IAaveGhoCcipBridge.BridgeMessageInitiated(
       bytes32(0),
       MAINNET_CHAIN_SELECTOR,
-      facilitator,
+      owner,
       amountToSend
     );
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amountToSend, DEFAULT_GAS_LIMIT, feeToken);
+    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amountToSend, feeToken);
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -440,49 +425,6 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
     vm.stopPrank();
   }
 
-  function test_successful_customGasLimit() public {
-    vm.selectFork(mainnetFork);
-    uint256 beforeBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
-      address(AaveV3Ethereum.COLLECTOR)
-    );
-    uint256 customGasLimit = 300_000;
-
-    vm.selectFork(arbitrumFork);
-    uint256 amountToSend = 1_000 ether;
-    uint256 fee = arbitrumBridge.quoteBridge(
-      MAINNET_CHAIN_SELECTOR,
-      amountToSend,
-      customGasLimit,
-      feeToken
-    );
-    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, facilitator, amountToSend + fee);
-
-    vm.startPrank(facilitator);
-    vm.expectEmit(false, true, true, true, address(arbitrumBridge));
-    emit IAaveGhoCcipBridge.BridgeMessageInitiated(
-      bytes32(0),
-      MAINNET_CHAIN_SELECTOR,
-      facilitator,
-      amountToSend
-    );
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amountToSend, customGasLimit, feeToken);
-
-    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
-
-    vm.expectEmit(true, true, false, true, address(mainnetBridge));
-    emit IAaveGhoCcipBridge.BridgeMessageFinalized(
-      message.messageId,
-      address(AaveV3Ethereum.COLLECTOR),
-      amountToSend
-    );
-    ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
-    uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
-      address(AaveV3Ethereum.COLLECTOR)
-    );
-    assertEq(afterBalance, beforeBalance + amountToSend, 'Bridged amount not updated correctly');
-    vm.stopPrank();
-  }
-
   function test_revertsIf_fuzzRateLimitExceeded(uint256 amount) public {
     vm.selectFork(arbitrumFork);
     uint128 limit = arbitrumBridge.getRateLimit(MAINNET_CHAIN_SELECTOR);
@@ -491,14 +433,14 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
 
     amount = bound(amount, limit + 1, bucket - level); // made top limit to prevent arithmetic overflow
     vm.prank(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
-    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(facilitator, amount); // Mint amount so enough GHO is available on Arbitrum
+    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(owner, amount); // Mint amount so enough GHO is available on Arbitrum
 
     uint256 fee = 1 ether; // set static fee to avoid reverts of quote bridge
-    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, facilitator, amount + fee);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, owner, amount + fee);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(abi.encodeWithSelector(IAaveGhoCcipBridge.RateLimitExceeded.selector, limit));
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amount, 300_000, feeToken);
+    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amount, feeToken);
     vm.stopPrank();
   }
 
@@ -513,20 +455,20 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
     amount = bound(amount, 1, limit);
 
     vm.prank(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
-    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(facilitator, amount); // Mint amount so enough GHO is available on Arbitrum
+    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(owner, amount); // Mint amount so enough GHO is available on Arbitrum
 
-    uint256 fee = arbitrumBridge.quoteBridge(MAINNET_CHAIN_SELECTOR, amount, 300_000, feeToken);
-    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, facilitator, amount + fee);
+    uint256 fee = arbitrumBridge.quoteBridge(MAINNET_CHAIN_SELECTOR, amount, feeToken);
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, owner, amount + fee);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectEmit(false, true, true, true, address(arbitrumBridge));
     emit IAaveGhoCcipBridge.BridgeMessageInitiated(
       bytes32(0),
       MAINNET_CHAIN_SELECTOR,
-      facilitator,
+      owner,
       amount
     );
-    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amount, 300_000, feeToken);
+    arbitrumBridge.send(MAINNET_CHAIN_SELECTOR, amount, feeToken);
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -555,26 +497,64 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
     amount = bound(amount, 1, limit);
 
     vm.prank(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
-    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(facilitator, amount); // Mint amount so enough GHO is available on Arbitrum
+    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(owner, amount); // Mint amount so enough GHO is available on Arbitrum
 
-    uint256 fee = arbitrumBridge.quoteBridge(
-      MAINNET_CHAIN_SELECTOR,
-      amount,
-      DEFAULT_GAS_LIMIT,
-      address(0)
-    );
-    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, facilitator, amount);
-    deal(facilitator, 100 ether);
+    uint256 fee = arbitrumBridge.quoteBridge(MAINNET_CHAIN_SELECTOR, amount, address(0));
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, owner, amount);
+    deal(owner, 100 ether);
 
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectEmit(false, true, true, true, address(arbitrumBridge));
     emit IAaveGhoCcipBridge.BridgeMessageInitiated(
       bytes32(0),
       MAINNET_CHAIN_SELECTOR,
-      facilitator,
+      owner,
       amount
     );
-    arbitrumBridge.send{value: fee}(MAINNET_CHAIN_SELECTOR, amount, DEFAULT_GAS_LIMIT, address(0));
+    arbitrumBridge.send{value: fee}(MAINNET_CHAIN_SELECTOR, amount, address(0));
+
+    Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
+
+    vm.expectEmit(true, true, false, true, address(mainnetBridge));
+    emit IAaveGhoCcipBridge.BridgeMessageFinalized(
+      message.messageId,
+      address(AaveV3Ethereum.COLLECTOR),
+      amount
+    );
+    ccipLocalSimulatorFork.switchChainAndRouteMessage(mainnetFork);
+    uint256 afterBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Ethereum.COLLECTOR)
+    );
+    assertEq(afterBalance, beforeBalance + amount, 'Bridged amount not updated correctly');
+    vm.stopPrank();
+  }
+
+  function test_successful_payWithEthExcessFee(uint256 amount) public {
+    vm.selectFork(mainnetFork);
+    uint256 beforeBalance = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
+      address(AaveV3Ethereum.COLLECTOR)
+    );
+
+    vm.selectFork(arbitrumFork);
+    uint128 limit = arbitrumBridge.getRateLimit(MAINNET_CHAIN_SELECTOR);
+    amount = bound(amount, 1, limit);
+
+    vm.prank(GovernanceV3Arbitrum.EXECUTOR_LVL_1);
+    ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).directMint(owner, amount); // Mint amount so enough GHO is available on Arbitrum
+
+    uint256 fee = arbitrumBridge.quoteBridge(MAINNET_CHAIN_SELECTOR, amount, address(0));
+    deal(AaveV3ArbitrumAssets.GHO_UNDERLYING, owner, amount);
+    deal(owner, 100 ether);
+
+    vm.startPrank(owner);
+    vm.expectEmit(false, true, true, true, address(arbitrumBridge));
+    emit IAaveGhoCcipBridge.BridgeMessageInitiated(
+      bytes32(0),
+      MAINNET_CHAIN_SELECTOR,
+      owner,
+      amount
+    );
+    arbitrumBridge.send{value: fee + 1 ether}(MAINNET_CHAIN_SELECTOR, amount, address(0));
 
     Internal.EVM2EVMMessage memory message = _getMessageFromRecordedLogs();
 
@@ -598,23 +578,16 @@ contract RecoverFailedMessageTokensTest is AaveGhoCcipBridgeForkTestBase {
 
   function test_revertIf_callerNotOwner() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
 
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(facilitator), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(mainnetBridge.DEFAULT_ADMIN_ROLE()), 32)
-      )
-    );
+    vm.expectRevert('Ownable: caller is not the owner');
     mainnetBridge.recoverFailedMessageTokens(bytes32(0));
     vm.stopPrank();
   }
 
   function test_revertIf_messageNotFound() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     vm.expectRevert(IAaveGhoCcipBridge.MessageNotFound.selector);
     mainnetBridge.recoverFailedMessageTokens(bytes32(0));
@@ -629,7 +602,7 @@ contract RecoverFailedMessageTokensTest is AaveGhoCcipBridgeForkTestBase {
       address(AaveV3Arbitrum.COLLECTOR)
     );
 
-    vm.startPrank(admin);
+    vm.startPrank(owner);
     vm.expectEmit(true, false, false, false, address(arbitrumBridge));
     emit IAaveGhoCcipBridge.BridgeMessageRecovered(message.messageId);
     arbitrumBridge.recoverFailedMessageTokens(message.messageId);
@@ -646,30 +619,39 @@ contract RecoverFailedMessageTokensTest is AaveGhoCcipBridgeForkTestBase {
 contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
   function test_revertIf_callerNotOwner() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
 
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(facilitator), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(mainnetBridge.DEFAULT_ADMIN_ROLE()), 32)
-      )
+    vm.expectRevert('Ownable: caller is not the owner');
+    mainnetBridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(arbitrumBridge),
+      bytes(''),
+      DEFAULT_GAS_LIMIT
     );
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
   }
 
   function test_successful() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(arbitrumBridge),
+      DEFAULT_GAS_LIMIT
+    );
+    mainnetBridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(arbitrumBridge),
+      bytes(''),
+      DEFAULT_GAS_LIMIT
+    );
+
+    (bytes memory dest, , ) = mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR);
 
     assertEq(
-      mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR),
-      address(arbitrumBridge),
+      dest,
+      abi.encodePacked(arbitrumBridge),
       'Destination bridge not set correctly in the mapping'
     );
     vm.stopPrank();
@@ -679,43 +661,45 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
 contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
   function test_revertIf_callerNotOwner() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
 
-    vm.expectRevert(
-      abi.encodePacked(
-        'AccessControl: account ',
-        Strings.toHexString(uint160(facilitator), 20),
-        ' is missing role ',
-        Strings.toHexString(uint256(mainnetBridge.DEFAULT_ADMIN_ROLE()), 32)
-      )
-    );
+    vm.expectRevert('Ownable: caller is not the owner');
     mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
     vm.stopPrank();
   }
 
   function test_successful() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
-    mainnetBridge.setDestinationChain(ARBITRUM_CHAIN_SELECTOR, address(arbitrumBridge));
+    emit IAaveGhoCcipBridge.DestinationChainSet(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(arbitrumBridge),
+      DEFAULT_GAS_LIMIT
+    );
+    mainnetBridge.setDestinationChain(
+      ARBITRUM_CHAIN_SELECTOR,
+      abi.encodePacked(arbitrumBridge),
+      bytes(''),
+      DEFAULT_GAS_LIMIT
+    );
+
+    (bytes memory dest, , ) = mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR);
 
     assertEq(
-      mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR),
-      address(arbitrumBridge),
+      dest,
+      abi.encodePacked(arbitrumBridge),
       'Destination bridge not set correctly in the mapping'
     );
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, address(0));
+    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, bytes(''), 0);
     mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
 
-    assertEq(
-      mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR),
-      address(0),
-      'Destination bridge not removed correctly in the mapping'
-    );
+    (dest, , ) = mainnetBridge.destinations(ARBITRUM_CHAIN_SELECTOR);
+
+    assertEq(dest, bytes(''), 'Destination bridge not removed correctly in the mapping');
     vm.stopPrank();
   }
 }
@@ -723,7 +707,7 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
 contract ProcessMessageTest is AaveGhoCcipBridgeForkTestBase {
   function test_revertsIf_callerNotSelf() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -745,7 +729,7 @@ contract ProcessMessageTest is AaveGhoCcipBridgeForkTestBase {
 contract CcipReceiveTest is AaveGhoCcipBridgeForkTestBase {
   function test_revertsIf_invalidRouter() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -758,13 +742,13 @@ contract CcipReceiveTest is AaveGhoCcipBridgeForkTestBase {
       destTokenAmounts: tokenAmounts
     });
 
-    vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.InvalidRouter.selector, admin));
+    vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.InvalidRouter.selector, owner));
     mainnetBridge.ccipReceive(message);
     vm.stopPrank();
   }
 
   function test_successful_receivedInvalidMessage() public {
-    vm.startPrank(admin);
+    vm.startPrank(owner);
     vm.selectFork(mainnetFork);
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
@@ -792,41 +776,41 @@ contract QuoteTransferTest is AaveGhoCcipBridgeForkTestBase {
 
   function test_revertsIf_unsupportedChain() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.UnsupportedChain.selector);
-    mainnetBridge.quoteBridge(BLAST_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
+    mainnetBridge.quoteBridge(BLAST_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_invalidTransferAmount() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(IAaveGhoCcipBridge.InvalidZeroAmount.selector);
-    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, 0, 0, feeToken);
+    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, 0, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_rateLimitExceeded() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
     uint128 limit = mainnetBridge.getRateLimit(ARBITRUM_CHAIN_SELECTOR);
     vm.expectRevert(abi.encodeWithSelector(IAaveGhoCcipBridge.RateLimitExceeded.selector, limit));
-    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, limit + 1, 0, feeToken);
+    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, limit + 1, feeToken);
     vm.stopPrank();
   }
 
   function test_revertsIf_invalidFeeToken() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(facilitator);
+    vm.startPrank(owner);
     vm.expectRevert(abi.encodeWithSelector(NotAFeeToken.selector, address(1)));
-    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, address(1));
+    mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, address(1));
     vm.stopPrank();
   }
 
   function test_successful() public {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
-    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, 0, feeToken);
+    vm.startPrank(owner);
+    uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_CHAIN_SELECTOR, AMOUNT_TO_SEND, feeToken);
 
     assertGt(fee, 0);
     vm.stopPrank();
@@ -850,14 +834,14 @@ contract RescuableTest is AaveGhoCcipBridgeForkTestBase {
     vm.selectFork(mainnetFork);
     deal(AaveV3EthereumAssets.GHO_UNDERLYING, address(mainnetBridge), amount);
 
-    assertEq(mainnetBridge.whoCanRescue(), admin);
+    assertEq(mainnetBridge.whoCanRescue(), owner);
     assertEq(mainnetBridge.maxRescue(AaveV3EthereumAssets.GHO_UNDERLYING), amount);
 
     uint256 balanceBefore = IERC20(AaveV3EthereumAssets.GHO_UNDERLYING).balanceOf(
       address(AaveV3Ethereum.COLLECTOR)
     );
 
-    vm.prank(admin);
+    vm.prank(owner);
     mainnetBridge.emergencyTokenTransfer(
       AaveV3EthereumAssets.GHO_UNDERLYING,
       address(AaveV3Ethereum.COLLECTOR),
@@ -876,7 +860,7 @@ contract GetInvalidMessage is AaveGhoCcipBridgeForkTestBase {
 
   function test_revertIf_messageNotFound() external {
     vm.selectFork(mainnetFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     vm.expectRevert(IAaveGhoCcipBridge.MessageNotFound.selector);
     mainnetBridge.getInvalidMessage(bytes32(0));
@@ -887,7 +871,7 @@ contract GetInvalidMessage is AaveGhoCcipBridgeForkTestBase {
     Internal.EVM2EVMMessage memory message = _buildInvalidMessage();
 
     vm.selectFork(arbitrumFork);
-    vm.startPrank(admin);
+    vm.startPrank(owner);
 
     Client.EVMTokenAmount[] memory tokenAmounts = arbitrumBridge.getInvalidMessage(
       message.messageId

@@ -1,6 +1,15 @@
 # AaveGhoCcipBridge
 
-The AaveGhoCcipBridge is a contract to facilitate moving GHO from Ethereum Mainnet to other networks utilizing the underlying CCIP infrastructure from Chainlink.
+The AaveGhoCcipBridge is a contract to facilitate moving GHO from Ethereum Mainnet to other networks utilizing the underlying CCIP infrastructure from Chainlink. The GHO obtained on the receiving network is immediately transferred automatically to the COLLECTOR instance of that network.
+
+# Funding
+
+The contract must be funded with fee tokens in order for the message to be executed. Most networks will support GHO as a fee token, but in case it is not supported at the beginning, LINK can be used.
+During a governance proposal, GHO/LINK can be sent to the CCIP instance that will be bridging the GHO tokens to another network.
+The easiest flow is to have the contract funded with tokens beforehand as it's very cheap to bridge.
+
+From mainnet to another network the cost of a message is ~1.50. From a non-mainnet network to Mainnet the cost is ~0.50.
+Billing costs can be found [here](https://docs.chain.link/ccip/billing)
 
 # Permissions
 
@@ -20,3 +29,5 @@ https://github.com/smartcontractkit/chainlink/blob/62c23768cd483b179301625603a78
 
 The chain selector for a given chain is defined by CCIP. The list of chain selectors can be found here:
 https://docs.chain.link/ccip/directory/mainnet
+
+Non-EVM chains are supported.
