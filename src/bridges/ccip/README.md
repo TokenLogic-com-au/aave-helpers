@@ -1,6 +1,6 @@
 # AaveGhoCcipBridge
 
-The AaveGhoCcipBridge is a contract to facilitate moving GHO from Ethereum Mainnet to other networks utilizing the underlying CCIP infrastructure from Chainlink. The GHO obtained on the receiving network is immediately transferred automatically to the COLLECTOR instance of that network.
+The AaveGhoCcipBridge is a contract to facilitate moving GHO from Ethereum Mainnet to other networks utilizing the underlying CCIP infrastructure from Chainlink. The GHO obtained on the receiving network is immediately transferred automatically to the COLLECTOR instance of that network. The contract also allows sending GHO across networks, as well as back to Ethereum Mainnet.
 
 # Funding
 
@@ -13,9 +13,8 @@ Billing costs can be found [here](https://docs.chain.link/ccip/billing)
 
 # Permissions
 
-The contract implements AccessControl for permissioned functions.
-The DEFAULT_ADMIN will always be the respective network's Level 1 Executor (Governance).
-The BRIDGER_ROLE will be given to "Facilitator" type contracts to mint and then bridge GHO.
+The contract implements Ownable for permissioned functions.
+The Owner will always be the respective network's Level 1 Executor (Governance).
 
 # Security Considerations
 
@@ -35,6 +34,8 @@ Non-EVM chains are supported.
 ### Destination Addresses
 
 The destination chain address must be provided as bytes. For EVM chains, convert the address to bytes with `abi.encode(address)`, where address if an EVM address. For Solana/Aptos, `abi.encode(bytes32)` where bytes32 is the Aptos/Solana address.
+
+The destination chain address must be provided as bytes. For EVM chains, convert the address to bytes with `abi.encode(address)`, where address is an EVM address (ie: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2). For Solana/Aptos, `abi.encode(bytes32)` where bytes32 is the Aptos/Solana address (ie: A7FMMgue4aZmPLLoutVtbC7gJcyqkHybUieiaDg9aaVE).
 
 ### Gas Limits
 
