@@ -31,8 +31,9 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   /// @inheritdoc IAaveGhoCcipBridge
   bytes32 public constant BRIDGER_ROLE = keccak256('BRIDGER_ROLE');
 
-  /// @inheritdoc IAaveGhoCcipBridge
-  uint256 public constant DEFAULT_GAS_LIMIT = 200_000;
+  /// https://etherscan.io/address/0x06179f7C1be40863405f374E7f5F8806c728660A
+  /// @dev Upgradeable contract so address unlikely to change
+  address public constant MAINNET_TOKEN_POOL = 0x06179f7C1be40863405f374E7f5F8806c728660A;
 
   /// @inheritdoc IAaveGhoCcipBridge
   address public immutable GHO_TOKEN;
@@ -303,6 +304,14 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     uint128 limit = _getRateLimit(chainSelector);
     if (amount > limit) {
       revert RateLimitExceeded(limit);
+    }
+
+    // Only applicable to Mainnet
+    // Should be unreachable as it's unlikely to be lower than the rate limit
+    if (block.chainid == 1) {
+      uint256 bridgeLimit = ITokenPool(MAINNET_TOKEN_POOL).getBridgeLimit() -
+        ITokenPool(MAINNET_TOKEN_POOL).getCurrentBridgedAmount();
+      if (amount > bridgeLimit) revert BridgeLimitExceeded(bridgeLimit);
     }
   }
 

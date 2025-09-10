@@ -5,6 +5,14 @@ interface ITokenPool {
   /// @notice Mint an amount of tokens with no additional logic.
   function directMint(address to, uint256 amount) external;
 
+  /// @notice Gets the bridge limit
+  /// @return The maximum amount of tokens that can be transferred out to other chains
+  function getBridgeLimit() external view returns (uint256);
+
+  /// @notice Gets the current bridged amount to other chains
+  /// @return The amount of tokens transferred out to other chains
+  function getCurrentBridgedAmount() external view returns (uint256);
+
   /// @notice Gets the token bucket with its values for the block it was requested at.
   function getCurrentOutboundRateLimiterState(
     uint64 remoteChainSelector

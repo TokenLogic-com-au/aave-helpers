@@ -32,4 +32,14 @@ https://docs.chain.link/ccip/directory/mainnet
 
 Non-EVM chains are supported.
 
+### Destination Addresses
+
 The destination chain address must be provided as bytes. For EVM chains, convert the address to bytes with `abi.encode(address)`, where address if an EVM address. For Solana/Aptos, `abi.encode(bytes32)` where bytes32 is the Aptos/Solana address.
+
+### Gas Limits
+
+CCIP docs on gas limits can be found [here](https://docs.chain.link/ccip/tutorials/evm/ccipreceive-gaslimit)
+
+In order to profile gas limits, a user can run tests with the `--gas-report` flag enabled to get an estimate of the gas costs incurred. Adding a few percentage points for safety is always recommended. From tests, for EVM to EVM messages, the average cost is around 65,000 gas used by the `ccipReceive()` function so a gas limit of 100,000 should be more than enough and is 50% of the default gas-limit of 200,000 established by CCIP which would save the DAO a lot of gas. Gas not used is lost.
+
+Even if a function cannot be executed because of insufficient gas automatically, a transaction can always be manually executed at a later time with a higher gas cost.

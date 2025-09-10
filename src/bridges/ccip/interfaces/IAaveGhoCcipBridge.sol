@@ -67,6 +67,11 @@ interface IAaveGhoCcipBridge {
   event BridgeMessageRecovered(bytes32 indexed messageId);
 
   /**
+   * @dev The bridge's bridge limit has been exceeded
+   */
+  error BridgeLimitExceeded(uint256 limit);
+
+  /**
    * @dev Insufficient fee paid for transfer
    */
   error InsufficientFee();
@@ -108,7 +113,7 @@ interface IAaveGhoCcipBridge {
 
   /**
    * @notice Transfers tokens to specified destination chain.
-   * @dev chain selector can be found https://docs.chain.link/ccip/supported-networks/v1_2_0/mainnet
+   * @dev chain selector can be found https://docs.chain.link/ccip/directory/mainnet
    * @param chainSelector The chain selector of the destination chain
    * @param amount The amount of GHO to transfer
    * @param feeToken The address of the fee token to pay transfer with
@@ -169,6 +174,7 @@ interface IAaveGhoCcipBridge {
 
   /**
    * @notice Returns the bridge rate limit for a given chain.
+   * @dev If call is made on Mainnet it check the bridge limit of the ETH Token Pool
    * @param chainSelector The chain selector of the destination chain
    * @return The rate limit of the chain
    */
@@ -192,12 +198,6 @@ interface IAaveGhoCcipBridge {
    * @return The bytes32 role identifier
    */
   function BRIDGER_ROLE() external view returns (bytes32);
-
-  /**
-   * @notice Returns the default gas limit for CCIP bridges.
-   * @return The gas limit
-   */
-  function DEFAULT_GAS_LIMIT() external view returns (uint256);
 
   /**
    * @notice Returns the GHO token address on the deployed chain.

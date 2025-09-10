@@ -108,7 +108,6 @@ library CallWithExactGas {
       // We save the gas before the call so we can calculate how much gas the call used
       let gasBeforeCall := gas()
       // call and return whether we succeeded. ignore return data
-      // call(gas,addr,value,argsOffset,argsLength,retOffset,retLength)
       success := call(gasLimit, target, 0, add(payload, 0x20), mload(payload), 0x0, 0x0)
       gasUsed := sub(gasBeforeCall, gas())
 
