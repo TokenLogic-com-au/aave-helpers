@@ -30,10 +30,6 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   /// @inheritdoc IAaveGhoCcipBridge
   bytes32 public constant BRIDGER_ROLE = keccak256('BRIDGER_ROLE');
 
-  /// https://etherscan.io/address/0x06179f7C1be40863405f374E7f5F8806c728660A
-  /// @dev Upgradeable contract so address unlikely to change
-  address public constant MAINNET_TOKEN_POOL = 0x06179f7C1be40863405f374E7f5F8806c728660A;
-
   /// @inheritdoc IAaveGhoCcipBridge
   address public immutable GHO_TOKEN;
 
@@ -44,7 +40,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   address public immutable COLLECTOR;
 
   /// @dev Map containing destination chain's configuration
-  mapping(uint64 => RemoteChainConfig) internal destinations;
+  mapping(uint64 => RemoteChainConfig) internal _destinations;
 
   /// @dev Map containing failed token transfer amounts for a message
   mapping(bytes32 => Client.EVMTokenAmount[]) internal _failedTokenTransfers;
@@ -81,7 +77,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     transferOwnership(initialOwner);
   }
 
-  /// @dev Default receive function so the contract can be sent Ether
+  /// @dev Default receive function enabling the contract to accept native tokens
   receive() external payable {}
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -132,7 +128,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   /// @inheritdoc IAaveGhoCcipBridge
   function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
     if (
-      keccak256(destinations[message.sourceChainSelector].destination) != keccak256(message.sender)
+      keccak256(_destinations[message.sourceChainSelector].destination) != keccak256(message.sender)
     ) {
       revert UnknownSourceDestination();
     }
@@ -169,7 +165,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
       revert InvalidZeroAddress();
     }
 
-    destinations[chainSelector] = RemoteChainConfig({
+    _destinations[chainSelector] = RemoteChainConfig({
       destination: destination,
       extraArgsOverride: extraArgs,
       gasLimit: gasLimit
@@ -180,7 +176,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
 
   /// @inheritdoc IAaveGhoCcipBridge
   function removeDestinationChain(uint64 chainSelector) external onlyOwner {
-    delete destinations[chainSelector];
+    delete _destinations[chainSelector];
 
     emit DestinationChainSet(chainSelector, bytes(''), 0);
   }
@@ -189,7 +185,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   function getDestinationRemoteConfig(
     uint64 chainSelector
   ) external view returns (RemoteChainConfig memory) {
-    return destinations[chainSelector];
+    return _destinations[chainSelector];
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -266,7 +262,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
     tokenAmounts[0] = Client.EVMTokenAmount({token: GHO_TOKEN, amount: amount});
 
-    RemoteChainConfig memory remoteConfig = destinations[chainSelector];
+    RemoteChainConfig memory remoteConfig = _destinations[chainSelector];
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: remoteConfig.destination,
@@ -304,7 +300,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
    * @param amount The amount of GHO to transfer
    */
   function _validateDestinationAndLimit(uint64 chainSelector, uint256 amount) internal view {
-    if (destinations[chainSelector].destination.length == 0) {
+    if (_destinations[chainSelector].destination.length == 0) {
       revert UnsupportedChain();
     }
 
@@ -315,8 +311,11 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
 
     // Only applicable to Mainnet
     if (block.chainid == 1) {
-      uint256 availableToBridge = ITokenPool(MAINNET_TOKEN_POOL).getBridgeLimit() -
-        ITokenPool(MAINNET_TOKEN_POOL).getCurrentBridgedAmount();
+      address onRamp = IRouter(ROUTER).getOnRamp(chainSelector);
+      ITokenPool tokenPool = ITokenPool(
+        IOnRampClient(onRamp).getPoolBySourceToken(chainSelector, GHO_TOKEN)
+      );
+      uint256 availableToBridge = tokenPool.getBridgeLimit() - tokenPool.getCurrentBridgedAmount();
       if (amount > availableToBridge) revert BridgeLimitExceeded(availableToBridge);
     }
   }
