@@ -91,7 +91,8 @@ contract SetDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
     emit IAaveGhoCcipBridge.DestinationChainSet(
       MAINNET_CHAIN_SELECTOR,
       abi.encode(destinationBridge),
-      200_000
+      200_000,
+      bytes('')
     );
     bridge.setDestinationChain(
       MAINNET_CHAIN_SELECTOR,
@@ -128,7 +129,8 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
     emit IAaveGhoCcipBridge.DestinationChainSet(
       ARBITRUM_CHAIN_SELECTOR,
       abi.encode(destinationBridge),
-      200_000
+      200_000,
+      bytes('')
     );
     bridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
@@ -151,7 +153,7 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
     assertEq(destAddress, destinationBridge, 'Destination bridge not set correctly in the mapping');
 
     vm.expectEmit(address(bridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, bytes(''), 0);
+    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, bytes(''), 0, bytes(''));
     bridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
 
     config = bridge.getDestinationRemoteConfig(ARBITRUM_CHAIN_SELECTOR);

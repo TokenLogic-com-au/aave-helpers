@@ -171,14 +171,14 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
       gasLimit: gasLimit
     });
 
-    emit DestinationChainSet(chainSelector, destination, gasLimit);
+    emit DestinationChainSet(chainSelector, destination, gasLimit, extraArgs);
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
   function removeDestinationChain(uint64 chainSelector) external onlyOwner {
     delete _destinations[chainSelector];
 
-    emit DestinationChainSet(chainSelector, bytes(''), 0);
+    emit DestinationChainSet(chainSelector, bytes(''), 0, bytes(''));
   }
 
   /// @inheritdoc IAaveGhoCcipBridge

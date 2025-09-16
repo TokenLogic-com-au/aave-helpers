@@ -642,7 +642,8 @@ contract SetDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     emit IAaveGhoCcipBridge.DestinationChainSet(
       ARBITRUM_CHAIN_SELECTOR,
       abi.encode(arbitrumBridge),
-      DEFAULT_GAS_LIMIT
+      DEFAULT_GAS_LIMIT,
+      bytes('')
     );
     mainnetBridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
@@ -680,7 +681,8 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     emit IAaveGhoCcipBridge.DestinationChainSet(
       ARBITRUM_CHAIN_SELECTOR,
       abi.encode(arbitrumBridge),
-      DEFAULT_GAS_LIMIT
+      DEFAULT_GAS_LIMIT,
+      bytes('')
     );
     mainnetBridge.setDestinationChain(
       ARBITRUM_CHAIN_SELECTOR,
@@ -700,7 +702,7 @@ contract RemoveDestinationChainTest is AaveGhoCcipBridgeForkTestBase {
     );
 
     vm.expectEmit(address(mainnetBridge));
-    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, bytes(''), 0);
+    emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, bytes(''), 0, bytes(''));
     mainnetBridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
 
     config = mainnetBridge.getDestinationRemoteConfig(ARBITRUM_CHAIN_SELECTOR);
