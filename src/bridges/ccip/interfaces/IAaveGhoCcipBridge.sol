@@ -28,7 +28,7 @@ interface IAaveGhoCcipBridge {
    * @param messageId The ID of the cross-chain message
    * @param destinationChainSelector The selector of the destination chain
    * @param from The address of sender on source chain
-   * @param amount The total amount of GHO transfered
+   * @param amount The total amount of GHO transferred
    */
   event BridgeMessageInitiated(
     bytes32 indexed messageId,
@@ -119,11 +119,7 @@ interface IAaveGhoCcipBridge {
    * @param feeToken The address of the fee token to pay transfer with
    * @return The ID of the cross-chain message
    */
-  function send(
-    uint64 chainSelector,
-    uint256 amount,
-    address feeToken
-  ) external payable returns (bytes32);
+  function send(uint64 chainSelector, uint256 amount, address feeToken) external returns (bytes32);
 
   /**
    * @notice Wraps _ccipReceive() as an external function in order to leverage try/catch functionality.
@@ -162,6 +158,18 @@ interface IAaveGhoCcipBridge {
    * @param chainSelector The chain selector of the destination chain
    */
   function removeDestinationChain(uint64 chainSelector) external;
+
+  /**
+   * @notice Returns the configuration of the corresponding bridge for a specified chain selector.
+   * @param chainSelector The chain selector of destination chain
+   * @return The struct representation of the destination configuration which consists of:
+   * The bytes representation of the address of AaveGhoCcipBridge on the destination chain
+   * The extra arguments to send to the destination chain in the bridge message
+   * The gas limit to send to the destination chain
+   */
+  function getDestinationRemoteConfig(
+    uint64 chainSelector
+  ) external view returns (RemoteChainConfig memory);
 
   /**
    * @notice Returns contents of specified invalid message.
@@ -216,15 +224,4 @@ interface IAaveGhoCcipBridge {
    * @return The address of the Collector contract
    */
   function COLLECTOR() external view returns (address);
-
-  /**
-   * @notice Returns the address of the corresponding bridge for a specified chain selector.
-   * @param chainSelector The chain selector of destination chain
-   * @return The bytes representation of the address of AaveGhoCcipBridge on the destination chain
-   * @return The extra arguments to send to the destination chain in the bridge message
-   * @return The gas limit to send to the destination chain
-   */
-  function destinations(
-    uint64 chainSelector
-  ) external view returns (bytes memory, bytes memory, uint32);
 }

@@ -7,7 +7,6 @@ import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 import {Ownable} from 'aave-v3-origin/contracts/dependencies/openzeppelin/contracts/Ownable.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
-
 import {Client} from 'src/dependencies/chainlink/libraries/Client.sol';
 import {CCIPReceiver} from 'src/dependencies/chainlink/CCIPReceiver.sol';
 import {IAny2EVMMessageReceiver} from 'src/dependencies/chainlink/interfaces/IAny2EVMMessageReceiver.sol';
@@ -21,9 +20,9 @@ import {IAaveGhoCcipBridge} from 'src/bridges/ccip/interfaces/IAaveGhoCcipBridge
  * @title AaveGhoCcipBridge
  * @author TokenLogic
  * @notice Provides bridging capabilities for the GHO token across networks.
- * @dev The fee token must be pre-funded for the bridge message to be sent. When doing a governance
- * proposal ensure funds are present on this contract beforehand (GHO/LINK) or transfer funds from the
- * treasury as part of the proposal.
+ * @dev The fees required for bridge messages must be available in advance. For governance proposals, ensure
+ * this contract is pre-funded with the necessary tokens (GHO/LINK), or include a transfer from the treasury
+ * as part of the proposal.
  */
 contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBridge {
   using SafeERC20 for IERC20;
@@ -44,15 +43,14 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   /// @inheritdoc IAaveGhoCcipBridge
   address public immutable COLLECTOR;
 
-  /// @inheritdoc IAaveGhoCcipBridge
-  mapping(uint64 chainSelector => RemoteChainConfig remoteConfig) public destinations;
+  /// @dev Map containing destination chain's configuration
+  mapping(uint64 => RemoteChainConfig) internal destinations;
 
   /// @dev Map containing failed token transfer amounts for a message
-  mapping(bytes32 messageId => Client.EVMTokenAmount[] destTokenAmounts)
-    private _failedTokenTransfers;
+  mapping(bytes32 => Client.EVMTokenAmount[]) internal _failedTokenTransfers;
 
   /// @dev Map containing failed messages and their status
-  mapping(bytes32 messageId => bool isFailed) private _failedMessages;
+  mapping(bytes32 => bool) internal _failedMessages;
 
   /**
    * @dev Modifier to allow only the contract itself to execute a function.
@@ -83,12 +81,15 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     transferOwnership(initialOwner);
   }
 
+  /// @dev Default receive function so the contract can be sent Ether
+  receive() external payable {}
+
   /// @inheritdoc IAaveGhoCcipBridge
   function send(
     uint64 chainSelector,
     uint256 amount,
     address feeToken
-  ) external payable onlyOwner returns (bytes32) {
+  ) external onlyOwner returns (bytes32) {
     _validateDestinationAndLimit(chainSelector, amount);
 
     Client.EVM2AnyMessage memory message = _buildCCIPMessage(chainSelector, amount, feeToken);
@@ -96,9 +97,8 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     uint256 fee = IRouterClient(ROUTER).getFee(chainSelector, message);
 
     if (feeToken == address(0)) {
-      if (msg.value < fee) revert InsufficientFee();
+      if (address(this).balance < fee) revert InsufficientFee();
     } else {
-      IERC20(feeToken).safeTransferFrom(msg.sender, address(this), fee);
       IERC20(feeToken).safeIncreaseAllowance(ROUTER, fee);
     }
 
@@ -183,6 +183,13 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     delete destinations[chainSelector];
 
     emit DestinationChainSet(chainSelector, bytes(''), 0);
+  }
+
+  /// @inheritdoc IAaveGhoCcipBridge
+  function getDestinationRemoteConfig(
+    uint64 chainSelector
+  ) external view returns (RemoteChainConfig memory) {
+    return destinations[chainSelector];
   }
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -307,11 +314,10 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     }
 
     // Only applicable to Mainnet
-    // Should be unreachable as it's unlikely to be lower than the rate limit
     if (block.chainid == 1) {
-      uint256 bridgeLimit = ITokenPool(MAINNET_TOKEN_POOL).getBridgeLimit() -
+      uint256 availableToBridge = ITokenPool(MAINNET_TOKEN_POOL).getBridgeLimit() -
         ITokenPool(MAINNET_TOKEN_POOL).getCurrentBridgedAmount();
-      if (amount > bridgeLimit) revert BridgeLimitExceeded(bridgeLimit);
+      if (amount > availableToBridge) revert BridgeLimitExceeded(availableToBridge);
     }
   }
 

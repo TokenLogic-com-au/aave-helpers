@@ -100,11 +100,13 @@ contract SetDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
       200_000
     );
 
-    (bytes memory dest, , ) = bridge.destinations(MAINNET_CHAIN_SELECTOR);
-    address destAddress = abi.decode(dest, (address));
+    IAaveGhoCcipBridge.RemoteChainConfig memory config = bridge.getDestinationRemoteConfig(
+      MAINNET_CHAIN_SELECTOR
+    );
+    address destAddress = abi.decode(config.destination, (address));
 
     assertEq(
-      dest,
+      config.destination,
       abi.encode(destinationBridge),
       'Destination bridge not set correctly in the mapping'
     );
@@ -135,11 +137,13 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
       200_000
     );
 
-    (bytes memory dest, , ) = bridge.destinations(ARBITRUM_CHAIN_SELECTOR);
-    address destAddress = abi.decode(dest, (address));
+    IAaveGhoCcipBridge.RemoteChainConfig memory config = bridge.getDestinationRemoteConfig(
+      ARBITRUM_CHAIN_SELECTOR
+    );
+    address destAddress = abi.decode(config.destination, (address));
 
     assertEq(
-      dest,
+      config.destination,
       abi.encode(destinationBridge),
       'Destination bridge not set correctly in the mapping'
     );
@@ -150,9 +154,9 @@ contract RemoveDestinationBridgeTest is AaveGhoCcipBridgeTestBase {
     emit IAaveGhoCcipBridge.DestinationChainSet(ARBITRUM_CHAIN_SELECTOR, bytes(''), 0);
     bridge.removeDestinationChain(ARBITRUM_CHAIN_SELECTOR);
 
-    (dest, , ) = bridge.destinations(ARBITRUM_CHAIN_SELECTOR);
+    config = bridge.getDestinationRemoteConfig(ARBITRUM_CHAIN_SELECTOR);
 
-    assertEq(dest, bytes(''), 'Destination bridge not set correctly in the mapping');
+    assertEq(config.destination, bytes(''), 'Destination bridge not set correctly in the mapping');
   }
 }
 
