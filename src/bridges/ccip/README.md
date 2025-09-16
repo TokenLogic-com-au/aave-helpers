@@ -33,8 +33,6 @@ Non-EVM chains are supported.
 
 ### Destination Addresses
 
-The destination chain address must be provided as bytes. For EVM chains, convert the address to bytes with `abi.encode(address)`, where address if an EVM address. For Solana/Aptos, `abi.encode(bytes32)` where bytes32 is the Aptos/Solana address.
-
 The destination chain address must be provided as bytes. For EVM chains, convert the address to bytes with `abi.encode(address)`, where address is an EVM address (ie: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2). For Solana/Aptos, `abi.encode(bytes32)` where bytes32 is the Aptos/Solana address (ie: A7FMMgue4aZmPLLoutVtbC7gJcyqkHybUieiaDg9aaVE).
 
 ### Gas Limits

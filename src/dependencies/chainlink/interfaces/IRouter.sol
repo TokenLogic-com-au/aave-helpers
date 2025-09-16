@@ -14,7 +14,7 @@ interface IRouter {
   /// @dev if the receiver is a contracts that signals support for CCIP execution through EIP-165.
   /// the contract is called. If not, only tokens are transferred.
   /// @return success A boolean value indicating whether the ccip message was received without errors.
-  /// @return retBytes A bytes array containing return data form CCIP receiver.
+  /// @return retBytes A bytes array containing return data from CCIP receiver.
   /// @return gasUsed the gas used by the external customer call. Does not include any overhead.
   function routeMessage(
     Client.Any2EVMMessage calldata message,

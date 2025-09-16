@@ -11,8 +11,8 @@ import {Client} from '../../../dependencies/chainlink/libraries/Client.sol';
 interface IAaveGhoCcipBridge {
   /**
    * Struct representing a destination chain
-   * @return extraArgsOverride Any extra arguments to pass with message to the destination chain
-   * @return bridge The bytes representation of an address (EVM or non-EVM)
+   * @return extraArgsOverride The bytes representation of an address (EVM or non-EVM)
+   * @return destination Any extra arguments to pass with message to the destination chain
    * @return gasLimit The gas limit to set for the destination chain's ccipReceive() function
    */
   struct RemoteChainConfig {
