@@ -383,6 +383,18 @@ contract SendArbitrumToMainnet is AaveGhoCcipBridgeForkTestBase {
     vm.stopPrank();
   }
 
+  function test_revertsIf_insufficientFeeToken() public {
+    vm.selectFork(arbitrumFork);
+    vm.startPrank(owner);
+    vm.expectRevert(IAaveGhoCcipBridge.InsufficientFee.selector);
+    arbitrumBridge.send(
+      MAINNET_CHAIN_SELECTOR,
+      AMOUNT_TO_SEND,
+      AaveV3ArbitrumAssets.GHO_UNDERLYING
+    );
+    vm.stopPrank();
+  }
+
   function test_revertsIf_invalidFeeToken() public {
     address invalidFeeToken = makeAddr('new erc20');
     vm.selectFork(arbitrumFork);
@@ -733,6 +745,28 @@ contract ProcessMessageTest is AaveGhoCcipBridgeForkTestBase {
     });
 
     vm.expectRevert(IAaveGhoCcipBridge.OnlySelf.selector);
+    mainnetBridge.processMessage(message);
+    vm.stopPrank();
+  }
+
+  function test_revertsIf_invalidToken() public {
+    vm.selectFork(mainnetFork);
+    vm.startPrank(address(mainnetBridge));
+
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0].token = AaveV3EthereumAssets.USDC_UNDERLYING;
+    tokenAmounts[0].amount = 1_000e6;
+
+    // build dummy message for test
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32(0),
+      sourceChainSelector: ARBITRUM_CHAIN_SELECTOR,
+      sender: abi.encode(address(arbitrumBridge)),
+      data: '',
+      destTokenAmounts: tokenAmounts
+    });
+
+    vm.expectRevert(IAaveGhoCcipBridge.InvalidToken.selector);
     mainnetBridge.processMessage(message);
     vm.stopPrank();
   }

@@ -83,6 +83,12 @@ interface IAaveGhoCcipBridge {
   error InsufficientFee();
 
   /**
+   *
+   * @dev Received token is not expected token
+   */
+  error InvalidToken();
+
+  /**
    * @dev Address cannot be the zero-address
    */
   error InvalidZeroAddress();
@@ -206,12 +212,6 @@ interface IAaveGhoCcipBridge {
     uint256 amount,
     address feeToken
   ) external view returns (uint256);
-
-  /**
-   * @notice This role defines which users can call the send() function.
-   * @return The bytes32 role identifier
-   */
-  function BRIDGER_ROLE() external view returns (bytes32);
 
   /**
    * @notice Returns the GHO token address on the deployed chain.

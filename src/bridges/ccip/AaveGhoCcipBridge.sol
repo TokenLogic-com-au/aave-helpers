@@ -28,9 +28,6 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
   using SafeERC20 for IERC20;
 
   /// @inheritdoc IAaveGhoCcipBridge
-  bytes32 public constant BRIDGER_ROLE = keccak256('BRIDGER_ROLE');
-
-  /// @inheritdoc IAaveGhoCcipBridge
   address public immutable GHO_TOKEN;
 
   /// @inheritdoc IAaveGhoCcipBridge
@@ -95,6 +92,7 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     if (feeToken == address(0)) {
       if (address(this).balance < fee) revert InsufficientFee();
     } else {
+      if (IERC20(feeToken).balanceOf(address(this)) < fee) revert InsufficientFee();
       IERC20(feeToken).safeIncreaseAllowance(ROUTER, fee);
     }
 
@@ -133,6 +131,8 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
       revert UnknownSourceDestination();
     }
 
+    if (message.destTokenAmounts[0].token != GHO_TOKEN) revert InvalidToken();
+
     uint256 ghoAmount = message.destTokenAmounts[0].amount;
     IERC20(GHO_TOKEN).safeTransfer(COLLECTOR, ghoAmount);
 
@@ -150,6 +150,8 @@ contract AaveGhoCcipBridge is CCIPReceiver, Ownable, Rescuable, IAaveGhoCcipBrid
     for (uint256 i = 0; i < length; i++) {
       IERC20(destTokenAmounts[i].token).safeTransfer(COLLECTOR, destTokenAmounts[i].amount);
     }
+
+    delete _failedTokenTransfers[messageId];
 
     emit BridgeMessageRecovered(messageId);
   }
