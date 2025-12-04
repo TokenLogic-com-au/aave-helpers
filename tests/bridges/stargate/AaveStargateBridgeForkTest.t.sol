@@ -101,32 +101,19 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
         emit log_named_uint("Liquidity ratio (received/sent * 10000)", (expectedReceived * 10000) / AMOUNT_TO_BRIDGE);
     }
 
-    /**
-     * @notice Actual bridging tests are skipped on fork because Stargate pools have
-     *         complex internal accounting that can't be reliably replicated with deal().
-     *         The pool's internal credits/deficits don't match the token balances we set.
-     *
-     *         For production testing, use integration tests on testnets where the pool
-     *         state is properly initialized.
-     *
-     *         What we CAN test reliably on fork:
-     *         - Quote functions (quoteBridge, quoteOFT) - work correctly
-     *         - Access control (onlyOwner) - works correctly
-     *         - Emergency rescue functions - work correctly
-     */
-    function test_bridge_skipped_forkStateIssue() public {
+    function test_bridge_happyPath() public {
         vm.selectFork(mainnetFork);
 
-        // This test documents why actual bridging tests are skipped on fork.
-        // Stargate pools maintain internal credit/deficit accounting that doesn't
-        // align with token balances set via deal().
-        //
-        // The quote functions work correctly and prove the integration is correct.
-        // Actual bridging would work in production with proper pool state.
-
         uint256 smallAmount = 100e6; // 100 USDT
+
+        // Fund the bridge with USDT
+        deal(ETHEREUM_USDT, address(mainnetBridge), smallAmount);
+        assertEq(IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), smallAmount, "Bridge should have USDT");
+
+        // Quote the expected amount and fee
         uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, smallAmount, receiver);
-        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, smallAmount, receiver, expectedReceived);
+        uint256 minAmount = (expectedReceived * 9950) / 10000; // 0.5% slippage
+        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, smallAmount, receiver, minAmount);
 
         emit log_named_uint("Amount to bridge", smallAmount);
         emit log_named_uint("Expected received (from quoteOFT)", expectedReceived);
@@ -136,7 +123,23 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
         assertGt(fee, 0, "Fee should be quoted");
         assertGt(expectedReceived, 0, "Expected received should be quoted");
 
-        emit log("Actual bridging skipped: Pool internal state cannot be replicated on fork");
+        // Ensure bridge has enough native token for fees
+        vm.deal(address(mainnetBridge), fee + 1 ether);
+
+        // Execute the bridge
+        vm.startPrank(owner);
+
+        vm.expectEmit(true, true, true, true, address(mainnetBridge));
+        emit Bridge(ETHEREUM_USDT, ARBITRUM_EID, receiver, smallAmount, minAmount);
+
+        mainnetBridge.bridge(ARBITRUM_EID, smallAmount, receiver, minAmount);
+
+        vm.stopPrank();
+
+        // Verify bridge balance is 0 after transfer
+        assertEq(
+            IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), 0, "Bridge should have 0 USDT after bridging"
+        );
     }
 
     function test_revertsIf_notOwner() public {
@@ -175,17 +178,9 @@ contract BridgeArbitrumToEthereumTest is Test, StargateConstants {
     );
 
     function setUp() public {
-        // Create Arbitrum fork
-        try vm.createSelectFork(vm.rpcUrl("arbitrum")) returns (uint256 forkId) {
-            arbitrumFork = forkId;
-
-            // Use USDT0 OFT (OUpgradeable) on Arbitrum for bridging
-            arbitrumBridge = new AaveStargateBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
-
-            vm.deal(address(arbitrumBridge), 100 ether);
-        } catch {
-            // Arbitrum RPC not available, tests will be skipped
-        }
+        arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
+        // Use USDT0 OFT (OUpgradeable) on Arbitrum for bridging
+        arbitrumBridge = new AaveStargateBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
     }
 
     function test_bridge_arbitrumToEthereum_10MillionUSDT() public {

@@ -17,16 +17,16 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     using SafeERC20 for IERC20;
 
     /// @inheritdoc IAaveStargateBridge
-    address public immutable STARGATE_USDT;
+    address public immutable OFT_USDT;
 
     /// @inheritdoc IAaveStargateBridge
     address public immutable USDT;
 
-    /// @param stargateUsdt The Stargate pool address for USDT on this chain
+    /// @param oftUsdt The OFT address for USDT on this chain
     /// @param usdt The USDT token address on this chain
     /// @param owner The owner of the contract upon deployment
-    constructor(address stargateUsdt, address usdt, address owner) Ownable(owner) {
-        STARGATE_USDT = stargateUsdt;
+    constructor(address oftUsdt, address usdt, address owner) Ownable(owner) {
+        OFT_USDT = oftUsdt;
         USDT = usdt;
     }
 
@@ -39,11 +39,11 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
 
         SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, minAmountLD);
 
-        MessagingFee memory messagingFee = IOFT(STARGATE_USDT).quoteSend(sendParam, false);
+        MessagingFee memory messagingFee = IOFT(OFT_USDT).quoteSend(sendParam, false);
 
-        IERC20(USDT).forceApprove(STARGATE_USDT, amount);
+        IERC20(USDT).forceApprove(OFT_USDT, amount);
 
-        IOFT(STARGATE_USDT).send{value: messagingFee.nativeFee}(sendParam, messagingFee, msg.sender);
+        IOFT(OFT_USDT).send{value: messagingFee.nativeFee}(sendParam, messagingFee, msg.sender);
 
         emit Bridge(USDT, dstEid, receiver, amount, minAmountLD);
     }
@@ -55,7 +55,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
         returns (uint256 nativeFee)
     {
         SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, minAmountLD);
-        MessagingFee memory messagingFee = IOFT(STARGATE_USDT).quoteSend(sendParam, false);
+        MessagingFee memory messagingFee = IOFT(OFT_USDT).quoteSend(sendParam, false);
         return messagingFee.nativeFee;
     }
 
@@ -66,7 +66,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
         returns (uint256 amountReceivedLD)
     {
         SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, 0);
-        (,, OFTReceipt memory receipt) = IOFT(STARGATE_USDT).quoteOFT(sendParam);
+        (,, OFTReceipt memory receipt) = IOFT(OFT_USDT).quoteOFT(sendParam);
         return receipt.amountReceivedLD;
     }
 

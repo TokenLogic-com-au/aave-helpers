@@ -197,7 +197,7 @@ contract ReceiveEtherTest is AaveStargateBridgeTestBase {
 
 contract ViewFunctionsTest is AaveStargateBridgeTestBase {
     function test_stargateUsdt() public view {
-        assertEq(bridge.STARGATE_USDT(), address(mockStargate));
+        assertEq(bridge.OFT_USDT(), address(mockStargate));
     }
 
     function test_usdt() public view {

@@ -16,7 +16,7 @@ interface IAaveStargateBridge {
     );
 
     /// @notice Returns the Stargate pool address for USDT on the deployed chain
-    function STARGATE_USDT() external view returns (address);
+    function OFT_USDT() external view returns (address);
 
     /// @notice Returns the USDT token address on the deployed chain
     function USDT() external view returns (address);
