@@ -101,9 +101,9 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
     function test_bridge_happyPath() public {
         vm.selectFork(mainnetFork);
 
-        // Fund the bridge with USDT
-        deal(ETHEREUM_USDT, address(mainnetBridge), BRIDGE_AMOUNT);
-        assertEq(IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), BRIDGE_AMOUNT, "Bridge should have USDT");
+        // Fund the owner with USDT
+        deal(ETHEREUM_USDT, owner, BRIDGE_AMOUNT);
+        assertEq(IERC20(ETHEREUM_USDT).balanceOf(owner), BRIDGE_AMOUNT, "Owner should have USDT");
 
         // Quote the expected amount and fee
         uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, BRIDGE_AMOUNT, receiver);
@@ -124,6 +124,8 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
 
         // Execute the bridge
         vm.startPrank(owner);
+
+        SafeERC20.forceApprove(IERC20(ETHEREUM_USDT), address(mainnetBridge), BRIDGE_AMOUNT);
 
         vm.expectEmit(true, true, true, true, address(mainnetBridge));
         emit Bridge(ETHEREUM_USDT, ARBITRUM_EID, receiver, BRIDGE_AMOUNT, BRIDGE_AMOUNT);
@@ -166,10 +168,9 @@ contract BridgeArbitrumToEthereumTest is AaveStargateBridgeForkTestBase {
 
         address ethReceiver = address(AaveV3Ethereum.COLLECTOR);
 
-        // Use deal to give USDT to bridge
-        deal(ARBITRUM_USDT, address(arbitrumBridge), LARGE_BRIDGE_AMOUNT);
+        deal(ARBITRUM_USDT, owner, LARGE_BRIDGE_AMOUNT);
 
-        assertEq(IERC20(ARBITRUM_USDT).balanceOf(address(arbitrumBridge)), LARGE_BRIDGE_AMOUNT, "Bridge should have USDT");
+        assertEq(IERC20(ARBITRUM_USDT).balanceOf(owner), LARGE_BRIDGE_AMOUNT, "Owner should have USDT");
 
         // Quote the OFT
         uint256 expectedReceived = arbitrumBridge.quoteOFT(ETHEREUM_EID, LARGE_BRIDGE_AMOUNT, ethReceiver);
@@ -188,6 +189,8 @@ contract BridgeArbitrumToEthereumTest is AaveStargateBridgeForkTestBase {
 
         // Bridge the tokens
         vm.startPrank(owner);
+
+        IERC20(ARBITRUM_USDT).approve(address(arbitrumBridge), LARGE_BRIDGE_AMOUNT);
 
         vm.expectEmit(true, true, true, true, address(arbitrumBridge));
         emit Bridge(ARBITRUM_USDT, ETHEREUM_EID, ethReceiver, LARGE_BRIDGE_AMOUNT, LARGE_BRIDGE_AMOUNT);
@@ -455,15 +458,17 @@ contract QuoteBridgeEthereumToOptimismTest is AaveStargateBridgeForkTestBase {
 contract NoSlippageTest is AaveStargateBridgeForkTestBase {
     function test_bridge_withExactAmount() public {
         vm.selectFork(mainnetFork);
-        deal(ETHEREUM_USDT, address(mainnetBridge), BRIDGE_AMOUNT);
+        deal(ETHEREUM_USDT, owner, BRIDGE_AMOUNT);
 
         uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, BRIDGE_AMOUNT, receiver);
 
         assertEq(expectedReceived, BRIDGE_AMOUNT, "OFT should have no slippage");
 
-        vm.prank(owner);
+        vm.startPrank(owner);
+        SafeERC20.forceApprove(IERC20(ETHEREUM_USDT), address(mainnetBridge), BRIDGE_AMOUNT);
         // Bridge with exact amount (OFT guarantees 1:1)
         mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+        vm.stopPrank();
 
         assertEq(IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), 0, "Bridge should have 0 USDT");
     }

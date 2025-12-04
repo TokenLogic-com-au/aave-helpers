@@ -37,6 +37,8 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     function bridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD) external payable onlyOwner {
         if (amount == 0) revert InvalidZeroAmount();
 
+        IERC20(USDT).safeTransferFrom(msg.sender, address(this), amount);
+
         SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, minAmountLD);
 
         MessagingFee memory messagingFee = IOFT(OFT_USDT).quoteSend(sendParam, false);

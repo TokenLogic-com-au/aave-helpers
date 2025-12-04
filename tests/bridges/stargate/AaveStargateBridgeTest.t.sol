@@ -61,9 +61,11 @@ contract BridgeTest is AaveStargateBridgeTestBase {
     }
 
     function test_successful() public {
-        deal(address(usdt), address(bridge), AMOUNT);
+        deal(address(usdt), owner, AMOUNT);
 
         vm.startPrank(owner);
+
+        usdt.approve(address(bridge), AMOUNT);
 
         vm.expectEmit(true, true, true, true, address(bridge));
         emit Bridge(address(usdt), ARBITRUM_EID, receiver, AMOUNT, AMOUNT);
@@ -82,9 +84,11 @@ contract BridgeTest is AaveStargateBridgeTestBase {
         vm.assume(amount > 0 && amount < type(uint128).max);
         vm.assume(dstEid > 0);
 
-        deal(address(usdt), address(bridge), amount);
+        deal(address(usdt), owner, amount);
 
         vm.startPrank(owner);
+
+        usdt.approve(address(bridge), amount);
 
         vm.expectEmit(true, true, true, true, address(bridge));
         emit Bridge(address(usdt), dstEid, receiver, amount, amount);
