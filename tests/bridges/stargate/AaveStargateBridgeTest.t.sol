@@ -76,19 +76,7 @@ contract BridgeTest is AaveStargateBridgeTestBase {
         assertEq(usdt.balanceOf(address(mockStargate)), AMOUNT, "MockStargate should have USDT");
     }
 
-    function test_successful_withSlippage() public {
-        uint256 minAmount = AMOUNT - (AMOUNT * 50) / 10000; // 0.5% slippage
-        deal(address(usdt), address(bridge), AMOUNT);
 
-        vm.startPrank(owner);
-
-        vm.expectEmit(true, true, true, true, address(bridge));
-        emit Bridge(address(usdt), ARBITRUM_EID, receiver, AMOUNT, minAmount);
-
-        bridge.bridge(ARBITRUM_EID, AMOUNT, receiver, minAmount);
-
-        vm.stopPrank();
-    }
 
     function test_successful_fuzz(uint256 amount, uint32 dstEid) public {
         vm.assume(amount > 0 && amount < type(uint128).max);
@@ -125,17 +113,17 @@ contract QuoteBridgeTest is AaveStargateBridgeTestBase {
 }
 
 contract QuoteOFTTest is AaveStargateBridgeTestBase {
-    function test_successful() public view {
+    function test_noSlippage() public view {
         uint256 amountReceived = bridge.quoteOFT(ARBITRUM_EID, AMOUNT, receiver);
-        assertEq(amountReceived, AMOUNT);
+        assertEq(amountReceived, AMOUNT, "OFT should have no slippage");
     }
 
-    function test_successful_withFee() public {
-        uint256 expectedReceived = AMOUNT - (AMOUNT * 10) / 10000; // 0.1% fee
-        mockStargate.setMockAmountReceived(expectedReceived);
+    function test_noSlippage_fuzz(uint256 amount, uint32 dstEid) public view {
+        vm.assume(amount > 0);
+        vm.assume(dstEid > 0);
 
-        uint256 amountReceived = bridge.quoteOFT(ARBITRUM_EID, AMOUNT, receiver);
-        assertEq(amountReceived, expectedReceived);
+        uint256 amountReceived = bridge.quoteOFT(dstEid, amount, receiver);
+        assertEq(amountReceived, amount, "OFT should have no slippage");
     }
 }
 

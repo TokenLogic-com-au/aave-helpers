@@ -20,13 +20,12 @@ import {IOFT, SendParam, MessagingFee, OFTReceipt} from "src/bridges/stargate/IO
 /**
  * @title AaveStargateBridgeForkTest
  * @notice Fork tests for USDT0 OFT bridge via LayerZero V2
- * @dev Uses USDT0 OFT contracts (not legacy Stargate pools)
- *      Ethereum: OAdapterUpgradeable at 0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee
  */
 contract AaveStargateBridgeForkTestBase is Test, StargateConstants {
     using SafeERC20 for IERC20;
 
-    uint256 public constant AMOUNT_TO_BRIDGE = 10_000_000e6; // 10 million USDT
+    uint256 public constant LARGE_BRIDGE_AMOUNT = 10_000_000e6; // 10 million USDT
+    uint256 public constant BRIDGE_AMOUNT = 1000e6; // 1000 USDT
 
     uint256 public mainnetFork;
     uint256 public arbitrumFork;
@@ -39,6 +38,14 @@ contract AaveStargateBridgeForkTestBase is Test, StargateConstants {
 
     // USDT whale on Ethereum mainnet
     address public constant USDT_WHALE = 0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503;
+
+    event Bridge(
+        address indexed token,
+        uint32 indexed dstEid,
+        address indexed receiver,
+        uint256 amount,
+        uint256 minAmountReceived
+    );
 
     function setUp() public virtual {
         mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"));
@@ -56,7 +63,7 @@ contract QuoteBridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
     function test_quoteBridge_ethereumToArbitrum() public {
         vm.selectFork(mainnetFork);
 
-        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, AMOUNT_TO_BRIDGE, receiver, AMOUNT_TO_BRIDGE);
+        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
 
         assertGt(fee, 0, "Fee should be greater than 0");
         emit log_named_uint("Native fee for 10M USDT Ethereum -> Arbitrum", fee);
@@ -65,63 +72,52 @@ contract QuoteBridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
     function test_quoteOFT_ethereumToArbitrum() public {
         vm.selectFork(mainnetFork);
 
-        uint256 amountReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, AMOUNT_TO_BRIDGE, receiver);
+        uint256 amountReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver);
 
-        assertGt(amountReceived, 0, "Amount received should be greater than 0");
-        assertLe(amountReceived, AMOUNT_TO_BRIDGE, "Amount received should not exceed sent amount");
+        assertEq(amountReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
         emit log_named_uint("Expected amount received on Arbitrum", amountReceived);
     }
 }
 
 contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
-    event Bridge(
-        address indexed token,
-        uint32 indexed dstEid,
-        address indexed receiver,
-        uint256 amount,
-        uint256 minAmountReceived
-    );
-
     function test_quote_ethereumToArbitrum_10MillionUSDT() public {
         vm.selectFork(mainnetFork);
 
         // Quote the OFT to get expected amount for 10M USDT
-        uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, AMOUNT_TO_BRIDGE, receiver);
+        uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver);
+
+        assertEq(expectedReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
 
         // Quote the fee
-        uint256 minAmount = (expectedReceived * 9950) / 10000; // 0.5% slippage
-        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, AMOUNT_TO_BRIDGE, receiver, minAmount);
+        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
 
-        emit log_named_uint("Amount to bridge", AMOUNT_TO_BRIDGE);
+        emit log_named_uint("Amount to bridge", LARGE_BRIDGE_AMOUNT);
         emit log_named_uint("Expected received on Arbitrum", expectedReceived);
         emit log_named_uint("Native fee required (ETH)", fee);
 
         assertGt(fee, 0, "Fee should be greater than 0");
-
-        emit log_named_uint("Liquidity ratio (received/sent * 10000)", (expectedReceived * 10000) / AMOUNT_TO_BRIDGE);
     }
 
     function test_bridge_happyPath() public {
         vm.selectFork(mainnetFork);
 
-        uint256 smallAmount = 100e6; // 100 USDT
-
         // Fund the bridge with USDT
-        deal(ETHEREUM_USDT, address(mainnetBridge), smallAmount);
-        assertEq(IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), smallAmount, "Bridge should have USDT");
+        deal(ETHEREUM_USDT, address(mainnetBridge), BRIDGE_AMOUNT);
+        assertEq(IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), BRIDGE_AMOUNT, "Bridge should have USDT");
 
         // Quote the expected amount and fee
-        uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, smallAmount, receiver);
-        uint256 minAmount = (expectedReceived * 9950) / 10000; // 0.5% slippage
-        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, smallAmount, receiver, minAmount);
+        uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, BRIDGE_AMOUNT, receiver);
 
-        emit log_named_uint("Amount to bridge", smallAmount);
+        assertEq(expectedReceived, BRIDGE_AMOUNT, "OFT should have no slippage");
+
+        uint256 fee = mainnetBridge.quoteBridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+
+        emit log_named_uint("Amount to bridge", BRIDGE_AMOUNT);
         emit log_named_uint("Expected received (from quoteOFT)", expectedReceived);
         emit log_named_uint("Native fee required", fee);
 
         // Verify quote functions work correctly
         assertGt(fee, 0, "Fee should be quoted");
-        assertGt(expectedReceived, 0, "Expected received should be quoted");
 
         // Ensure bridge has enough native token for fees
         vm.deal(address(mainnetBridge), fee + 1 ether);
@@ -130,9 +126,9 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
         vm.startPrank(owner);
 
         vm.expectEmit(true, true, true, true, address(mainnetBridge));
-        emit Bridge(ETHEREUM_USDT, ARBITRUM_EID, receiver, smallAmount, minAmount);
+        emit Bridge(ETHEREUM_USDT, ARBITRUM_EID, receiver, BRIDGE_AMOUNT, BRIDGE_AMOUNT);
 
-        mainnetBridge.bridge(ARBITRUM_EID, smallAmount, receiver, minAmount);
+        mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
 
         vm.stopPrank();
 
@@ -149,7 +145,7 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
 
         vm.startPrank(notOwner);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
-        mainnetBridge.bridge(ARBITRUM_EID, AMOUNT_TO_BRIDGE, receiver, AMOUNT_TO_BRIDGE);
+        mainnetBridge.bridge(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
         vm.stopPrank();
     }
 }
@@ -158,28 +154,10 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
  * @notice Tests for Arbitrum to Ethereum USDT bridging via USDT0 OFT
  * @dev Arbitrum: OUpgradeable at 0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92
  */
-contract BridgeArbitrumToEthereumTest is Test, StargateConstants {
-    using SafeERC20 for IERC20;
-
-    uint256 public constant AMOUNT_TO_BRIDGE = 10_000_000e6; // 10 million USDT
-
-    uint256 public arbitrumFork;
-
-    address public owner = makeAddr("owner");
-
-    AaveStargateBridge public arbitrumBridge;
-
-    event Bridge(
-        address indexed token,
-        uint32 indexed dstEid,
-        address indexed receiver,
-        uint256 amount,
-        uint256 minAmountReceived
-    );
-
-    function setUp() public {
+contract BridgeArbitrumToEthereumTest is AaveStargateBridgeForkTestBase {
+    function setUp() public override {
         arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
-        // Use USDT0 OFT (OUpgradeable) on Arbitrum for bridging
+        owner = makeAddr("owner");
         arbitrumBridge = new AaveStargateBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
     }
 
@@ -189,18 +167,19 @@ contract BridgeArbitrumToEthereumTest is Test, StargateConstants {
         address ethReceiver = address(AaveV3Ethereum.COLLECTOR);
 
         // Use deal to give USDT to bridge
-        deal(ARBITRUM_USDT, address(arbitrumBridge), AMOUNT_TO_BRIDGE);
+        deal(ARBITRUM_USDT, address(arbitrumBridge), LARGE_BRIDGE_AMOUNT);
 
-        assertEq(IERC20(ARBITRUM_USDT).balanceOf(address(arbitrumBridge)), AMOUNT_TO_BRIDGE, "Bridge should have USDT");
+        assertEq(IERC20(ARBITRUM_USDT).balanceOf(address(arbitrumBridge)), LARGE_BRIDGE_AMOUNT, "Bridge should have USDT");
 
         // Quote the OFT
-        uint256 expectedReceived = arbitrumBridge.quoteOFT(ETHEREUM_EID, AMOUNT_TO_BRIDGE, ethReceiver);
-        uint256 minAmount = (expectedReceived * 9950) / 10000; // 0.5% slippage
+        uint256 expectedReceived = arbitrumBridge.quoteOFT(ETHEREUM_EID, LARGE_BRIDGE_AMOUNT, ethReceiver);
+
+        assertEq(expectedReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
 
         // Quote the fee
-        uint256 fee = arbitrumBridge.quoteBridge(ETHEREUM_EID, AMOUNT_TO_BRIDGE, ethReceiver, minAmount);
+        uint256 fee = arbitrumBridge.quoteBridge(ETHEREUM_EID, LARGE_BRIDGE_AMOUNT, ethReceiver, LARGE_BRIDGE_AMOUNT);
 
-        emit log_named_uint("Bridging amount from Arbitrum to Ethereum", AMOUNT_TO_BRIDGE);
+        emit log_named_uint("Bridging amount from Arbitrum to Ethereum", LARGE_BRIDGE_AMOUNT);
         emit log_named_uint("Expected received on Ethereum", expectedReceived);
         emit log_named_uint("Native fee required (ETH on Arbitrum)", fee);
 
@@ -211,9 +190,9 @@ contract BridgeArbitrumToEthereumTest is Test, StargateConstants {
         vm.startPrank(owner);
 
         vm.expectEmit(true, true, true, true, address(arbitrumBridge));
-        emit Bridge(ARBITRUM_USDT, ETHEREUM_EID, ethReceiver, AMOUNT_TO_BRIDGE, minAmount);
+        emit Bridge(ARBITRUM_USDT, ETHEREUM_EID, ethReceiver, LARGE_BRIDGE_AMOUNT, LARGE_BRIDGE_AMOUNT);
 
-        arbitrumBridge.bridge(ETHEREUM_EID, AMOUNT_TO_BRIDGE, ethReceiver, minAmount);
+        arbitrumBridge.bridge(ETHEREUM_EID, LARGE_BRIDGE_AMOUNT, ethReceiver, LARGE_BRIDGE_AMOUNT);
 
         vm.stopPrank();
 
@@ -264,30 +243,16 @@ contract TransferOwnershipTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for Ethereum to Plasma USDT bridging via USDT0 OFT
  */
-contract QuoteBridgeEthereumToPlasmaTest is Test, StargateConstants {
-    uint256 public constant AMOUNT_TO_BRIDGE = 10_000_000e6; // 10 million USDT
-
-    uint256 public mainnetFork;
-
-    address public owner = makeAddr("owner");
-    address public receiver;
-
-    AaveStargateBridge public mainnetBridge;
-
-    function setUp() public {
-        mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"));
-
-        mainnetBridge = new AaveStargateBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
-
+contract QuoteBridgeEthereumToPlasmaTest is AaveStargateBridgeForkTestBase {
+    function setUp() public override {
+        super.setUp();
         receiver = address(AaveV3Plasma.COLLECTOR);
-
-        vm.deal(address(mainnetBridge), 100 ether);
     }
 
     function test_quoteBridge_ethereumToPlasma() public {
         vm.selectFork(mainnetFork);
 
-        uint256 fee = mainnetBridge.quoteBridge(PLASMA_EID, AMOUNT_TO_BRIDGE, receiver, AMOUNT_TO_BRIDGE);
+        uint256 fee = mainnetBridge.quoteBridge(PLASMA_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
 
         assertGt(fee, 0, "Fee should be greater than 0");
         emit log_named_uint("Native fee for 10M USDT Ethereum -> Plasma", fee);
@@ -296,45 +261,246 @@ contract QuoteBridgeEthereumToPlasmaTest is Test, StargateConstants {
     function test_quoteOFT_ethereumToPlasma() public {
         vm.selectFork(mainnetFork);
 
-        uint256 amountReceived = mainnetBridge.quoteOFT(PLASMA_EID, AMOUNT_TO_BRIDGE, receiver);
+        uint256 amountReceived = mainnetBridge.quoteOFT(PLASMA_EID, LARGE_BRIDGE_AMOUNT, receiver);
 
-        emit log_named_uint("Amount to bridge", AMOUNT_TO_BRIDGE);
+        emit log_named_uint("Amount to bridge", LARGE_BRIDGE_AMOUNT);
         emit log_named_uint("Expected amount received on Plasma", amountReceived);
 
-        // For OFT (Hydra) transfers, there should be no slippage
-        // amountReceived should equal AMOUNT_TO_BRIDGE (or very close)
-        if (amountReceived == AMOUNT_TO_BRIDGE) {
-            emit log("OFT transfer: No slippage (1:1)");
-        } else if (amountReceived > 0) {
-            uint256 ratio = (amountReceived * 10000) / AMOUNT_TO_BRIDGE;
-            emit log_named_uint("Ratio (received/sent * 10000)", ratio);
-        } else {
-            // Route not yet configured - this is expected until Stargate enables the path
-            emit log("Route status: Ethereum -> Plasma USDT path not yet configured in Stargate");
-        }
+        assertEq(amountReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
     }
 
-    function test_quote_smallAmount_ethereumToPlasma() public {
+    function test_quote_BRIDGE_AMOUNT_ethereumToPlasma() public {
         vm.selectFork(mainnetFork);
 
-        uint256 smallAmount = 100e6; // 100 USDT
+        uint256 amountReceived = mainnetBridge.quoteOFT(PLASMA_EID, BRIDGE_AMOUNT, receiver);
+        uint256 fee = mainnetBridge.quoteBridge(PLASMA_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
 
-        uint256 amountReceived = mainnetBridge.quoteOFT(PLASMA_EID, smallAmount, receiver);
-        uint256 fee = mainnetBridge.quoteBridge(PLASMA_EID, smallAmount, receiver, amountReceived);
-
-        emit log_named_uint("Amount to bridge", smallAmount);
+        emit log_named_uint("Amount to bridge", BRIDGE_AMOUNT);
         emit log_named_uint("Expected received on Plasma", amountReceived);
         emit log_named_uint("Native fee required (ETH)", fee);
 
         assertGt(fee, 0, "Fee should be quoted");
 
-        // For OFT, expected received should equal sent amount (no slippage)
-        if (amountReceived == smallAmount) {
-            emit log("SUCCESS: OFT 1:1 transfer confirmed");
-        } else if (amountReceived > 0) {
-            emit log_named_uint("Ratio (received/sent * 10000)", (amountReceived * 10000) / smallAmount);
-        } else {
-            emit log("Route status: Path not configured - verify with Stargate when route is enabled");
-        }
+        assertEq(amountReceived, BRIDGE_AMOUNT, "OFT should have no slippage");
+    }
+}
+
+/**
+ * @notice Tests for zero amount revert
+ */
+contract BridgeZeroAmountTest is AaveStargateBridgeForkTestBase {
+    function test_revertsIf_zeroAmount() public {
+        vm.selectFork(mainnetFork);
+
+        vm.prank(owner);
+        vm.expectRevert(IAaveStargateBridge.InvalidZeroAmount.selector);
+        mainnetBridge.bridge(ARBITRUM_EID, 0, receiver, 0);
+    }
+}
+
+/**
+ * @notice Tests for constructor and immutable values
+ */
+contract ConstructorAndImmutablesTest is AaveStargateBridgeForkTestBase {
+    function test_constructor_setsImmutables() public {
+        vm.selectFork(mainnetFork);
+
+        assertEq(mainnetBridge.OFT_USDT(), ETHEREUM_USDT0_OFT, "OFT_USDT should be set correctly");
+        assertEq(mainnetBridge.USDT(), ETHEREUM_USDT, "USDT should be set correctly");
+        assertEq(mainnetBridge.owner(), owner, "Owner should be set correctly");
+    }
+
+    function test_constructor_arbitrumBridge() public {
+        arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
+        vm.selectFork(arbitrumFork);
+
+        arbitrumBridge = new AaveStargateBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
+
+        assertEq(arbitrumBridge.OFT_USDT(), ARBITRUM_USDT0_OFT, "OFT_USDT should be set correctly");
+        assertEq(arbitrumBridge.USDT(), ARBITRUM_USDT, "USDT should be set correctly");
+        assertEq(arbitrumBridge.owner(), owner, "Owner should be set correctly");
+    }
+}
+
+/**
+ * @notice Tests for receive function and native token handling
+ */
+contract ReceiveFunctionTest is AaveStargateBridgeForkTestBase {
+    function test_receive_acceptsNativeTokens() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 balanceBefore = address(mainnetBridge).balance;
+
+        address sender = makeAddr("sender");
+        vm.deal(sender, 10 ether);
+
+        vm.prank(sender);
+        (bool success,) = address(mainnetBridge).call{value: 1 ether}("");
+
+        assertTrue(success, "Should accept native tokens");
+        assertEq(address(mainnetBridge).balance, balanceBefore + 1 ether, "Balance should increase");
+    }
+}
+
+/**
+ * @notice Tests for Rescuable functionality
+ */
+contract RescuableTest is AaveStargateBridgeForkTestBase {
+    function test_whoCanRescue_returnsOwner() public {
+        vm.selectFork(mainnetFork);
+
+        assertEq(mainnetBridge.whoCanRescue(), owner, "whoCanRescue should return owner");
+    }
+
+    function test_maxRescue_returnsMaxUint() public {
+        vm.selectFork(mainnetFork);
+
+        assertEq(mainnetBridge.maxRescue(ETHEREUM_USDT), type(uint256).max, "maxRescue should return max uint256");
+        assertEq(mainnetBridge.maxRescue(address(0)), type(uint256).max, "maxRescue should return max uint256 for any address");
+    }
+
+    function test_emergencyTokenTransfer_revertsIf_notOwner() public {
+        vm.selectFork(mainnetFork);
+
+        address notOwner = makeAddr("not-owner");
+        uint256 amount = 1_000e6;
+
+        deal(ETHEREUM_USDT, address(mainnetBridge), amount);
+
+        vm.prank(notOwner);
+        vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
+        mainnetBridge.emergencyTokenTransfer(ETHEREUM_USDT, address(AaveV3Ethereum.COLLECTOR), amount);
+    }
+
+    function test_emergencyEtherTransfer() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 ethAmount = 5 ether;
+        vm.deal(address(mainnetBridge), ethAmount);
+
+        address rescueTo = address(AaveV3Ethereum.COLLECTOR);
+        uint256 collectorBalanceBefore = rescueTo.balance;
+
+        vm.prank(owner);
+        IRescuable(address(mainnetBridge)).emergencyEtherTransfer(rescueTo, ethAmount);
+
+        assertEq(rescueTo.balance, collectorBalanceBefore + ethAmount, "Collector should receive ETH");
+        assertEq(address(mainnetBridge).balance, 0, "Bridge should have 0 ETH balance");
+    }
+}
+
+/**
+ * @notice Tests for Ethereum to Polygon USDT bridging
+ */
+contract QuoteBridgeEthereumToPolygonTest is AaveStargateBridgeForkTestBase {
+    function setUp() public override {
+        super.setUp();
+        receiver = makeAddr("polygon-receiver");
+    }
+
+    function test_quoteBridge_ethereumToPolygon() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 fee = mainnetBridge.quoteBridge(POLYGON_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
+
+        assertGt(fee, 0, "Fee should be greater than 0");
+        emit log_named_uint("Native fee for 10M USDT Ethereum -> Polygon", fee);
+    }
+
+    function test_quoteOFT_ethereumToPolygon() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 amountReceived = mainnetBridge.quoteOFT(POLYGON_EID, LARGE_BRIDGE_AMOUNT, receiver);
+
+        emit log_named_uint("Amount to bridge", LARGE_BRIDGE_AMOUNT);
+        emit log_named_uint("Expected amount received on Polygon", amountReceived);
+
+        assertEq(amountReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
+    }
+}
+
+/**
+ * @notice Tests for Ethereum to Optimism USDT bridging
+ */
+contract QuoteBridgeEthereumToOptimismTest is AaveStargateBridgeForkTestBase {
+    function setUp() public override {
+        super.setUp();
+        receiver = makeAddr("optimism-receiver");
+    }
+
+    function test_quoteBridge_ethereumToOptimism() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 fee = mainnetBridge.quoteBridge(OPTIMISM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
+
+        assertGt(fee, 0, "Fee should be greater than 0");
+        emit log_named_uint("Native fee for 10M USDT Ethereum -> Optimism", fee);
+    }
+
+    function test_quoteOFT_ethereumToOptimism() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 amountReceived = mainnetBridge.quoteOFT(OPTIMISM_EID, LARGE_BRIDGE_AMOUNT, receiver);
+
+        emit log_named_uint("Amount to bridge", LARGE_BRIDGE_AMOUNT);
+        emit log_named_uint("Expected amount received on Optimism", amountReceived);
+
+        assertEq(amountReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
+    }
+}
+
+/**
+ * @notice Tests for OFT no-slippage guarantee
+ */
+contract NoSlippageTest is AaveStargateBridgeForkTestBase {
+    function test_bridge_withExactAmount() public {
+        vm.selectFork(mainnetFork);
+        deal(ETHEREUM_USDT, address(mainnetBridge), BRIDGE_AMOUNT);
+
+        uint256 expectedReceived = mainnetBridge.quoteOFT(ARBITRUM_EID, BRIDGE_AMOUNT, receiver);
+
+        assertEq(expectedReceived, BRIDGE_AMOUNT, "OFT should have no slippage");
+
+        vm.prank(owner);
+        // Bridge with exact amount (OFT guarantees 1:1)
+        mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+
+        assertEq(IERC20(ETHEREUM_USDT).balanceOf(address(mainnetBridge)), 0, "Bridge should have 0 USDT");
+    }
+}
+
+/**
+ * @notice Tests for ownership transfer scenarios
+ */
+contract OwnershipTest is AaveStargateBridgeForkTestBase {
+    function test_transferOwnership_revertsIf_notOwner() public {
+        vm.selectFork(mainnetFork);
+
+        address notOwner = makeAddr("not-owner");
+        address newOwner = makeAddr("new-owner");
+
+        vm.prank(notOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+        mainnetBridge.transferOwnership(newOwner);
+    }
+
+    function test_renounceOwnership() public {
+        vm.selectFork(mainnetFork);
+
+        vm.prank(owner);
+        mainnetBridge.renounceOwnership();
+
+        assertEq(mainnetBridge.owner(), address(0), "Owner should be zero address");
+    }
+
+    function test_bridge_revertsAfterRenounceOwnership() public {
+        vm.selectFork(mainnetFork);
+
+        vm.prank(owner);
+        mainnetBridge.renounceOwnership();
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, owner));
+        mainnetBridge.bridge(ARBITRUM_EID, 100e6, receiver, 0);
     }
 }
