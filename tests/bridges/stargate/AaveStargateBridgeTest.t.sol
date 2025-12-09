@@ -8,7 +8,7 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 
 import {AaveStargateBridge} from "src/bridges/stargate/AaveStargateBridge.sol";
-import {IAaveStargateBridge} from "src/bridges/stargate/IAaveStargateBridge.sol";
+import {IAaveStargateBridge} from "src/bridges/stargate/interfaces/IAaveStargateBridge.sol";
 import {MockStargate} from "./mocks/MockStargate.sol";
 
 contract AaveStargateBridgeTestBase is Test {
@@ -33,6 +33,8 @@ contract AaveStargateBridgeTestBase is Test {
         uint256 minAmountReceived
     );
 
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
     function setUp() public {
         ERC20Mock mockUsdt = new ERC20Mock();
         usdt = IERC20(address(mockUsdt));
@@ -42,6 +44,24 @@ contract AaveStargateBridgeTestBase is Test {
         bridge = new AaveStargateBridge(address(mockStargate), address(usdt), owner);
 
         vm.deal(address(bridge), 10 ether);
+    }
+}
+
+contract ConstructorTest is AaveStargateBridgeTestBase {
+    function test_revertsIf_zero_oft_address() public {
+        vm.expectRevert(IAaveStargateBridge.InvalidZeroAddress.selector);
+        new AaveStargateBridge(address(0), address(usdt), owner);
+    }
+
+    function test_revertsIf_zero_usdt_address() public {
+        vm.expectRevert(IAaveStargateBridge.InvalidZeroAddress.selector);
+        new AaveStargateBridge(address(mockStargate), address(0), owner);
+    }
+
+    function test_successful() public view {
+        assertEq(bridge.OFT_USDT(), address(mockStargate));
+        assertEq(bridge.USDT(), address(usdt));
+        assertEq(bridge.owner(), owner);
     }
 }
 
@@ -77,8 +97,6 @@ contract BridgeTest is AaveStargateBridgeTestBase {
         assertEq(usdt.balanceOf(address(bridge)), 0, "Bridge should have no USDT left");
         assertEq(usdt.balanceOf(address(mockStargate)), AMOUNT, "MockStargate should have USDT");
     }
-
-
 
     function test_successful_fuzz(uint256 amount, uint32 dstEid) public {
         vm.assume(amount > 0 && amount < type(uint128).max);
@@ -143,7 +161,12 @@ contract TransferOwnershipTest is AaveStargateBridgeTestBase {
         address newOwner = makeAddr("new-owner");
 
         vm.startPrank(owner);
+
+        vm.expectEmit(true, true, true, true, address(bridge));
+        emit OwnershipTransferred(owner, newOwner);
+
         bridge.transferOwnership(newOwner);
+
         vm.stopPrank();
 
         assertEq(bridge.owner(), newOwner);
@@ -188,7 +211,7 @@ contract ReceiveEtherTest is AaveStargateBridgeTestBase {
 }
 
 contract ViewFunctionsTest is AaveStargateBridgeTestBase {
-    function test_stargateUsdt() public view {
+    function test_oft_usdt() public view {
         assertEq(bridge.OFT_USDT(), address(mockStargate));
     }
 

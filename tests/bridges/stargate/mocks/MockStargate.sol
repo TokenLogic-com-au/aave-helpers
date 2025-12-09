@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IOFT, SendParam, MessagingFee, MessagingReceipt, OFTReceipt} from "src/bridges/stargate/IOFT.sol";
+import {IOFT, SendParam, MessagingFee, MessagingReceipt, OFTReceipt, OFTLimit, OFTFeeDetail} from "layerzero-v2/oft/interfaces/IOFT.sol";
 
 contract MockStargate is IOFT {
     using SafeERC20 for IERC20;
@@ -62,10 +62,24 @@ contract MockStargate is IOFT {
         external
         view
         override
-        returns (uint256 amountSentLD, uint256 amountReceivedLD, OFTReceipt memory receipt)
+        returns (OFTLimit memory limit, OFTFeeDetail[] memory oftFeeDetails, OFTReceipt memory receipt)
     {
-        amountSentLD = _sendParam.amountLD;
-        amountReceivedLD = mockAmountReceivedLD > 0 ? mockAmountReceivedLD : _sendParam.amountLD;
+        uint256 amountSentLD = _sendParam.amountLD;
+        uint256 amountReceivedLD = mockAmountReceivedLD > 0 ? mockAmountReceivedLD : _sendParam.amountLD;
+        limit = OFTLimit({minAmountLD: 0, maxAmountLD: type(uint256).max});
+        oftFeeDetails = new OFTFeeDetail[](0);
         receipt = OFTReceipt({amountSentLD: amountSentLD, amountReceivedLD: amountReceivedLD});
+    }
+
+    function oftVersion() external pure override returns (bytes4 interfaceId, uint64 version) {
+        return (0x02e49c2c, 1);
+    }
+
+    function approvalRequired() external pure override returns (bool) {
+        return true;
+    }
+
+    function sharedDecimals() external pure override returns (uint8) {
+        return 6;
     }
 }

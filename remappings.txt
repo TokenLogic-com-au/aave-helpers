@@ -4,3 +4,5 @@ aave-v3-origin-tests/=lib/aave-address-book/lib/aave-v3-origin/tests
 forge-std/=lib/forge-std/src/
 solidity-utils/=lib/aave-address-book/lib/aave-v3-origin/lib/solidity-utils/src/
 openzeppelin-contracts/=lib/aave-address-book/lib/aave-v3-origin/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/
+layerzero-v2/=lib/LayerZero-v2/packages/layerzero-v2/evm/oapp/contracts/
+@layerzerolabs/lz-evm-protocol-v2/contracts/=lib/LayerZero-v2/packages/layerzero-v2/evm/protocol/contracts/

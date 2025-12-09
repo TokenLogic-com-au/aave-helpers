@@ -7,8 +7,8 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
-import {IAaveStargateBridge} from "./IAaveStargateBridge.sol";
-import {IOFT, SendParam, MessagingFee, OFTReceipt} from "./IOFT.sol";
+import {IAaveStargateBridge} from "./interfaces/IAaveStargateBridge.sol";
+import {IOFT, SendParam, MessagingFee, OFTReceipt} from "layerzero-v2/oft/interfaces/IOFT.sol";
 
 /// @title AaveStargateBridge
 /// @author Aave
@@ -26,6 +26,8 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     /// @param usdt The USDT token address on this chain
     /// @param owner The owner of the contract upon deployment
     constructor(address oftUsdt, address usdt, address owner) Ownable(owner) {
+        if (oftUsdt == address(0)) revert InvalidZeroAddress();
+        if (usdt == address(0)) revert InvalidZeroAddress();
         OFT_USDT = oftUsdt;
         USDT = usdt;
     }
@@ -35,7 +37,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
 
     /// @inheritdoc IAaveStargateBridge
     function bridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD) external payable onlyOwner {
-        if (amount == 0) revert InvalidZeroAmount();
+        if (amount < 1) revert InvalidZeroAmount();
 
         IERC20(USDT).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -54,7 +56,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     function quoteBridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD)
         external
         view
-        returns (uint256 nativeFee)
+        returns (uint256)
     {
         SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, minAmountLD);
         MessagingFee memory messagingFee = IOFT(OFT_USDT).quoteSend(sendParam, false);
@@ -65,7 +67,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     function quoteOFT(uint32 dstEid, uint256 amount, address receiver)
         external
         view
-        returns (uint256 amountReceivedLD)
+        returns (uint256)
     {
         SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, 0);
         (,, OFTReceipt memory receipt) = IOFT(OFT_USDT).quoteOFT(sendParam);
@@ -87,20 +89,20 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     /// @param amount The amount to send
     /// @param receiver The receiver address on destination
     /// @param minAmountLD The minimum amount to receive
-    /// @return sendParam The constructed SendParam struct
+    /// @return The constructed SendParam struct
     function _buildSendParam(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD)
         internal
         pure
-        returns (SendParam memory sendParam)
+        returns (SendParam memory)
     {
-        sendParam = SendParam({
+        return SendParam({
             dstEid: dstEid,
             to: _addressToBytes32(receiver),
             amountLD: amount,
             minAmountLD: minAmountLD,
             extraOptions: new bytes(0),
             composeMsg: new bytes(0),
-            oftCmd: new bytes(0) // Empty bytes for taxi mode (immediate)
+            oftCmd: new bytes(0)
         });
     }
 
