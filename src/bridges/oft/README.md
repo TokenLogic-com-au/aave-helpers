@@ -68,6 +68,21 @@ Only the owner can:
 - The `quoteOFT()` function should be called immediately before bridging to get accurate amounts
 - Only the owner (governance) can execute bridges
 
+## Retry Mechanism
+
+LayerZero includes a retry mechanism to handle transactions which fail to execute on the destination chain.
+
+Because LayerZero separates the verification of a message from its execution, if a message fails to execute, it can be retried without having to resend it from the origin chain. This is possible because the message has already been confirmed by the DVNs as a valid message packet, meaning execution can be retried at any time, by anyone.
+
+### How to Retry
+
+To retry a failed message:
+
+1. **LayerZero Scan Interface**: Use the [LayerZero Scan](https://layerzeroscan.com/) UI to locate and retry the failed message
+2. **Direct Contract Call**: Call the `lzReceive` function directly on the Endpoint contract
+
+For more details, see the [LayerZero debugging documentation](https://docs.layerzero.network/v2/developers/evm/troubleshooting/debugging-messages#retry-message).
+
 ## Supported Chains
 
 USDT0 is currently deployed on the following chains:
