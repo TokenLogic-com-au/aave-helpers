@@ -14,7 +14,7 @@ import {CctpConstants} from "./Constants.sol";
 
 contract AaveCctpBridgeTestBase is Test, CctpConstants {
     uint256 public constant AMOUNT = 1_000e6; // 1000 USDC
-    uint256 public constant MOCK_FEE = 100; // 0.01% fee in basis points
+    uint256 public constant MAX_FEE = 10e6; // 1% of 1000 USDC
 
     MockTokenMessengerV2 public mockTokenMessenger;
     IERC20 public usdc;
@@ -29,16 +29,38 @@ contract AaveCctpBridgeTestBase is Test, CctpConstants {
         uint32 indexed destinationDomain,
         address indexed receiver,
         uint256 amount,
-        uint64 nonce,
         IAaveCctpBridge.TransferSpeed speed
     );
+
+    function _startOwnerAndApprove(uint256 amount) internal {
+        deal(address(usdc), owner, amount);
+        vm.startPrank(owner);
+        usdc.approve(address(bridge), amount);
+    }
+
+    function _assertDeposit(
+        uint64 nonce,
+        uint256 amount,
+        uint32 destinationDomain,
+        address mintRecipient,
+        uint256 maxFee,
+        uint32 minFinalityThreshold
+    ) internal view {
+        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
+        assertEq(deposit.amount, amount);
+        assertEq(deposit.destinationDomain, destinationDomain);
+        assertEq(deposit.mintRecipient, bytes32(uint256(uint160(mintRecipient))));
+        assertEq(deposit.burnToken, address(usdc));
+        assertEq(deposit.destinationCaller, bytes32(0));
+        assertEq(deposit.maxFee, maxFee);
+        assertEq(deposit.minFinalityThreshold, minFinalityThreshold);
+    }
 
     function setUp() public {
         ERC20Mock mockUsdc = new ERC20Mock();
         usdc = IERC20(address(mockUsdc));
 
         mockTokenMessenger = new MockTokenMessengerV2(makeAddr("messageTransmitter"));
-        mockTokenMessenger.setMockMinFee(MOCK_FEE);
 
         bridge = new AaveCctpBridge(
             address(mockTokenMessenger),
@@ -103,46 +125,33 @@ contract BridgeTest is AaveCctpBridgeTestBase {
     }
 
     function test_successful_fastTransfer() public {
-        deal(address(usdc), owner, AMOUNT);
-
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), AMOUNT);
+        _startOwnerAndApprove(AMOUNT);
 
         vm.expectEmit(true, true, true, true, address(bridge));
-        emit Bridge(address(usdc), ARBITRUM_DOMAIN, receiver, AMOUNT, 1, IAaveCctpBridge.TransferSpeed.Fast);
+        emit Bridge(address(usdc), ARBITRUM_DOMAIN, receiver, AMOUNT, IAaveCctpBridge.TransferSpeed.Fast);
 
-        uint64 nonce = bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 1000, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 1000, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
 
-        assertEq(nonce, 1, "Nonce should be 1");
         assertEq(usdc.balanceOf(address(bridge)), 0, "Bridge should have no USDC left");
         assertEq(usdc.balanceOf(address(mockTokenMessenger)), AMOUNT, "TokenMessenger should have USDC");
 
-        // Verify deposit record
-        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
-        assertEq(deposit.amount, AMOUNT);
-        assertEq(deposit.destinationDomain, ARBITRUM_DOMAIN);
-        assertEq(deposit.minFinalityThreshold, FAST_FINALITY_THRESHOLD);
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, 1000, FAST_FINALITY_THRESHOLD);
     }
 
     function test_successful_standardTransfer() public {
-        deal(address(usdc), owner, AMOUNT);
-
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), AMOUNT);
+        _startOwnerAndApprove(AMOUNT);
 
         vm.expectEmit(true, true, true, true, address(bridge));
-        emit Bridge(address(usdc), ARBITRUM_DOMAIN, receiver, AMOUNT, 1, IAaveCctpBridge.TransferSpeed.Standard);
+        emit Bridge(address(usdc), ARBITRUM_DOMAIN, receiver, AMOUNT, IAaveCctpBridge.TransferSpeed.Standard);
 
-        uint64 nonce = bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Standard);
         vm.stopPrank();
 
-        // Verify deposit record has standard finality threshold
-        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
-        assertEq(deposit.minFinalityThreshold, STANDARD_FINALITY_THRESHOLD);
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, 0, STANDARD_FINALITY_THRESHOLD);
     }
 
-    function test_successful_fuzz(uint256 amount, uint32 dstDomain) public {
+    function test_fuzz_successful(uint256 amount, uint32 dstDomain) public {
         vm.assume(amount > 0 && amount < type(uint128).max);
         vm.assume(dstDomain != ETHEREUM_DOMAIN && dstDomain > 0);
 
@@ -155,137 +164,7 @@ contract BridgeTest is AaveCctpBridgeTestBase {
         vm.stopPrank();
 
         assertEq(usdc.balanceOf(address(bridge)), 0);
-    }
-}
-
-contract BridgeFastTest is AaveCctpBridgeTestBase {
-    function test_revertsIf_callerNotOwner() public {
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
-        bridge.bridgeFast(ARBITRUM_DOMAIN, AMOUNT, receiver);
-        vm.stopPrank();
-    }
-
-    function test_revertsIf_zeroAmount() public {
-        vm.startPrank(owner);
-        vm.expectRevert(IAaveCctpBridge.InvalidZeroAmount.selector);
-        bridge.bridgeFast(ARBITRUM_DOMAIN, 0, receiver);
-        vm.stopPrank();
-    }
-
-    function test_revertsIf_zeroReceiver() public {
-        vm.startPrank(owner);
-        vm.expectRevert(IAaveCctpBridge.InvalidReceiver.selector);
-        bridge.bridgeFast(ARBITRUM_DOMAIN, AMOUNT, address(0));
-        vm.stopPrank();
-    }
-
-    function test_successful() public {
-        deal(address(usdc), owner, AMOUNT);
-
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), AMOUNT);
-
-        vm.expectEmit(true, true, true, true, address(bridge));
-        emit Bridge(address(usdc), ARBITRUM_DOMAIN, receiver, AMOUNT, 1, IAaveCctpBridge.TransferSpeed.Fast);
-
-        uint64 nonce = bridge.bridgeFast(ARBITRUM_DOMAIN, AMOUNT, receiver);
-        vm.stopPrank();
-
-        assertEq(nonce, 1);
-
-        // Verify max fee is set to type(uint256).max
-        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
-        assertEq(deposit.maxFee, type(uint256).max);
-        assertEq(deposit.minFinalityThreshold, FAST_FINALITY_THRESHOLD);
-    }
-
-    function test_successful_fuzz(uint256 amount, uint32 dstDomain) public {
-        vm.assume(amount > 0 && amount < type(uint128).max);
-        vm.assume(dstDomain != ETHEREUM_DOMAIN && dstDomain > 0);
-
-        deal(address(usdc), owner, amount);
-
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), amount);
-
-        bridge.bridgeFast(dstDomain, amount, receiver);
-        vm.stopPrank();
-
-        assertEq(usdc.balanceOf(address(bridge)), 0);
-    }
-}
-
-contract BridgeStandardTest is AaveCctpBridgeTestBase {
-    function test_revertsIf_callerNotOwner() public {
-        vm.startPrank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
-        bridge.bridgeStandard(ARBITRUM_DOMAIN, AMOUNT, receiver);
-        vm.stopPrank();
-    }
-
-    function test_revertsIf_zeroAmount() public {
-        vm.startPrank(owner);
-        vm.expectRevert(IAaveCctpBridge.InvalidZeroAmount.selector);
-        bridge.bridgeStandard(ARBITRUM_DOMAIN, 0, receiver);
-        vm.stopPrank();
-    }
-
-    function test_revertsIf_zeroReceiver() public {
-        vm.startPrank(owner);
-        vm.expectRevert(IAaveCctpBridge.InvalidReceiver.selector);
-        bridge.bridgeStandard(ARBITRUM_DOMAIN, AMOUNT, address(0));
-        vm.stopPrank();
-    }
-
-    function test_successful() public {
-        deal(address(usdc), owner, AMOUNT);
-
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), AMOUNT);
-
-        vm.expectEmit(true, true, true, true, address(bridge));
-        emit Bridge(address(usdc), ARBITRUM_DOMAIN, receiver, AMOUNT, 1, IAaveCctpBridge.TransferSpeed.Standard);
-
-        uint64 nonce = bridge.bridgeStandard(ARBITRUM_DOMAIN, AMOUNT, receiver);
-        vm.stopPrank();
-
-        assertEq(nonce, 1);
-
-        // Verify maxFee is 0 and finality threshold is standard
-        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
-        assertEq(deposit.maxFee, 0);
-        assertEq(deposit.minFinalityThreshold, STANDARD_FINALITY_THRESHOLD);
-    }
-
-    function test_successful_fuzz(uint256 amount, uint32 dstDomain) public {
-        vm.assume(amount > 0 && amount < type(uint128).max);
-        vm.assume(dstDomain != ETHEREUM_DOMAIN && dstDomain > 0);
-
-        deal(address(usdc), owner, amount);
-
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), amount);
-
-        bridge.bridgeStandard(dstDomain, amount, receiver);
-        vm.stopPrank();
-
-        assertEq(usdc.balanceOf(address(bridge)), 0);
-    }
-}
-
-contract QuoteFeeTest is AaveCctpBridgeTestBase {
-    function test_successful() public view {
-        uint256 fee = bridge.quoteFee(ARBITRUM_DOMAIN, AMOUNT);
-        assertEq(fee, MOCK_FEE);
-    }
-
-    function test_successful_fuzz(uint256 amount, uint32 dstDomain) public view {
-        vm.assume(amount > 0);
-        vm.assume(dstDomain > 0);
-
-        uint256 fee = bridge.quoteFee(dstDomain, amount);
-        assertEq(fee, MOCK_FEE);
+        assertEq(usdc.balanceOf(owner), 0);
     }
 }
 
@@ -367,14 +246,10 @@ contract MultipleBridgesTest is AaveCctpBridgeTestBase {
         vm.startPrank(owner);
         usdc.approve(address(bridge), AMOUNT * 3);
 
-        uint64 nonce1 = bridge.bridgeFast(ARBITRUM_DOMAIN, AMOUNT, receiver);
-        uint64 nonce2 = bridge.bridgeStandard(BASE_DOMAIN, AMOUNT, receiver);
-        uint64 nonce3 = bridge.bridge(OPTIMISM_DOMAIN, AMOUNT, receiver, 500, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, AMOUNT - 1, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(BASE_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        bridge.bridge(OPTIMISM_DOMAIN, AMOUNT, receiver, 500, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
-
-        assertEq(nonce1, 1);
-        assertEq(nonce2, 2);
-        assertEq(nonce3, 3);
 
         // Verify each deposit went to correct domain
         assertEq(mockTokenMessenger.getDeposit(1).destinationDomain, ARBITRUM_DOMAIN);
@@ -385,35 +260,97 @@ contract MultipleBridgesTest is AaveCctpBridgeTestBase {
 
 contract MintRecipientEncodingTest is AaveCctpBridgeTestBase {
     function test_addressEncodedCorrectly() public {
-        deal(address(usdc), owner, AMOUNT);
+        _startOwnerAndApprove(AMOUNT);
 
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), AMOUNT);
-
-        uint64 nonce = bridge.bridgeFast(ARBITRUM_DOMAIN, AMOUNT, receiver);
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, MAX_FEE, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
 
-        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
-
-        // Verify the mintRecipient is correctly encoded as bytes32
-        bytes32 expectedRecipient = bytes32(uint256(uint160(receiver)));
-        assertEq(deposit.mintRecipient, expectedRecipient);
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, MAX_FEE, FAST_FINALITY_THRESHOLD);
     }
 
-    function test_addressEncodedCorrectly_fuzz(address recipient) public {
+    function test_fuzz_addressEncodedCorrectly(address recipient) public {
         vm.assume(recipient != address(0));
 
-        deal(address(usdc), owner, AMOUNT);
+        _startOwnerAndApprove(AMOUNT);
 
-        vm.startPrank(owner);
-        usdc.approve(address(bridge), AMOUNT);
-
-        uint64 nonce = bridge.bridgeFast(ARBITRUM_DOMAIN, AMOUNT, recipient);
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, recipient, MAX_FEE, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
 
-        MockTokenMessengerV2.DepositRecord memory deposit = mockTokenMessenger.getDeposit(nonce);
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, recipient, MAX_FEE, FAST_FINALITY_THRESHOLD);
+    }
+}
 
-        bytes32 expectedRecipient = bytes32(uint256(uint160(recipient)));
-        assertEq(deposit.mintRecipient, expectedRecipient);
+contract DepositRecordVerificationTest is AaveCctpBridgeTestBase {
+    function test_bridge_fastTransfer_verifiesAllDepositFields() public {
+        _startOwnerAndApprove(AMOUNT);
+
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 500, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, 500, FAST_FINALITY_THRESHOLD);
+    }
+
+    function test_bridge_standardTransfer_verifiesAllDepositFields() public {
+        _startOwnerAndApprove(AMOUNT);
+
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        vm.stopPrank();
+
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, 0, STANDARD_FINALITY_THRESHOLD);
+    }
+
+    function test_bridge_withDifferentDomains() public {
+        deal(address(usdc), owner, AMOUNT * 4);
+
+        vm.startPrank(owner);
+        usdc.approve(address(bridge), AMOUNT * 4);
+
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, MAX_FEE, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(BASE_DOMAIN, AMOUNT, receiver, MAX_FEE, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(OPTIMISM_DOMAIN, AMOUNT, receiver, MAX_FEE, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(AVALANCHE_DOMAIN, AMOUNT, receiver, MAX_FEE, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, MAX_FEE, FAST_FINALITY_THRESHOLD);
+        _assertDeposit(2, AMOUNT, BASE_DOMAIN, receiver, MAX_FEE, FAST_FINALITY_THRESHOLD);
+        _assertDeposit(3, AMOUNT, OPTIMISM_DOMAIN, receiver, MAX_FEE, FAST_FINALITY_THRESHOLD);
+        _assertDeposit(4, AMOUNT, AVALANCHE_DOMAIN, receiver, MAX_FEE, FAST_FINALITY_THRESHOLD);
+    }
+
+    function test_bridge_withMinimumAmount() public {
+        uint256 minAmount = 1;
+        deal(address(usdc), owner, minAmount);
+
+        vm.startPrank(owner);
+        usdc.approve(address(bridge), minAmount);
+
+        bridge.bridge(ARBITRUM_DOMAIN, minAmount, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+
+        _assertDeposit(1, minAmount, ARBITRUM_DOMAIN, receiver, 0, FAST_FINALITY_THRESHOLD);
+    }
+
+    function test_bridge_withLargeAmount() public {
+        uint256 largeAmount = 1_000_000_000e6; // 1 billion USDC
+        uint256 largeFee = largeAmount / 100; // 1% fee
+        deal(address(usdc), owner, largeAmount);
+
+        vm.startPrank(owner);
+        usdc.approve(address(bridge), largeAmount);
+
+        bridge.bridge(ARBITRUM_DOMAIN, largeAmount, receiver, largeFee, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+
+        _assertDeposit(1, largeAmount, ARBITRUM_DOMAIN, receiver, largeFee, FAST_FINALITY_THRESHOLD);
+    }
+
+    function test_bridge_maxFeePassedCorrectly() public {
+        _startOwnerAndApprove(AMOUNT);
+
+        uint256 customMaxFee = 12345;
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, customMaxFee, IAaveCctpBridge.TransferSpeed.Standard);
+        vm.stopPrank();
+
+        _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, customMaxFee, STANDARD_FINALITY_THRESHOLD);
     }
 }

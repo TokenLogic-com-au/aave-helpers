@@ -13,7 +13,6 @@ interface ITokenMessengerV2 {
     /// @param destinationCaller Address that can call receiveMessage on destination (bytes32(0) for any)
     /// @param maxFee Maximum fee for Fast Transfer (in burn token units)
     /// @param minFinalityThreshold Minimum finality level (1000 for Fast, 2000 for Standard)
-    /// @return Unique nonce reserved by message
     function depositForBurn(
         uint256 amount,
         uint32 destinationDomain,
@@ -22,20 +21,5 @@ interface ITokenMessengerV2 {
         bytes32 destinationCaller,
         uint256 maxFee,
         uint32 minFinalityThreshold
-    ) external returns (uint64);
-
-    /// @notice Calculates the minimum fee for Standard Transfer
-    /// @param destinationDomain Destination domain identifier
-    /// @param burnToken Address of the burn token
-    /// @param amount Amount of tokens to transfer
-    /// @return The minimum fee amount
-    function getMinFeeAmount(
-        uint32 destinationDomain,
-        address burnToken,
-        uint256 amount
-    ) external view returns (uint256);
-
-    /// @notice Returns the local MessageTransmitterV2 contract address
-    /// @return Address of the MessageTransmitterV2
-    function localMessageTransmitter() external view returns (address);
+    ) external;
 }

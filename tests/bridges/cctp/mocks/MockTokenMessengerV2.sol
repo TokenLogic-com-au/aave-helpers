@@ -10,10 +10,6 @@ import {ITokenMessengerV2} from "src/bridges/cctp/interfaces/ITokenMessengerV2.s
 contract MockTokenMessengerV2 is ITokenMessengerV2 {
     using SafeERC20 for IERC20;
 
-    address public immutable messageTransmitter;
-    uint64 public nextNonce;
-    uint256 public mockMinFee;
-
     // Track deposits for verification
     struct DepositRecord {
         uint256 amount;
@@ -24,6 +20,8 @@ contract MockTokenMessengerV2 is ITokenMessengerV2 {
         uint256 maxFee;
         uint32 minFinalityThreshold;
     }
+
+    uint64 public _nextNonce;
 
     mapping(uint64 => DepositRecord) public deposits;
 
@@ -39,14 +37,11 @@ contract MockTokenMessengerV2 is ITokenMessengerV2 {
         uint32 minFinalityThreshold
     );
 
-    constructor(address _messageTransmitter) {
-        messageTransmitter = _messageTransmitter;
-        nextNonce = 1;
-        mockMinFee = 0;
-    }
+    /// @dev Amount must be greater than zero
+    error InvalidAmount();
 
-    function setMockMinFee(uint256 _minFee) external {
-        mockMinFee = _minFee;
+    constructor(address) {
+        _nextNonce = 1;
     }
 
     function depositForBurn(
@@ -57,13 +52,13 @@ contract MockTokenMessengerV2 is ITokenMessengerV2 {
         bytes32 destinationCaller,
         uint256 maxFee,
         uint32 minFinalityThreshold
-    ) external override returns (uint64) {
-        require(amount > 0, "Amount must be greater than 0");
+    ) external override {
+        if (amount < 1) revert InvalidAmount();
 
         // Transfer tokens from sender to this contract (simulating burn)
         IERC20(burnToken).safeTransferFrom(msg.sender, address(this), amount);
 
-        uint64 nonce = nextNonce++;
+        uint64 nonce = _nextNonce++;
 
         deposits[nonce] = DepositRecord({
             amount: amount,
@@ -86,20 +81,6 @@ contract MockTokenMessengerV2 is ITokenMessengerV2 {
             maxFee,
             minFinalityThreshold
         );
-
-        return nonce;
-    }
-
-    function getMinFeeAmount(
-        uint32, /* destinationDomain */
-        address, /* burnToken */
-        uint256 /* amount */
-    ) external view override returns (uint256) {
-        return mockMinFee;
-    }
-
-    function localMessageTransmitter() external view override returns (address) {
-        return messageTransmitter;
     }
 
     /// @notice Helper to get deposit record for verification in tests

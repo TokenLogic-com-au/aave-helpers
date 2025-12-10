@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.30;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -11,7 +11,7 @@ import {IAaveCctpBridge} from "./interfaces/IAaveCctpBridge.sol";
 import {ITokenMessengerV2} from "./interfaces/ITokenMessengerV2.sol";
 
 /// @title AaveCctpBridge
-/// @author TokenLogic
+/// @author stevyhacker (TokenLogic)
 /// @notice Helper contract to bridge USDC using Circle's CCTP V2
 contract AaveCctpBridge is Ownable, Rescuable, IAaveCctpBridge {
     using SafeERC20 for IERC20;
@@ -56,19 +56,20 @@ contract AaveCctpBridge is Ownable, Rescuable, IAaveCctpBridge {
         address receiver,
         uint256 maxFee,
         TransferSpeed speed
-    ) external onlyOwner returns (uint64) {
+    ) external onlyOwner {
         if (amount < 1) revert InvalidZeroAmount();
         if (receiver == address(0)) revert InvalidReceiver();
         if (destinationDomain == LOCAL_DOMAIN) revert InvalidDestinationDomain();
 
+        uint32 finalityThreshold = STANDARD_FINALITY_THRESHOLD;
+        if (speed == TransferSpeed.Fast) {
+            finalityThreshold = FAST_FINALITY_THRESHOLD;
+        }
+
         IERC20(USDC).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(USDC).forceApprove(TOKEN_MESSENGER, amount);
 
-        uint32 finalityThreshold = speed == TransferSpeed.Fast
-            ? FAST_FINALITY_THRESHOLD
-            : STANDARD_FINALITY_THRESHOLD;
-
-        uint64 nonce = ITokenMessengerV2(TOKEN_MESSENGER).depositForBurn(
+        ITokenMessengerV2(TOKEN_MESSENGER).depositForBurn(
             amount,
             destinationDomain,
             _addressToBytes32(receiver),
@@ -78,70 +79,7 @@ contract AaveCctpBridge is Ownable, Rescuable, IAaveCctpBridge {
             finalityThreshold
         );
 
-        emit Bridge(USDC, destinationDomain, receiver, amount, nonce, speed);
-
-        return nonce;
-    }
-
-    /// @inheritdoc IAaveCctpBridge
-    function bridgeFast(
-        uint32 destinationDomain,
-        uint256 amount,
-        address receiver
-    ) external onlyOwner returns (uint64) {
-        if (amount < 1) revert InvalidZeroAmount();
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (destinationDomain == LOCAL_DOMAIN) revert InvalidDestinationDomain();
-
-        IERC20(USDC).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(USDC).forceApprove(TOKEN_MESSENGER, amount);
-
-        uint64 nonce = ITokenMessengerV2(TOKEN_MESSENGER).depositForBurn(
-            amount,
-            destinationDomain,
-            _addressToBytes32(receiver),
-            USDC,
-            bytes32(0),
-            type(uint256).max,
-            FAST_FINALITY_THRESHOLD
-        );
-
-        emit Bridge(USDC, destinationDomain, receiver, amount, nonce, TransferSpeed.Fast);
-
-        return nonce;
-    }
-
-    /// @inheritdoc IAaveCctpBridge
-    function bridgeStandard(
-        uint32 destinationDomain,
-        uint256 amount,
-        address receiver
-    ) external onlyOwner returns (uint64) {
-        if (amount < 1) revert InvalidZeroAmount();
-        if (receiver == address(0)) revert InvalidReceiver();
-        if (destinationDomain == LOCAL_DOMAIN) revert InvalidDestinationDomain();
-
-        IERC20(USDC).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(USDC).forceApprove(TOKEN_MESSENGER, amount);
-
-        uint64 nonce = ITokenMessengerV2(TOKEN_MESSENGER).depositForBurn(
-            amount,
-            destinationDomain,
-            _addressToBytes32(receiver),
-            USDC,
-            bytes32(0),
-            0,
-            STANDARD_FINALITY_THRESHOLD
-        );
-
-        emit Bridge(USDC, destinationDomain, receiver, amount, nonce, TransferSpeed.Standard);
-
-        return nonce;
-    }
-
-    /// @inheritdoc IAaveCctpBridge
-    function quoteFee(uint32 destinationDomain, uint256 amount) external view returns (uint256) {
-        return ITokenMessengerV2(TOKEN_MESSENGER).getMinFeeAmount(destinationDomain, USDC, amount);
+        emit Bridge(USDC, destinationDomain, receiver, amount, speed);
     }
 
     /// @inheritdoc Rescuable
