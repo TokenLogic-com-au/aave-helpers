@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IAaveStargateBridge {
+interface IAaveOFTBridge {
     /// @dev Thrown when bridge amount is zero
     error InvalidZeroAmount();
 
@@ -22,14 +22,14 @@ interface IAaveStargateBridge {
         uint256 minAmountReceived
     );
 
-    /// @notice Bridges USDT to a destination chain using Stargate
+    /// @notice Bridges USDT to a destination chain using OFT
     /// @param dstEid The destination LayerZero endpoint ID
     /// @param amount The amount of USDT to bridge
     /// @param receiver The receiver address on the destination chain
     /// @param minAmountLD The minimum amount to receive on destination (slippage protection)
     function bridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD) external payable;
 
-    /// @notice Returns the Stargate OFT address for USDT on the deployed chain
+    /// @notice Returns the OFT address for USDT on the deployed chain
     function OFT_USDT() external view returns (address);
 
     /// @notice Returns the USDT token address on the deployed chain

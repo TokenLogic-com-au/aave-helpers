@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-/// @title StargateConstants
+/// @title OFT Constants
 /// @notice Constants for USDT0 OFT bridge integration via LayerZero V2
 /// @dev USDT0 supported chains: Ethereum, Arbitrum, Polygon, Optimism, Plasma
 ///      NOT supported: Avalanche, Base (no USDT0 deployment)
 /// @dev Addresses from https://docs.usdt0.to/technical-documentation/developer/usdt0-deployments
-contract StargateConstants {
+contract OFTConstants {
     // LayerZero V2 Endpoint IDs
     uint32 public constant ETHEREUM_EID = 30101;
     uint32 public constant POLYGON_EID = 30109;

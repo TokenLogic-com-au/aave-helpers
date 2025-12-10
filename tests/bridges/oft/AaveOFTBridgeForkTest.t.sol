@@ -11,15 +11,15 @@ import {AaveV3Arbitrum} from "aave-address-book/AaveV3Arbitrum.sol";
 import {AaveV3Plasma} from "aave-address-book/AaveV3Plasma.sol";
 import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 
-import {StargateConstants} from "./Constants.sol";
-import {AaveStargateBridge} from "src/bridges/stargate/AaveStargateBridge.sol";
-import {IAaveStargateBridge} from "src/bridges/stargate/interfaces/IAaveStargateBridge.sol";
+import {OFTConstants} from "./Constants.sol";
+import {AaveOFTBridge} from "src/bridges/oft/AaveOFTBridge.sol";
+import {IAaveOFTBridge} from "src/bridges/oft/interfaces/IAaveOFTBridge.sol";
 
 /**
- * @title AaveStargateBridgeForkTest
+ * @title AaveOFTBridgeForkTest
  * @notice Fork tests for USDT0 OFT bridge via LayerZero V2
  */
-contract AaveStargateBridgeForkTestBase is Test, StargateConstants {
+contract AaveOFTBridgeForkTestBase is Test, OFTConstants {
     using SafeERC20 for IERC20;
 
     uint256 public constant LARGE_BRIDGE_AMOUNT = 10_000_000e6; // 10 million USDT
@@ -31,8 +31,8 @@ contract AaveStargateBridgeForkTestBase is Test, StargateConstants {
     address public owner = makeAddr("owner");
     address public receiver;
 
-    AaveStargateBridge public mainnetBridge;
-    AaveStargateBridge public arbitrumBridge;
+    AaveOFTBridge public mainnetBridge;
+    AaveOFTBridge public arbitrumBridge;
 
     event Bridge(
         address indexed token,
@@ -46,7 +46,7 @@ contract AaveStargateBridgeForkTestBase is Test, StargateConstants {
         mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"));
 
         // Use USDT0 OFT (OAdapterUpgradeable) on Ethereum for bridging
-        mainnetBridge = new AaveStargateBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
+        mainnetBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
 
         receiver = address(AaveV3Arbitrum.COLLECTOR);
 
@@ -54,7 +54,7 @@ contract AaveStargateBridgeForkTestBase is Test, StargateConstants {
     }
 }
 
-contract QuoteBridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
+contract QuoteBridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
     function test_quoteBridge_ethereumToArbitrum() public {
         vm.selectFork(mainnetFork);
 
@@ -86,7 +86,7 @@ contract QuoteBridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
     }
 }
 
-contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
+contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
     function test_bridge_happyPath() public {
         vm.selectFork(mainnetFork);
 
@@ -146,7 +146,7 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
 
         address deployer = makeAddr("bridge-deployer");
         vm.prank(deployer);
-        AaveStargateBridge unfundedBridge = new AaveStargateBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
+        AaveOFTBridge unfundedBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
         assertEq(address(unfundedBridge).balance, 0, "Bridge should not be pre-funded");
 
         deal(ETHEREUM_USDT, owner, BRIDGE_AMOUNT);
@@ -197,7 +197,7 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
         vm.selectFork(mainnetFork);
 
         vm.prank(owner);
-        vm.expectRevert(IAaveStargateBridge.InvalidZeroAmount.selector);
+        vm.expectRevert(IAaveOFTBridge.InvalidZeroAmount.selector);
         mainnetBridge.bridge(ARBITRUM_EID, 0, receiver, 0);
     }
 }
@@ -206,11 +206,11 @@ contract BridgeEthereumToArbitrumTest is AaveStargateBridgeForkTestBase {
  * @notice Tests for Arbitrum to Ethereum USDT bridging via USDT0 OFT
  * @dev Arbitrum: OUpgradeable at 0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92
  */
-contract BridgeArbitrumToEthereumTest is AaveStargateBridgeForkTestBase {
+contract BridgeArbitrumToEthereumTest is AaveOFTBridgeForkTestBase {
     function setUp() public override {
         arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
         owner = makeAddr("owner");
-        arbitrumBridge = new AaveStargateBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
+        arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
     }
 
     function test_bridge_arbitrumToEthereum_10MillionUSDT() public {
@@ -252,7 +252,7 @@ contract BridgeArbitrumToEthereumTest is AaveStargateBridgeForkTestBase {
     }
 }
 
-contract EmergencyTokenTransferTest is AaveStargateBridgeForkTestBase {
+contract EmergencyTokenTransferTest is AaveOFTBridgeForkTestBase {
     function test_emergencyTokenTransfer() public {
         vm.selectFork(mainnetFork);
 
@@ -276,7 +276,7 @@ contract EmergencyTokenTransferTest is AaveStargateBridgeForkTestBase {
     }
 }
 
-contract TransferOwnershipTest is AaveStargateBridgeForkTestBase {
+contract TransferOwnershipTest is AaveOFTBridgeForkTestBase {
     function test_transferOwnership() public {
         vm.selectFork(mainnetFork);
 
@@ -312,7 +312,7 @@ contract TransferOwnershipTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for Ethereum to Plasma USDT bridging via USDT0 OFT
  */
-contract QuoteBridgeEthereumToPlasmaTest is AaveStargateBridgeForkTestBase {
+contract QuoteBridgeEthereumToPlasmaTest is AaveOFTBridgeForkTestBase {
     function setUp() public override {
         super.setUp();
         receiver = address(AaveV3Plasma.COLLECTOR);
@@ -347,7 +347,7 @@ contract QuoteBridgeEthereumToPlasmaTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for constructor and immutable values
  */
-contract ConstructorAndImmutablesTest is AaveStargateBridgeForkTestBase {
+contract ConstructorAndImmutablesTest is AaveOFTBridgeForkTestBase {
     function test_constructor_setsImmutables() public {
         vm.selectFork(mainnetFork);
 
@@ -360,7 +360,7 @@ contract ConstructorAndImmutablesTest is AaveStargateBridgeForkTestBase {
         arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
         vm.selectFork(arbitrumFork);
 
-        arbitrumBridge = new AaveStargateBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
+        arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
 
         assertEq(arbitrumBridge.OFT_USDT(), ARBITRUM_USDT0_OFT, "OFT_USDT should be set correctly");
         assertEq(arbitrumBridge.USDT(), ARBITRUM_USDT, "USDT should be set correctly");
@@ -371,7 +371,7 @@ contract ConstructorAndImmutablesTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for receive function and native token handling
  */
-contract ReceiveFunctionTest is AaveStargateBridgeForkTestBase {
+contract ReceiveFunctionTest is AaveOFTBridgeForkTestBase {
     function test_receive_acceptsNativeTokens() public {
         vm.selectFork(mainnetFork);
 
@@ -391,7 +391,7 @@ contract ReceiveFunctionTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for Rescuable functionality
  */
-contract RescuableTest is AaveStargateBridgeForkTestBase {
+contract RescuableTest is AaveOFTBridgeForkTestBase {
     function test_whoCanRescue_returnsOwner() public {
         vm.selectFork(mainnetFork);
 
@@ -438,7 +438,7 @@ contract RescuableTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for Ethereum to Polygon USDT bridging
  */
-contract QuoteBridgeEthereumToPolygonTest is AaveStargateBridgeForkTestBase {
+contract QuoteBridgeEthereumToPolygonTest is AaveOFTBridgeForkTestBase {
     function setUp() public override {
         super.setUp();
         receiver = makeAddr("polygon-receiver");
@@ -464,7 +464,7 @@ contract QuoteBridgeEthereumToPolygonTest is AaveStargateBridgeForkTestBase {
 /**
  * @notice Tests for Ethereum to Optimism USDT bridging
  */
-contract QuoteBridgeEthereumToOptimismTest is AaveStargateBridgeForkTestBase {
+contract QuoteBridgeEthereumToOptimismTest is AaveOFTBridgeForkTestBase {
     function setUp() public override {
         super.setUp();
         receiver = makeAddr("optimism-receiver");

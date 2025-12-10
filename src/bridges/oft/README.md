@@ -1,6 +1,6 @@
-# AaveStargateBridge
+# AaveOFTBridge
 
-The AaveStargateBridge is a contract to facilitate moving USDT between networks using USDT0 OFT (Omnichain Fungible Token) via LayerZero V2. This provides seamless, 1:1 cross-chain USDT transfers with no slippage.
+The AaveOFTBridge is a contract to facilitate moving USDT between networks using USDT0 OFT (Omnichain Fungible Token) via LayerZero V2. This provides seamless, 1:1 cross-chain USDT transfers with no slippage.
 
 ## How USDT0 Works
 

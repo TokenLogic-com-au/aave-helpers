@@ -7,23 +7,23 @@ import {ERC20Mock} from "openzeppelin-contracts/contracts/mocks/token/ERC20Mock.
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 
-import {AaveStargateBridge} from "src/bridges/stargate/AaveStargateBridge.sol";
-import {IAaveStargateBridge} from "src/bridges/stargate/interfaces/IAaveStargateBridge.sol";
-import {MockStargate} from "./mocks/MockStargate.sol";
+import {AaveOFTBridge} from "src/bridges/oft/AaveOFTBridge.sol";
+import {IAaveOFTBridge} from "src/bridges/oft/interfaces/IAaveOFTBridge.sol";
+import {MockOFT} from "./mocks/MockOFT.sol";
 
-contract AaveStargateBridgeTestBase is Test {
+contract AaveOFTBridgeTestBase is Test {
     uint32 public constant ARBITRUM_EID = 30110;
     uint32 public constant OPTIMISM_EID = 30111;
     uint256 public constant MOCK_FEE = 0.01 ether;
     uint256 public constant AMOUNT = 1_000e6;
 
-    MockStargate public mockStargate;
+    MockOFT public mockOFT;
     IERC20 public usdt;
     address public owner = makeAddr("owner");
     address public alice = makeAddr("alice");
     address public receiver = makeAddr("receiver");
 
-    AaveStargateBridge bridge;
+    AaveOFTBridge bridge;
 
     event Bridge(
         address indexed token,
@@ -39,33 +39,33 @@ contract AaveStargateBridgeTestBase is Test {
         ERC20Mock mockUsdt = new ERC20Mock();
         usdt = IERC20(address(mockUsdt));
 
-        mockStargate = new MockStargate(address(usdt));
+        mockOFT = new MockOFT(address(usdt));
 
-        bridge = new AaveStargateBridge(address(mockStargate), address(usdt), owner);
+        bridge = new AaveOFTBridge(address(mockOFT), address(usdt), owner);
 
         vm.deal(address(bridge), 10 ether);
     }
 }
 
-contract ConstructorTest is AaveStargateBridgeTestBase {
+contract ConstructorTest is AaveOFTBridgeTestBase {
     function test_revertsIf_zero_oft_address() public {
-        vm.expectRevert(IAaveStargateBridge.InvalidZeroAddress.selector);
-        new AaveStargateBridge(address(0), address(usdt), owner);
+        vm.expectRevert(IAaveOFTBridge.InvalidZeroAddress.selector);
+        new AaveOFTBridge(address(0), address(usdt), owner);
     }
 
     function test_revertsIf_zero_usdt_address() public {
-        vm.expectRevert(IAaveStargateBridge.InvalidZeroAddress.selector);
-        new AaveStargateBridge(address(mockStargate), address(0), owner);
+        vm.expectRevert(IAaveOFTBridge.InvalidZeroAddress.selector);
+        new AaveOFTBridge(address(mockOFT), address(0), owner);
     }
 
     function test_successful() public view {
-        assertEq(bridge.OFT_USDT(), address(mockStargate));
+        assertEq(bridge.OFT_USDT(), address(mockOFT));
         assertEq(bridge.USDT(), address(usdt));
         assertEq(bridge.owner(), owner);
     }
 }
 
-contract BridgeTest is AaveStargateBridgeTestBase {
+contract BridgeTest is AaveOFTBridgeTestBase {
     function test_revertsIf_callerNotOwner() public {
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
@@ -75,7 +75,7 @@ contract BridgeTest is AaveStargateBridgeTestBase {
 
     function test_revertsIf_zeroAmount() public {
         vm.startPrank(owner);
-        vm.expectRevert(IAaveStargateBridge.InvalidZeroAmount.selector);
+        vm.expectRevert(IAaveOFTBridge.InvalidZeroAmount.selector);
         bridge.bridge(ARBITRUM_EID, 0, receiver, 0);
         vm.stopPrank();
     }
@@ -95,7 +95,7 @@ contract BridgeTest is AaveStargateBridgeTestBase {
         vm.stopPrank();
 
         assertEq(usdt.balanceOf(address(bridge)), 0, "Bridge should have no USDT left");
-        assertEq(usdt.balanceOf(address(mockStargate)), AMOUNT, "MockStargate should have USDT");
+        assertEq(usdt.balanceOf(address(mockOFT)), AMOUNT, "MockOFT should have USDT");
     }
 
     function test_successful_fuzz(uint256 amount, uint32 dstEid) public {
@@ -119,7 +119,7 @@ contract BridgeTest is AaveStargateBridgeTestBase {
     }
 }
 
-contract QuoteBridgeTest is AaveStargateBridgeTestBase {
+contract QuoteBridgeTest is AaveOFTBridgeTestBase {
     function test_successful() public view {
         uint256 fee = bridge.quoteBridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT);
         assertEq(fee, MOCK_FEE);
@@ -134,7 +134,7 @@ contract QuoteBridgeTest is AaveStargateBridgeTestBase {
     }
 }
 
-contract QuoteOFTTest is AaveStargateBridgeTestBase {
+contract QuoteOFTTest is AaveOFTBridgeTestBase {
     function test_noSlippage() public view {
         uint256 amountReceived = bridge.quoteOFT(ARBITRUM_EID, AMOUNT, receiver);
         assertEq(amountReceived, AMOUNT, "OFT should have no slippage");
@@ -149,7 +149,7 @@ contract QuoteOFTTest is AaveStargateBridgeTestBase {
     }
 }
 
-contract TransferOwnershipTest is AaveStargateBridgeTestBase {
+contract TransferOwnershipTest is AaveOFTBridgeTestBase {
     function test_revertsIf_invalidCaller() public {
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
@@ -173,7 +173,7 @@ contract TransferOwnershipTest is AaveStargateBridgeTestBase {
     }
 }
 
-contract EmergencyTokenTransferTest is AaveStargateBridgeTestBase {
+contract EmergencyTokenTransferTest is AaveOFTBridgeTestBase {
     function test_revertsIf_invalidCaller() public {
         vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
         vm.startPrank(alice);
@@ -198,7 +198,7 @@ contract EmergencyTokenTransferTest is AaveStargateBridgeTestBase {
     }
 }
 
-contract ReceiveEtherTest is AaveStargateBridgeTestBase {
+contract ReceiveEtherTest is AaveOFTBridgeTestBase {
     function test_successful_receiveEther() public {
         uint256 initialBalance = address(bridge).balance;
         uint256 amount = 1 ether;
@@ -210,9 +210,9 @@ contract ReceiveEtherTest is AaveStargateBridgeTestBase {
     }
 }
 
-contract ViewFunctionsTest is AaveStargateBridgeTestBase {
+contract ViewFunctionsTest is AaveOFTBridgeTestBase {
     function test_oft_usdt() public view {
-        assertEq(bridge.OFT_USDT(), address(mockStargate));
+        assertEq(bridge.OFT_USDT(), address(mockOFT));
     }
 
     function test_usdt() public view {

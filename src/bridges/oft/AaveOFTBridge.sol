@@ -7,19 +7,19 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
-import {IAaveStargateBridge} from "./interfaces/IAaveStargateBridge.sol";
+import {IAaveOFTBridge} from "./interfaces/IAaveOFTBridge.sol";
 import {IOFT, SendParam, MessagingFee, OFTReceipt} from "layerzero-v2/oft/interfaces/IOFT.sol";
 
-/// @title AaveStargateBridge
-/// @author Aave
-/// @notice Helper contract to bridge USDT using Stargate V2 (LayerZero OFT)
-contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
+/// @title AaveOFTBridge
+/// @author @stevyhacker (TokenLogic)
+/// @notice Helper contract to bridge USDT using OFT V2 (LayerZero OFT)
+contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
     using SafeERC20 for IERC20;
 
-    /// @inheritdoc IAaveStargateBridge
+    /// @inheritdoc IAaveOFTBridge
     address public immutable OFT_USDT;
 
-    /// @inheritdoc IAaveStargateBridge
+    /// @inheritdoc IAaveOFTBridge
     address public immutable USDT;
 
     /// @param oftUsdt The OFT address for USDT on this chain
@@ -35,7 +35,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
     /// @dev Default receive function enabling the contract to accept native tokens for refunds
     receive() external payable {}
 
-    /// @inheritdoc IAaveStargateBridge
+    /// @inheritdoc IAaveOFTBridge
     function bridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD) external payable onlyOwner {
         if (amount < 1) revert InvalidZeroAmount();
 
@@ -52,7 +52,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
         emit Bridge(USDT, dstEid, receiver, amount, minAmountLD);
     }
 
-    /// @inheritdoc IAaveStargateBridge
+    /// @inheritdoc IAaveOFTBridge
     function quoteBridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD)
         external
         view
@@ -63,7 +63,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
         return messagingFee.nativeFee;
     }
 
-    /// @inheritdoc IAaveStargateBridge
+    /// @inheritdoc IAaveOFTBridge
     function quoteOFT(uint32 dstEid, uint256 amount, address receiver)
         external
         view
@@ -84,7 +84,7 @@ contract AaveStargateBridge is Ownable, Rescuable, IAaveStargateBridge {
         return type(uint256).max;
     }
 
-    /// @dev Builds the SendParam struct for Stargate transfer
+    /// @dev Builds the SendParam struct for OFT transfer
     /// @param dstEid The destination LayerZero endpoint ID
     /// @param amount The amount to send
     /// @param receiver The receiver address on destination

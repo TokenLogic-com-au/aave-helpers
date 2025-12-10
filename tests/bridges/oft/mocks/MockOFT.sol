@@ -5,7 +5,7 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IOFT, SendParam, MessagingFee, MessagingReceipt, OFTReceipt, OFTLimit, OFTFeeDetail} from "layerzero-v2/oft/interfaces/IOFT.sol";
 
-contract MockStargate is IOFT {
+contract MockOFT is IOFT {
     using SafeERC20 for IERC20;
 
     address public immutable override token;
