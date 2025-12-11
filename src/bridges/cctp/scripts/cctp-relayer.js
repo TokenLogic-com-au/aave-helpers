@@ -16,7 +16,13 @@ const {
   linea,
 } = require("viem/chains");
 
+// Default configuration
+const DEFAULT_POLL_INTERVAL_MS = 5000;
+const DEFAULT_MAX_RETRIES = 60;
+const FETCH_TIMEOUT_MS = 30000;
+
 // CCTP Domain IDs (from Circle docs)
+// https://developers.circle.com/cctp/cctp-supported-blockchains
 const CCTP_DOMAINS = {
   1: 0, // Ethereum Mainnet
   10: 2, // Optimism
@@ -65,35 +71,62 @@ const BRIDGE_EVENT_ABI = parseAbi([
   "event Bridge(address indexed token, uint32 indexed destinationDomain, address indexed receiver, uint256 amount, uint64 nonce, uint8 speed)",
 ]);
 
-// MessageTransmitterV2 contract addresses (mainnet)
+// MessageTransmitterV2 contract address (same for all EVM chains on mainnet)
 // Source: https://developers.circle.com/cctp/evm-smart-contracts
-const MESSAGE_TRANSMITTER_V2_ADDRESSES = {
-  0: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Ethereum
-  1: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Avalanche
-  2: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Optimism
-  3: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Arbitrum
-  6: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Base
-  7: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Polygon
-  10: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Unichain
-  11: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Linea
-};
+const MESSAGE_TRANSMITTER_V2_ADDRESS = "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64";
 
+// Supported domains for MessageTransmitterV2
+const SUPPORTED_DOMAINS = new Set([0, 1, 2, 3, 6, 7, 10, 11]);
+
+/**
+ * Sleep utility function
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Validates a transaction hash format
+ * @param {string} txHash - Transaction hash to validate
+ * @returns {boolean}
+ */
+function isValidTxHash(txHash) {
+  return /^0x[a-fA-F0-9]{64}$/.test(txHash);
+}
+
+/**
+ * Get chain configuration for viem client
+ * @param {number} chainId - Chain ID
+ * @returns {object} Chain config
+ */
+function getChainConfig(chainId) {
+  return CHAIN_CONFIG[chainId] || { id: chainId };
+}
+
+/**
+ * CCTP V2 Relayer for completing cross-chain USDC transfers
+ */
 class CctpRelayer {
   constructor(config) {
+    const sourceChain = getChainConfig(config.sourceChainId);
+    const destChain = getChainConfig(config.destChainId);
+
     this.sourceClient = createPublicClient({
-      chain: CHAIN_CONFIG[config.sourceChainId] || { id: config.sourceChainId },
+      chain: sourceChain,
       transport: http(config.sourceRpcUrl),
     });
 
     this.destPublicClient = createPublicClient({
-      chain: CHAIN_CONFIG[config.destChainId] || { id: config.destChainId },
+      chain: destChain,
       transport: http(config.destRpcUrl),
     });
 
     const account = privateKeyToAccount(config.privateKey);
     this.destWalletClient = createWalletClient({
       account,
-      chain: CHAIN_CONFIG[config.destChainId] || { id: config.destChainId },
+      chain: destChain,
       transport: http(config.destRpcUrl),
     });
 
@@ -103,8 +136,32 @@ class CctpRelayer {
       : ATTESTATION_API.mainnet;
     this.sourceDomain = config.sourceDomain;
     this.destDomain = config.destDomain;
-    this.pollIntervalMs = config.pollIntervalMs || 5000;
-    this.maxRetries = config.maxRetries || 60;
+    this.pollIntervalMs = config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    this.maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
+
+    this._validateConfig();
+  }
+
+  /**
+   * Validates the relayer configuration
+   * @private
+   */
+  _validateConfig() {
+    if (!SUPPORTED_DOMAINS.has(this.destDomain)) {
+      console.warn(`Warning: Domain ${this.destDomain} may not be supported for MessageTransmitterV2`);
+    }
+  }
+
+  /**
+   * Gets the MessageTransmitterV2 address for the destination domain
+   * @returns {string|null}
+   * @private
+   */
+  _getTransmitterAddress() {
+    if (!SUPPORTED_DOMAINS.has(this.destDomain)) {
+      return null;
+    }
+    return MESSAGE_TRANSMITTER_V2_ADDRESS;
   }
 
   /**
@@ -120,7 +177,11 @@ class CctpRelayer {
     let retries = 0;
     while (retries < this.maxRetries) {
       try {
-        const response = await fetch(url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error(`API returned status ${response.status}`);
@@ -158,7 +219,7 @@ class CctpRelayer {
         console.error(`Error fetching attestation: ${error.message}`);
       }
 
-      await this.sleep(this.pollIntervalMs);
+      await sleep(this.pollIntervalMs);
       retries++;
     }
 
@@ -173,7 +234,7 @@ class CctpRelayer {
    * @returns {Promise<boolean>}
    */
   async isNonceUsed(nonce) {
-    const transmitterAddress = MESSAGE_TRANSMITTER_V2_ADDRESSES[this.destDomain];
+    const transmitterAddress = this._getTransmitterAddress();
 
     if (!transmitterAddress) {
       console.log(`  No transmitter address for domain ${this.destDomain}`);
@@ -190,7 +251,6 @@ class CctpRelayer {
       });
 
       console.log(`  usedNonces result: ${usedNonce}`);
-      // If usedNonces returns non-zero, the nonce has been used
       return usedNonce > 0n;
     } catch (error) {
       console.error(`  Error checking nonce: ${error.message}`);
@@ -206,11 +266,11 @@ class CctpRelayer {
    * @returns {Promise<{receipt: object|null, alreadyReceived: boolean}>}
    */
   async receiveMessage(message, attestation, nonce) {
-    const transmitterAddress = MESSAGE_TRANSMITTER_V2_ADDRESSES[this.destDomain];
+    const transmitterAddress = this._getTransmitterAddress();
 
     if (!transmitterAddress) {
       throw new Error(
-        `Unknown MessageTransmitterV2 address for domain ${this.destDomain}`
+        `Unsupported destination domain: ${this.destDomain}. Supported domains: ${[...SUPPORTED_DOMAINS].join(", ")}`
       );
     }
 
@@ -344,10 +404,6 @@ class CctpRelayer {
     // Keep running indefinitely
     await new Promise(() => {});
   }
-
-  sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
 }
 
 /**
@@ -423,7 +479,9 @@ async function main() {
   const relayer = new CctpRelayer(config);
 
   if (args.tx) {
-    // Complete a specific transfer
+    if (!isValidTxHash(args.tx)) {
+      throw new Error(`Invalid transaction hash format: ${args.tx}`);
+    }
     await relayer.completeTransfer(args.tx);
   } else if (args.watch) {
     // Watch for events and relay automatically
@@ -438,4 +496,11 @@ main().catch((error) => {
   process.exit(1);
 });
 
-module.exports = { CctpRelayer, getDomainFromChainId, CCTP_DOMAINS };
+module.exports = {
+  CctpRelayer,
+  getDomainFromChainId,
+  CCTP_DOMAINS,
+  SUPPORTED_DOMAINS,
+  MESSAGE_TRANSMITTER_V2_ADDRESS,
+  isValidTxHash,
+};
