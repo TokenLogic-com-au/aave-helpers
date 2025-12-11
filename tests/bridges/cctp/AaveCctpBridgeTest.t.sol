@@ -10,7 +10,7 @@ import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {AaveCctpBridge} from "src/bridges/cctp/AaveCctpBridge.sol";
 import {IAaveCctpBridge} from "src/bridges/cctp/interfaces/IAaveCctpBridge.sol";
 import {MockTokenMessengerV2} from "./mocks/MockTokenMessengerV2.sol";
-import {CctpConstants} from "./Constants.sol";
+import {CctpConstants} from "src/bridges/cctp/CctpConstants.sol";
 
 contract AaveCctpBridgeTestBase is Test, CctpConstants {
     uint256 public constant AMOUNT = 1_000e6; // 1000 USDC

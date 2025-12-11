@@ -7,7 +7,7 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 
 import {AaveCctpBridge} from "src/bridges/cctp/AaveCctpBridge.sol";
 import {IAaveCctpBridge} from "src/bridges/cctp/interfaces/IAaveCctpBridge.sol";
-import {CctpConstants} from "./Constants.sol";
+import {CctpConstants} from "src/bridges/cctp/CctpConstants.sol";
 
 contract AaveCctpBridgeForkTest is Test, CctpConstants {
     using SafeERC20 for IERC20;

@@ -66,13 +66,16 @@ const BRIDGE_EVENT_ABI = parseAbi([
 ]);
 
 // MessageTransmitterV2 contract addresses (mainnet)
+// Source: https://developers.circle.com/cctp/evm-smart-contracts
 const MESSAGE_TRANSMITTER_V2_ADDRESSES = {
-  0: "0x0a992d191deec32afe36203ad87d7d289a738f81", // Ethereum
-  1: "0x8186359af5f57fbb40c6b14a588d2a59c0c29880", // Avalanche
-  2: "0x4d41f22c5a0e5c74090899e5a8fb597a8842b3e8", // Optimism
-  3: "0xc30362313fbba5cf9163f0bb16a0e01f01a896ca", // Arbitrum
-  6: "0xaeb820d32ec4d6de43973d47d59a9c1657f95979", // Base
-  7: "0xf3be9355363857f3e001be68856a2f96b4c39ba9", // Polygon
+  0: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Ethereum
+  1: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Avalanche
+  2: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Optimism
+  3: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Arbitrum
+  6: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Base
+  7: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Polygon
+  10: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Unichain
+  11: "0x81D40F21F12A8F0E3252Bccb954D722d4c464B64", // Linea
 };
 
 class CctpRelayer {
@@ -107,7 +110,7 @@ class CctpRelayer {
   /**
    * Fetches attestation from Circle's API
    * @param {string} txHash - The burn transaction hash
-   * @returns {Promise<{message: string, attestation: string}>}
+   * @returns {Promise<{message: string, attestation: string, alreadyReceived: boolean}>}
    */
   async fetchAttestation(txHash) {
     const url = `${this.attestationApiHost}/v2/messages/${this.sourceDomain}?transactionHash=${txHash}`;
@@ -130,11 +133,16 @@ class CctpRelayer {
 
           if (msg.status === "complete" && msg.attestation) {
             console.log(`Attestation received for nonce: ${msg.eventNonce}`);
+
+            // Check if already received on destination chain
+            const alreadyReceived = await this.isNonceUsed(msg.eventNonce);
+
             return {
               message: msg.message,
               attestation: msg.attestation,
               nonce: msg.eventNonce,
               decodedMessage: msg.decodedMessage,
+              alreadyReceived,
             };
           }
 
@@ -160,12 +168,44 @@ class CctpRelayer {
   }
 
   /**
+   * Check if a nonce has already been used on the destination chain
+   * @param {string} nonce - The message nonce
+   * @returns {Promise<boolean>}
+   */
+  async isNonceUsed(nonce) {
+    const transmitterAddress = MESSAGE_TRANSMITTER_V2_ADDRESSES[this.destDomain];
+
+    if (!transmitterAddress) {
+      console.log(`  No transmitter address for domain ${this.destDomain}`);
+      return false;
+    }
+
+    try {
+      console.log(`  Checking if nonce ${nonce} is used on ${transmitterAddress}...`);
+      const usedNonce = await this.destPublicClient.readContract({
+        address: transmitterAddress,
+        abi: MESSAGE_TRANSMITTER_V2_ABI,
+        functionName: "usedNonces",
+        args: [nonce],
+      });
+
+      console.log(`  usedNonces result: ${usedNonce}`);
+      // If usedNonces returns non-zero, the nonce has been used
+      return usedNonce > 0n;
+    } catch (error) {
+      console.error(`  Error checking nonce: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
    * Calls receiveMessage on the destination chain
    * @param {string} message - The message bytes from attestation API
    * @param {string} attestation - The attestation signature
-   * @returns {Promise<object>} Transaction receipt
+   * @param {string} nonce - The message nonce for checking if already used
+   * @returns {Promise<{receipt: object|null, alreadyReceived: boolean}>}
    */
-  async receiveMessage(message, attestation) {
+  async receiveMessage(message, attestation, nonce) {
     const transmitterAddress = MESSAGE_TRANSMITTER_V2_ADDRESSES[this.destDomain];
 
     if (!transmitterAddress) {
@@ -176,29 +216,40 @@ class CctpRelayer {
 
     console.log(`Calling receiveMessage on ${transmitterAddress}...`);
 
-    const { request } = await this.destPublicClient.simulateContract({
-      address: transmitterAddress,
-      abi: MESSAGE_TRANSMITTER_V2_ABI,
-      functionName: "receiveMessage",
-      args: [message, attestation],
-      account: this.account,
-    });
+    try {
+      const { request } = await this.destPublicClient.simulateContract({
+        address: transmitterAddress,
+        abi: MESSAGE_TRANSMITTER_V2_ABI,
+        functionName: "receiveMessage",
+        args: [message, attestation],
+        account: this.account,
+      });
 
-    const hash = await this.destWalletClient.writeContract(request);
-    console.log(`Transaction submitted: ${hash}`);
+      const hash = await this.destWalletClient.writeContract(request);
+      console.log(`Transaction submitted: ${hash}`);
 
-    const receipt = await this.destPublicClient.waitForTransactionReceipt({
-      hash,
-    });
-    console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
+      const receipt = await this.destPublicClient.waitForTransactionReceipt({
+        hash,
+      });
+      console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
 
-    return receipt;
+      return { receipt, alreadyReceived: false };
+    } catch (error) {
+      // Check if the error is because the nonce was already used
+      const isNonceUsed = await this.isNonceUsed(nonce);
+      if (isNonceUsed) {
+        console.log(`\nMessage already received on destination chain (nonce used).`);
+        return { receipt: null, alreadyReceived: true };
+      }
+      // Re-throw if it's a different error
+      throw error;
+    }
   }
 
   /**
    * Complete a CCTP transfer by fetching attestation and calling receiveMessage
    * @param {string} burnTxHash - The burn transaction hash on source chain
-   * @returns {Promise<{attestation: object, receipt: object}>}
+   * @returns {Promise<{attestation: object, receipt: object|null}>}
    */
   async completeTransfer(burnTxHash) {
     console.log(`\nCompleting CCTP transfer for tx: ${burnTxHash}`);
@@ -218,17 +269,30 @@ class CctpRelayer {
       console.log(`  Recipient: ${decoded.decodedMessageBody?.mintRecipient}`);
     }
 
+    // Check if already received on destination chain (pre-check)
+    if (attestationData.alreadyReceived) {
+      console.log("\nTransfer already completed on destination chain!");
+      console.log("  Nonce has been used - skipping receiveMessage call.");
+      return { attestation: attestationData, receipt: null };
+    }
+
     // Step 2: Call receiveMessage on destination
     console.log("\n[Step 2] Submitting receiveMessage on destination chain...");
-    const receipt = await this.receiveMessage(
+    const result = await this.receiveMessage(
       attestationData.message,
-      attestationData.attestation
+      attestationData.attestation,
+      attestationData.nonce
     );
 
-    console.log("\nTransfer completed successfully!");
-    console.log(`  Destination tx: ${receipt.transactionHash}`);
+    if (result.alreadyReceived) {
+      console.log("\nTransfer was already completed on destination chain!");
+      return { attestation: attestationData, receipt: null };
+    }
 
-    return { attestation: attestationData, receipt };
+    console.log("\nTransfer completed successfully!");
+    console.log(`  Destination tx: ${result.receipt.transactionHash}`);
+
+    return { attestation: attestationData, receipt: result.receipt };
   }
 
   /**
