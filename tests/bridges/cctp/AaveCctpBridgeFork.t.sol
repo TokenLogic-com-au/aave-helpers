@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {AaveCctpBridge} from "src/bridges/cctp/AaveCctpBridge.sol";
 import {IAaveCctpBridge} from "src/bridges/cctp/interfaces/IAaveCctpBridge.sol";
@@ -15,6 +16,7 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
     AaveCctpBridge public bridge;
     IERC20 public usdc;
     address public owner = makeAddr("owner");
+    address public alice = makeAddr("alice");
     address public receiver = makeAddr("receiver");
 
     uint256 public constant AMOUNT = 10_000e6; // 10k USDC
@@ -85,4 +87,31 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
         _bridgeTo(LINEA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
+    function test_fork_revertsIf_callerNotOwner() public {
+        vm.startPrank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+    }
+
+    function test_fork_revertsIf_zeroAmount() public {
+        vm.startPrank(owner);
+        vm.expectRevert(IAaveCctpBridge.InvalidZeroAmount.selector);
+        bridge.bridge(ARBITRUM_DOMAIN, 0, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+    }
+
+    function test_fork_revertsIf_zeroReceiver() public {
+        vm.startPrank(owner);
+        vm.expectRevert(IAaveCctpBridge.InvalidReceiver.selector);
+        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, address(0), 0, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+    }
+
+    function test_fork_revertsIf_sameDestinationDomain() public {
+        vm.startPrank(owner);
+        vm.expectRevert(IAaveCctpBridge.InvalidDestinationDomain.selector);
+        bridge.bridge(ETHEREUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        vm.stopPrank();
+    }
 }
