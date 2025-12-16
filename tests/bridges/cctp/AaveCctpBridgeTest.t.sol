@@ -11,6 +11,7 @@ import {AaveCctpBridge} from "src/bridges/cctp/AaveCctpBridge.sol";
 import {IAaveCctpBridge} from "src/bridges/cctp/interfaces/IAaveCctpBridge.sol";
 import {MockTokenMessengerV2} from "./mocks/MockTokenMessengerV2.sol";
 import {CctpConstants} from "src/bridges/cctp/CctpConstants.sol";
+import {AaveCctpBridgeHarness} from "./AaveCctpBridgeHarness.sol";
 
 contract AaveCctpBridgeTestBase is Test, CctpConstants {
     uint256 public constant AMOUNT = 1_000e6; // 1000 USDC
@@ -352,5 +353,41 @@ contract DepositRecordVerificationTest is AaveCctpBridgeTestBase {
         vm.stopPrank();
 
         _assertDeposit(1, AMOUNT, ARBITRUM_DOMAIN, receiver, customMaxFee, STANDARD_FINALITY_THRESHOLD);
+    }
+}
+
+contract AddressToBytes32HarnessTest is Test, CctpConstants {
+    AaveCctpBridgeHarness public harness;
+
+    function setUp() public {
+        ERC20Mock mockUsdc = new ERC20Mock();
+        MockTokenMessengerV2 mockTokenMessenger = new MockTokenMessengerV2(makeAddr("messageTransmitter"));
+
+        harness = new AaveCctpBridgeHarness(
+            address(mockTokenMessenger),
+            address(mockUsdc),
+            ETHEREUM_DOMAIN,
+            makeAddr("owner")
+        );
+    }
+
+    function test_addressToBytes32_zeroAddress() public view {
+        bytes32 result = harness.exposed_addressToBytes32(address(0));
+        assertEq(result, bytes32(0));
+    }
+
+    function test_addressToBytes32_knownAddress() public view {
+        address testAddr = 0x1234567890AbcdEF1234567890aBcdef12345678;
+        bytes32 result = harness.exposed_addressToBytes32(testAddr);
+        assertEq(result, bytes32(uint256(uint160(testAddr))));
+    }
+
+    function test_fuzz_addressToBytes32(address addr) public view {
+        bytes32 result = harness.exposed_addressToBytes32(addr);
+        bytes32 expected = bytes32(uint256(uint160(addr)));
+        assertEq(result, expected);
+
+        address recovered = address(uint160(uint256(result)));
+        assertEq(recovered, addr);
     }
 }

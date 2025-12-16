@@ -11,7 +11,7 @@ import {ArbitrumScript, BaseScript, EthereumScript, OptimismScript, PolygonScrip
 import {AaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
 import {CctpConstants} from 'src/bridges/cctp/CctpConstants.sol';
 
-constant address TOKEN_LOGIC = 0x3765A685a401622C060E5D700D9ad89413363a91;
+address constant TOKEN_LOGIC = 0x3765A685a401622C060E5D700D9ad89413363a91;
 
 contract DeployCCTPBridgeEthereum is EthereumScript, CctpConstants {
   function run() external broadcast {
