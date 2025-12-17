@@ -17,6 +17,11 @@ CCTP V2 supports two transfer speed modes:
 | Fast     | 1000               | Faster transfer, may incur a fee     |
 | Standard | 2000               | Slower transfer, no fee  |
 
+Essentially, the Fast mode is just a tx confirmation is sufficient while the Standard mode requires hard finality and a large number of mined blocks.
+The exact numbers per chain can be found in the Circle documentation:
+- [cctp-fast-message-attestation-times](https://developers.circle.com/cctp/required-block-confirmations#cctp-fast-message-attestation-times)
+- [cctp-standard-message-attestation-times](https://developers.circle.com/cctp/required-block-confirmations#cctp-standard-message-attestation-times)
+
 The `maxFee` parameter allows specifying the maximum fee (in USDC) willing to pay for Fast transfers.
 
 ## Permissions

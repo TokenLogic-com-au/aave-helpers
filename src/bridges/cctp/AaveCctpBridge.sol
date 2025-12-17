@@ -16,11 +16,13 @@ import {ITokenMessengerV2} from "./interfaces/ITokenMessengerV2.sol";
 contract AaveCctpBridge is Ownable, Rescuable, IAaveCctpBridge {
     using SafeERC20 for IERC20;
 
-    /// @notice Finality threshold for Fast Transfer
-    uint32 public constant FAST_FINALITY_THRESHOLD = 1000;
+    /// @notice Finality threshold constant for Fast Transfer is 1000 and means just tx confirmation is sufficient
+    /// @dev Required confirmations per chain https://developers.circle.com/cctp/required-block-confirmations#cctp-fast-message-attestation-times
+    uint32 public constant FAST = 1000;
 
-    /// @notice Finality threshold for Standard Transfer
-    uint32 public constant STANDARD_FINALITY_THRESHOLD = 2000;
+    /// @notice Finality threshold constant for Standard Transfer is 2000 and means hard finality is requested
+    /// @dev Required confirmations per chain https://developers.circle.com/cctp/required-block-confirmations#cctp-standard-message-attestation-times
+    uint32 public constant STANDARD = 2000;
 
     /// @inheritdoc IAaveCctpBridge
     address public immutable TOKEN_MESSENGER;
@@ -61,10 +63,7 @@ contract AaveCctpBridge is Ownable, Rescuable, IAaveCctpBridge {
         if (receiver == address(0)) revert InvalidReceiver();
         if (destinationDomain == LOCAL_DOMAIN) revert InvalidDestinationDomain();
 
-        uint32 finalityThreshold = STANDARD_FINALITY_THRESHOLD;
-        if (speed == TransferSpeed.Fast) {
-            finalityThreshold = FAST_FINALITY_THRESHOLD;
-        }
+        uint32 finalityThreshold = speed == TransferSpeed.Fast ? FAST : STANDARD;
 
         IERC20(USDC).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(USDC).forceApprove(TOKEN_MESSENGER, amount);

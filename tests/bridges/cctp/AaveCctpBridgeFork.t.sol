@@ -51,64 +51,64 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
         assertEq(usdc.balanceOf(owner), 0, "Owner should have no USDC left");
     }
 
-    function test_fork_bridge_fast() public {
+    function test_bridge_fast() public {
         _bridgeTo(ARBITRUM_DOMAIN, AMOUNT / 100, IAaveCctpBridge.TransferSpeed.Fast);
     }
 
-    function test_fork_bridge_standard() public {
+    function test_bridge_standard() public {
         _bridgeTo(ARBITRUM_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_avalanche() public {
+    function test_bridge_to_avalanche() public {
         _bridgeTo(AVALANCHE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_optimism() public {
+    function test_bridge_to_optimism() public {
         _bridgeTo(OPTIMISM_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_base() public {
+    function test_bridge_to_base() public {
         _bridgeTo(BASE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_polygon() public {
+    function test_bridge_to_polygon() public {
         _bridgeTo(POLYGON_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_solana() public {
+    function test_bridge_to_solana() public {
         _bridgeTo(SOLANA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_unichain() public {
+    function test_bridge_to_unichain() public {
         _bridgeTo(UNICHAIN_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_bridge_to_linea() public {
+    function test_bridge_to_linea() public {
         _bridgeTo(LINEA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
-    function test_fork_revertsIf_callerNotOwner() public {
+    function test_revertsIf_callerNotOwner() public {
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
         bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
     }
 
-    function test_fork_revertsIf_zeroAmount() public {
+    function test_revertsIf_zeroAmount() public {
         vm.startPrank(owner);
         vm.expectRevert(IAaveCctpBridge.InvalidZeroAmount.selector);
         bridge.bridge(ARBITRUM_DOMAIN, 0, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
     }
 
-    function test_fork_revertsIf_zeroReceiver() public {
+    function test_revertsIf_zeroReceiver() public {
         vm.startPrank(owner);
         vm.expectRevert(IAaveCctpBridge.InvalidReceiver.selector);
         bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, address(0), 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
     }
 
-    function test_fork_revertsIf_sameDestinationDomain() public {
+    function test_revertsIf_sameDestinationDomain() public {
         vm.startPrank(owner);
         vm.expectRevert(IAaveCctpBridge.InvalidDestinationDomain.selector);
         bridge.bridge(ETHEREUM_DOMAIN, AMOUNT, receiver, 0, IAaveCctpBridge.TransferSpeed.Fast);

@@ -235,8 +235,8 @@ contract ViewFunctionsTest is AaveCctpBridgeTestBase {
     }
 
     function test_finalityThresholds() public view {
-        assertEq(bridge.FAST_FINALITY_THRESHOLD(), 1000);
-        assertEq(bridge.STANDARD_FINALITY_THRESHOLD(), 2000);
+        assertEq(bridge.FAST(), 1000);
+        assertEq(bridge.STANDARD(), 2000);
     }
 }
 

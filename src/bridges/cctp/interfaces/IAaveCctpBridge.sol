@@ -37,18 +37,6 @@ interface IAaveCctpBridge {
     /// @dev Constructor parameter is zero address
     error InvalidZeroAddress();
 
-    /// @notice Returns the TokenMessengerV2 contract address
-    /// @return Address of the CCTP V2 TokenMessenger
-    function TOKEN_MESSENGER() external view returns (address);
-
-    /// @notice Returns the USDC token address on this chain
-    /// @return Address of the USDC token
-    function USDC() external view returns (address);
-
-    /// @notice Returns the local CCTP domain identifier
-    /// @return The domain ID for this chain
-    function LOCAL_DOMAIN() external view returns (uint32);
-
     /// @notice Bridges USDC to a destination chain using CCTP V2
     /// @param destinationDomain The CCTP domain of the destination chain
     /// @param amount The amount of USDC to bridge
@@ -62,4 +50,16 @@ interface IAaveCctpBridge {
         uint256 maxFee,
         TransferSpeed speed
     ) external;
+
+    /// @notice Returns the TokenMessengerV2 contract address
+    /// @return Address of the CCTP V2 TokenMessenger
+    function TOKEN_MESSENGER() external view returns (address);
+
+    /// @notice Returns the USDC token address on this chain
+    /// @return Address of the USDC token
+    function USDC() external view returns (address);
+
+    /// @notice Returns the local CCTP domain identifier
+    /// @return The domain ID for this chain
+    function LOCAL_DOMAIN() external view returns (uint32);
 }
