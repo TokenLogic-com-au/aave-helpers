@@ -25,28 +25,32 @@ interface IAaveCctpBridge {
         TransferSpeed speed
     );
 
+    /// @notice Emitted when a collector address is set for a destination domain
+    /// @param destinationDomain The CCTP domain of the destination chain
+    /// @param collector The collector address for that domain
+    event CollectorSet(uint32 indexed destinationDomain, address indexed collector);
+
     /// @dev Amount provided is zero
     error InvalidZeroAmount();
 
     /// @dev Destination domain matches local domain
     error InvalidDestinationDomain();
 
-    /// @dev Receiver address is zero address
-    error InvalidReceiver();
-
     /// @dev Constructor parameter is zero address
     error InvalidZeroAddress();
 
+    /// @dev No collector configured for the destination domain
+    error CollectorNotConfigured(uint32 destinationDomain);
+
     /// @notice Bridges USDC to a destination chain using CCTP V2
+    /// @dev Receiver is the pre-configured collector for the destination domain
     /// @param destinationDomain The CCTP domain of the destination chain
     /// @param amount The amount of USDC to bridge
-    /// @param receiver The recipient address on the destination chain
     /// @param maxFee Maximum fee willing to pay for Fast Transfer (in USDC)
     /// @param speed Transfer speed (Fast or Standard)
     function bridge(
         uint32 destinationDomain,
         uint256 amount,
-        address receiver,
         uint256 maxFee,
         TransferSpeed speed
     ) external;
@@ -62,4 +66,14 @@ interface IAaveCctpBridge {
     /// @notice Returns the local CCTP domain identifier
     /// @return The domain ID for this chain
     function LOCAL_DOMAIN() external view returns (uint32);
+
+    /// @notice Sets the collector address for a destination domain
+    /// @param destinationDomain The CCTP domain of the destination chain
+    /// @param collector The collector address for that domain
+    function setDestinationCollector(uint32 destinationDomain, address collector) external;
+
+    /// @notice Returns the collector address for a destination domain
+    /// @param destinationDomain The CCTP domain of the destination chain
+    /// @return The collector address for that domain
+    function getDestinationCollector(uint32 destinationDomain) external view returns (address);
 }

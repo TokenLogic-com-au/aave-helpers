@@ -12,6 +12,7 @@ import {AaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
 import {CctpConstants} from 'src/bridges/cctp/CctpConstants.sol';
 
 address constant TOKEN_LOGIC = 0x3765A685a401622C060E5D700D9ad89413363a91;
+address constant GUARDIAN = 0x3765A685a401622C060E5D700D9ad89413363a91;
 
 contract DeployCCTPBridgeEthereum is EthereumScript, CctpConstants {
   function run() external broadcast {
@@ -20,7 +21,8 @@ contract DeployCCTPBridgeEthereum is EthereumScript, CctpConstants {
       ETHEREUM_TOKEN_MESSENGER,
       ETHEREUM_USDC,
       ETHEREUM_DOMAIN,
-      TOKEN_LOGIC
+      TOKEN_LOGIC,
+      GUARDIAN
     );
   }
 }
@@ -32,7 +34,8 @@ contract DeployCCTPBridgeArbitrum is ArbitrumScript, CctpConstants {
       ARBITRUM_TOKEN_MESSENGER,
       ARBITRUM_USDC,
       ARBITRUM_DOMAIN,
-      TOKEN_LOGIC
+      TOKEN_LOGIC,
+      GUARDIAN
     );
   }
 }
@@ -44,7 +47,8 @@ contract DeployCCTPBridgeOptimism is OptimismScript, CctpConstants {
       OPTIMISM_TOKEN_MESSENGER,
       OPTIMISM_USDC,
       OPTIMISM_DOMAIN,
-      TOKEN_LOGIC
+      TOKEN_LOGIC,
+      GUARDIAN
     );
   }
 }
@@ -56,7 +60,8 @@ contract DeployCCTPBridgePolygon is PolygonScript, CctpConstants {
       POLYGON_TOKEN_MESSENGER,
       POLYGON_USDC,
       POLYGON_DOMAIN,
-      TOKEN_LOGIC
+      TOKEN_LOGIC,
+      GUARDIAN
     );
   }
 }
@@ -68,7 +73,8 @@ contract DeployCCTPBridgeBase is BaseScript, CctpConstants {
       BASE_TOKEN_MESSENGER,
       BASE_USDC,
       BASE_DOMAIN,
-      TOKEN_LOGIC
+      TOKEN_LOGIC,
+      GUARDIAN
     );
   }
 }
