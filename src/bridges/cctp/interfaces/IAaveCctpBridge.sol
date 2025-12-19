@@ -14,21 +14,21 @@ interface IAaveCctpBridge {
     /// @notice Emitted when a bridge transfer is initiated
     /// @param token The address of the bridged token (USDC)
     /// @param destinationDomain The CCTP domain of the destination chain
-    /// @param receiver The recipient address on the destination chain
+    /// @param receiver The recipient address on the destination chain (bytes32 to support non-EVM)
     /// @param amount The amount of tokens bridged
     /// @param speed The transfer speed used (Fast or Standard)
     event Bridge(
         address indexed token,
         uint32 indexed destinationDomain,
-        address indexed receiver,
+        bytes32 indexed receiver,
         uint256 amount,
         TransferSpeed speed
     );
 
     /// @notice Emitted when a collector address is set for a destination domain
     /// @param destinationDomain The CCTP domain of the destination chain
-    /// @param collector The collector address for that domain
-    event CollectorSet(uint32 indexed destinationDomain, address indexed collector);
+    /// @param collector The collector address for that domain (bytes32 to support non-EVM)
+    event CollectorSet(uint32 indexed destinationDomain, bytes32 indexed collector);
 
     /// @dev Amount provided is zero
     error InvalidZeroAmount();
@@ -69,11 +69,11 @@ interface IAaveCctpBridge {
 
     /// @notice Sets the collector address for a destination domain
     /// @param destinationDomain The CCTP domain of the destination chain
-    /// @param collector The collector address for that domain
-    function setDestinationCollector(uint32 destinationDomain, address collector) external;
+    /// @param collector The collector address for that domain (bytes32 to support non-EVM)
+    function setDestinationCollector(uint32 destinationDomain, bytes32 collector) external;
 
     /// @notice Returns the collector address for a destination domain
     /// @param destinationDomain The CCTP domain of the destination chain
     /// @return The collector address for that domain
-    function getDestinationCollector(uint32 destinationDomain) external view returns (address);
+    function getDestinationCollector(uint32 destinationDomain) external view returns (bytes32);
 }

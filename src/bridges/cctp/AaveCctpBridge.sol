@@ -33,8 +33,8 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     /// @inheritdoc IAaveCctpBridge
     uint32 public immutable LOCAL_DOMAIN;
 
-    /// @notice Mapping of destination domain to collector address
-    mapping(uint32 destinationDomain => address collector) internal _destinations;
+    /// @notice Mapping of destination domain to collector address (bytes32 to support non-EVM chains)
+    mapping(uint32 destinationDomain => bytes32 collector) internal _destinations;
 
     /// @param tokenMessenger The TokenMessengerV2 address on this chain
     /// @param usdc The USDC token address on this chain
@@ -65,8 +65,8 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     ) external onlyOwnerOrGuardian {
         if (amount < 1) revert InvalidZeroAmount();
         if (destinationDomain == LOCAL_DOMAIN) revert InvalidDestinationDomain();
-        address receiver = _destinations[destinationDomain];
-        if (receiver == address(0)) revert CollectorNotConfigured(destinationDomain);
+        bytes32 receiver = _destinations[destinationDomain];
+        if (receiver == bytes32(0)) revert CollectorNotConfigured(destinationDomain);
 
         uint32 finalityThreshold = speed == TransferSpeed.Fast ? FAST : STANDARD;
 
@@ -76,7 +76,7 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
         ITokenMessengerV2(TOKEN_MESSENGER).depositForBurn(
             amount,
             destinationDomain,
-            _addressToBytes32(receiver),
+            receiver,
             USDC,
             bytes32(0),
             maxFee,
@@ -87,14 +87,14 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     }
 
     /// @inheritdoc IAaveCctpBridge
-    function setDestinationCollector(uint32 destinationDomain, address collector) external onlyOwner {
-        if (collector == address(0)) revert InvalidZeroAddress();
+    function setDestinationCollector(uint32 destinationDomain, bytes32 collector) external onlyOwner {
+        if (collector == bytes32(0)) revert InvalidZeroAddress();
         _destinations[destinationDomain] = collector;
         emit CollectorSet(destinationDomain, collector);
     }
 
     /// @inheritdoc IAaveCctpBridge
-    function getDestinationCollector(uint32 destinationDomain) external view returns (address) {
+    function getDestinationCollector(uint32 destinationDomain) external view returns (bytes32) {
         return _destinations[destinationDomain];
     }
 
@@ -108,8 +108,4 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
         return type(uint256).max;
     }
 
-    /// @dev Converts an address to bytes32 for CCTP
-    function _addressToBytes32(address addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(addr)));
-    }
 }

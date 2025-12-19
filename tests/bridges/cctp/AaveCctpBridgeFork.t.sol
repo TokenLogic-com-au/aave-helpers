@@ -23,6 +23,10 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
 
     uint256 public constant AMOUNT = 10_000e6; // 10k USDC
 
+    function _addressToBytes32(address addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(addr)));
+    }
+
     function setUp() public {
         string memory rpcUrl = vm.envOr("RPC_MAINNET", string(""));
         vm.createSelectFork(rpcUrl);
@@ -39,14 +43,14 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
 
         // Set up collectors for all destination domains
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, receiver);
-        bridge.setDestinationCollector(AVALANCHE_DOMAIN, receiver);
-        bridge.setDestinationCollector(OPTIMISM_DOMAIN, receiver);
-        bridge.setDestinationCollector(BASE_DOMAIN, receiver);
-        bridge.setDestinationCollector(POLYGON_DOMAIN, receiver);
-        bridge.setDestinationCollector(SOLANA_DOMAIN, receiver);
-        bridge.setDestinationCollector(UNICHAIN_DOMAIN, receiver);
-        bridge.setDestinationCollector(LINEA_DOMAIN, receiver);
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(AVALANCHE_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(OPTIMISM_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(BASE_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(POLYGON_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(SOLANA_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(UNICHAIN_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(LINEA_DOMAIN, _addressToBytes32(receiver));
         vm.stopPrank();
     }
 
@@ -126,7 +130,7 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
 
     function test_revertsIf_sameDestinationDomain() public {
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ETHEREUM_DOMAIN, receiver);
+        bridge.setDestinationCollector(ETHEREUM_DOMAIN, _addressToBytes32(receiver));
         vm.expectRevert(IAaveCctpBridge.InvalidDestinationDomain.selector);
         bridge.bridge(ETHEREUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
