@@ -485,3 +485,38 @@ contract QuoteBridgeEthereumToOptimismTest is AaveOFTBridgeForkTestBase {
         assertEq(amountReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
     }
 }
+
+/**
+ * @notice Tests for Ethereum to Ink USDT bridging via USDT0 OFT
+ */
+contract QuoteBridgeEthereumToInkTest is AaveOFTBridgeForkTestBase {
+    function setUp() public override {
+        super.setUp();
+        receiver = makeAddr("ink-receiver");
+    }
+
+    function test_quoteBridge_ethereumToInk() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 fee = mainnetBridge.quoteBridge(INK_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
+
+        assertGt(fee, 0, "Fee should be greater than 0");
+    }
+
+    function test_quoteOFT_ethereumToInk() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 amountReceived = mainnetBridge.quoteOFT(INK_EID, LARGE_BRIDGE_AMOUNT, receiver);
+        assertEq(amountReceived, LARGE_BRIDGE_AMOUNT, "OFT should have no slippage");
+    }
+
+    function test_quote_BRIDGE_AMOUNT_ethereumToInk() public {
+        vm.selectFork(mainnetFork);
+
+        uint256 amountReceived = mainnetBridge.quoteOFT(INK_EID, BRIDGE_AMOUNT, receiver);
+        uint256 fee = mainnetBridge.quoteBridge(INK_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+
+        assertGt(fee, 0, "Fee should be quoted");
+        assertEq(amountReceived, BRIDGE_AMOUNT, "OFT should have no slippage");
+    }
+}

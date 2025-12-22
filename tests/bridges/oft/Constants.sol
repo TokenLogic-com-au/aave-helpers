@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 /// @title OFT Constants
 /// @notice Constants for USDT0 OFT bridge integration via LayerZero V2
-/// @dev USDT0 supported chains: Ethereum, Arbitrum, Polygon, Optimism, Plasma
+/// @dev USDT0 supported chains: Ethereum, Arbitrum, Polygon, Optimism, Ink, Plasma
 ///      NOT supported: Avalanche, Base (no USDT0 deployment)
 /// @dev Addresses from https://docs.usdt0.to/technical-documentation/developer/usdt0-deployments
 contract OFTConstants {
@@ -12,6 +12,7 @@ contract OFTConstants {
     uint32 public constant POLYGON_EID = 30109;
     uint32 public constant ARBITRUM_EID = 30110;
     uint32 public constant OPTIMISM_EID = 30111;
+    uint32 public constant INK_EID = 30339;
     uint32 public constant PLASMA_EID = 30383;
 
     // USDT0 OFT Contracts - These are the contracts to call send() on for bridging
@@ -29,6 +30,9 @@ contract OFTConstants {
 
     /// @dev https://optimistic.etherscan.io/address/0xF03b4d9AC1D5d1E7c4cEf54C2A313b9fe051A0aD
     address public constant OPTIMISM_USDT0_OFT = 0xF03b4d9AC1D5d1E7c4cEf54C2A313b9fe051A0aD;
+
+    /// @dev https://explorer.inkonchain.com/address/0x0200C29006150606B650577BBE7B6248F58470c1
+    address public constant INK_USDT0_OFT = 0x0200C29006150606B650577BBE7B6248F58470c1;
 
     /// @dev https://plasmascan.to/address/0x02ca37966753bDdDf11216B73B16C1dE756A7CF9
     address public constant PLASMA_USDT0_OFT = 0x02ca37966753bDdDf11216B73B16C1dE756A7CF9;
@@ -48,6 +52,9 @@ contract OFTConstants {
 
     /// @dev https://optimistic.etherscan.io/address/0x01bFF41798a0BcF287b996046Ca68b395DbC1071
     address public constant OPTIMISM_USDT = 0x01bFF41798a0BcF287b996046Ca68b395DbC1071;
+
+    /// @dev https://explorer.inkonchain.com/address/0x0200C29006150606B650577BBE7B6248F58470c1
+    address public constant INK_USDT = 0x0200C29006150606B650577BBE7B6248F58470c1;
 
     /// @dev https://plasmascan.to/address/0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb
     address public constant PLASMA_USDT = 0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb;
