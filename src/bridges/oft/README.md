@@ -57,6 +57,7 @@ bridge.bridge(dstEid, amount, receiver, expectedReceived);
 The contract implements `Ownable` for permissioned functions. The owner should be the respective network's Level 1 Executor (Governance).
 
 Only the owner can:
+
 - Call `bridge()` to initiate transfers
 - Call `emergencyTokenTransfer()` to rescue tokens
 - Transfer ownership
@@ -89,32 +90,32 @@ USDT0 is currently deployed on the following chains:
 
 ### Endpoint IDs and OFT Contracts
 
-| Chain | Endpoint ID | USDT0 OFT Contract | Notes |
-|-------|------------|-------------------|-------|
-| Ethereum | 30101 | 0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee | OAdapterUpgradeable (locks USDT) |
-| Arbitrum | 30110 | 0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92 | OUpgradeable |
-| Polygon | 30109 | 0x6BA10300f0DC58B7a1e4c0e41f5daBb7D7829e13 | OUpgradeable |
-| Optimism | 30111 | 0xF03b4d9AC1D5d1E7c4cEf54C2A313b9fe051A0aD | OUpgradeable |
-| Ink | 30339 | 0x0200C29006150606B650577BBE7B6248F58470c1 | OUpgradeable |
-| Plasma | 30383 | 0x02ca37966753bDdDf11216B73B16C1dE756A7CF9 | OUpgradeable |
+| Chain    | Endpoint ID | USDT0 OFT Contract                         | Notes                            |
+| -------- | ----------- | ------------------------------------------ | -------------------------------- |
+| Ethereum | 30101       | 0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee | OAdapterUpgradeable (locks USDT) |
+| Arbitrum | 30110       | 0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92 | OUpgradeable                     |
+| Polygon  | 30109       | 0x6BA10300f0DC58B7a1e4c0e41f5daBb7D7829e13 | OUpgradeable                     |
+| Optimism | 30111       | 0xF03b4d9AC1D5d1E7c4cEf54C2A313b9fe051A0aD | OUpgradeable                     |
+| Ink      | 30339       | 0x0200C29006150606B650577BBE7B6248F58470c1 | OUpgradeable                     |
+| Plasma   | 30383       | 0x02ca37966753bDdDf11216B73B16C1dE756A7CF9 | OUpgradeable                     |
 
 ### USDT Token Addresses
 
-| Chain | USDT/USDT0 Token |
-|-------|-----------------|
+| Chain    | USDT/USDT0 Token                           |
+| -------- | ------------------------------------------ |
 | Ethereum | 0xdAC17F958D2ee523a2206206994597C13D831ec7 |
 | Arbitrum | 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9 |
-| Polygon | 0xc2132D05D31c914a87C6611C10748AEb04B58e8F |
+| Polygon  | 0xc2132D05D31c914a87C6611C10748AEb04B58e8F |
 | Optimism | 0x01bFF41798a0BcF287b996046Ca68b395DbC1071 |
-| Ink | 0x0200C29006150606B650577BBE7B6248F58470c1 |
-| Plasma | 0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb |
+| Ink      | 0x0200C29006150606B650577BBE7B6248F58470c1 |
+| Plasma   | 0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb |
 
 ### Not Supported
 
-| Chain | Reason |
-|-------|--------|
+| Chain     | Reason              |
+| --------- | ------------------- |
 | Avalanche | No USDT0 deployment |
-| Base | No USDT0 deployment |
+| Base      | No USDT0 deployment |
 
 ## Known Limitations
 

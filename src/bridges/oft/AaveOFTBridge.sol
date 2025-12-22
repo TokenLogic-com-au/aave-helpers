@@ -8,7 +8,7 @@ import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
 import {IAaveOFTBridge} from "./interfaces/IAaveOFTBridge.sol";
-import {IOFT, SendParam, MessagingFee, OFTReceipt} from "layerzero-v2/oft/interfaces/IOFT.sol";
+import {IOFT, SendParam, MessagingFee, OFTReceipt} from "./interfaces/IOFT.sol";
 
 /// @title AaveOFTBridge
 /// @author @stevyhacker (TokenLogic)

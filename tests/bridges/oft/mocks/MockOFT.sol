@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IOFT, SendParam, MessagingFee, MessagingReceipt, OFTReceipt, OFTLimit, OFTFeeDetail} from "layerzero-v2/oft/interfaces/IOFT.sol";
+import {IOFT, SendParam, MessagingFee, MessagingReceipt, OFTReceipt, OFTLimit, OFTFeeDetail} from "../../../../src/bridges/oft/interfaces/IOFT.sol";
 
 contract MockOFT is IOFT {
     using SafeERC20 for IERC20;
