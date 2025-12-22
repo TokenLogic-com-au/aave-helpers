@@ -21,7 +21,7 @@ USDT0 is Tether's official cross-chain solution using LayerZero's OFT standard. 
 
 ### `bridge()`
 
-Bridges USDT to a destination chain. The contract must hold the USDT tokens and have or receive sufficient native tokens for the LayerZero messaging fee.
+Bridges USDT to a destination chain. The contract transfers the USDT tokens and needs to have or receive sufficient native tokens for the LayerZero messaging fee.
 
 ### `quoteBridge()`
 
