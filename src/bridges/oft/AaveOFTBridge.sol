@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.27;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -26,8 +26,8 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
     /// @param usdt The USDT token address on this chain
     /// @param owner The owner of the contract upon deployment
     constructor(address oftUsdt, address usdt, address owner) Ownable(owner) {
-        if (oftUsdt == address(0)) revert InvalidZeroAddress();
-        if (usdt == address(0)) revert InvalidZeroAddress();
+        require(oftUsdt != address(0), InvalidZeroAddress());
+        require(usdt != address(0), InvalidZeroAddress());
         OFT_USDT = oftUsdt;
         USDT = usdt;
     }
@@ -37,7 +37,7 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
 
     /// @inheritdoc IAaveOFTBridge
     function bridge(uint32 dstEid, uint256 amount, address receiver, uint256 minAmountLD) external payable onlyOwner {
-        if (amount < 1) revert InvalidZeroAmount();
+        require(amount >= 1, InvalidZeroAmount());
 
         IERC20(USDT).safeTransferFrom(msg.sender, address(this), amount);
 
