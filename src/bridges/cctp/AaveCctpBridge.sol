@@ -87,10 +87,15 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     }
 
     /// @inheritdoc IAaveCctpBridge
-    function setDestinationCollector(uint32 destinationDomain, bytes32 collector) external onlyOwner {
+    function setDestinationCollector(uint32 destinationDomain, address collector) external onlyOwner {
+        if (collector == address(0)) revert InvalidZeroAddress();
+        _setDestinationCollector(destinationDomain, _addressToBytes32(collector));
+    }
+
+    /// @inheritdoc IAaveCctpBridge
+    function setDestinationCollectorNonEVM(uint32 destinationDomain, bytes32 collector) external onlyOwner {
         if (collector == bytes32(0)) revert InvalidZeroAddress();
-        _destinations[destinationDomain] = collector;
-        emit CollectorSet(destinationDomain, collector);
+        _setDestinationCollector(destinationDomain, collector);
     }
 
     /// @inheritdoc IAaveCctpBridge
@@ -106,6 +111,15 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     /// @inheritdoc IRescuableBase
     function maxRescue(address) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
         return type(uint256).max;
+    }
+
+    function _setDestinationCollector(uint32 destinationDomain, bytes32 collector) internal {
+        _destinations[destinationDomain] = collector;
+        emit CollectorSet(destinationDomain, collector);
+    }
+
+    function _addressToBytes32(address addr) internal pure returns (bytes32) {
+        return bytes32(uint256(uint160(addr)));
     }
 
 }

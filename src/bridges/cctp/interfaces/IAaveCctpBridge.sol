@@ -69,8 +69,13 @@ interface IAaveCctpBridge {
 
     /// @notice Sets the collector address for a destination domain
     /// @param destinationDomain The CCTP domain of the destination chain
-    /// @param collector The collector address for that domain (bytes32 to support non-EVM)
-    function setDestinationCollector(uint32 destinationDomain, bytes32 collector) external;
+    /// @param collector The collector address on the destination chain
+    function setDestinationCollector(uint32 destinationDomain, address collector) external;
+
+    /// @notice Sets the collector bytes32 for a destination domain (non-EVM)
+    /// @param destinationDomain The CCTP domain of the destination chain
+    /// @param collector The raw bytes32 collector identifier
+    function setDestinationCollectorNonEVM(uint32 destinationDomain, bytes32 collector) external;
 
     /// @notice Returns the collector address for a destination domain
     /// @param destinationDomain The CCTP domain of the destination chain

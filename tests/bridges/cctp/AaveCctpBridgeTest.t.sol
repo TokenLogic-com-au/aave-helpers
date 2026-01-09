@@ -78,10 +78,10 @@ contract AaveCctpBridgeTestBase is Test, CctpConstants {
 
         // Set up collectors for different domains
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(receiver));
-        bridge.setDestinationCollector(BASE_DOMAIN, _addressToBytes32(receiver));
-        bridge.setDestinationCollector(OPTIMISM_DOMAIN, _addressToBytes32(receiver));
-        bridge.setDestinationCollector(AVALANCHE_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, receiver);
+        bridge.setDestinationCollector(BASE_DOMAIN, receiver);
+        bridge.setDestinationCollector(OPTIMISM_DOMAIN, receiver);
+        bridge.setDestinationCollector(AVALANCHE_DOMAIN, receiver);
         vm.stopPrank();
     }
 }
@@ -136,7 +136,7 @@ contract BridgeTest is AaveCctpBridgeTestBase {
 
     function test_revertsIf_sameDestinationDomain() public {
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ETHEREUM_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(ETHEREUM_DOMAIN, receiver);
         vm.expectRevert(IAaveCctpBridge.InvalidDestinationDomain.selector);
         bridge.bridge(ETHEREUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
@@ -191,7 +191,7 @@ contract BridgeTest is AaveCctpBridgeTestBase {
         deal(address(usdc), owner, amount);
 
         vm.startPrank(owner);
-        bridge.setDestinationCollector(dstDomain, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(dstDomain, receiver);
         usdc.approve(address(bridge), amount);
 
         bridge.bridge(dstDomain, amount, 0, IAaveCctpBridge.TransferSpeed.Fast);
@@ -284,21 +284,28 @@ contract SetDestinationCollectorTest is AaveCctpBridgeTestBase {
     function test_revertsIf_callerNotOwner() public {
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, receiver);
         vm.stopPrank();
     }
 
     function test_revertsIf_guardianTriesToSet() public {
         vm.startPrank(guardian);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, guardian));
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, receiver);
         vm.stopPrank();
     }
 
     function test_revertsIf_zeroCollector() public {
         vm.startPrank(owner);
         vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, bytes32(0));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, address(0));
+        vm.stopPrank();
+    }
+
+    function test_revertsIf_zeroCollectorNonEVM() public {
+        vm.startPrank(owner);
+        vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
+        bridge.setDestinationCollectorNonEVM(SOLANA_DOMAIN, bytes32(0));
         vm.stopPrank();
     }
 
@@ -309,17 +316,30 @@ contract SetDestinationCollectorTest is AaveCctpBridgeTestBase {
         vm.expectEmit(true, true, true, true, address(bridge));
         emit CollectorSet(ARBITRUM_DOMAIN, _addressToBytes32(newCollector));
 
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(newCollector));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, newCollector);
         vm.stopPrank();
 
         assertEq(bridge.getDestinationCollector(ARBITRUM_DOMAIN), _addressToBytes32(newCollector));
+    }
+
+    function test_setDestinationCollectorNonEVM_successful() public {
+        bytes32 newCollector = keccak256("collector");
+
+        vm.startPrank(owner);
+        vm.expectEmit(true, true, true, true, address(bridge));
+        emit CollectorSet(SOLANA_DOMAIN, newCollector);
+
+        bridge.setDestinationCollectorNonEVM(SOLANA_DOMAIN, _addressToBytes32(newCollector));
+        vm.stopPrank();
+
+        assertEq(bridge.getDestinationCollector(ARBITRUM_DOMAIN), newCollector);
     }
 
     function test_canUpdateExisting() public {
         address newCollector = makeAddr("newCollector");
 
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(newCollector));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, newCollector);
         vm.stopPrank();
 
         assertEq(bridge.getDestinationCollector(ARBITRUM_DOMAIN), _addressToBytes32(newCollector));
@@ -361,7 +381,7 @@ contract MintRecipientEncodingTest is AaveCctpBridgeTestBase {
         _startOwnerAndApprove(AMOUNT);
 
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, _addressToBytes32(recipient));
+        bridge.setDestinationCollector(ARBITRUM_DOMAIN, recipient);
         vm.stopPrank();
 
         _startOwnerAndApprove(AMOUNT);
