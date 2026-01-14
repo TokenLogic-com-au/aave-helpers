@@ -23,13 +23,11 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
     address public immutable USDT;
 
     /// @param oftUsdt The OFT address for USDT on this chain
-    /// @param usdt The USDT token address on this chain
     /// @param owner The owner of the contract upon deployment
-    constructor(address oftUsdt, address usdt, address owner) Ownable(owner) {
+    constructor(address oftUsdt, address owner) Ownable(owner) {
         require(oftUsdt != address(0), InvalidZeroAddress());
-        require(usdt != address(0), InvalidZeroAddress());
         OFT_USDT = oftUsdt;
-        USDT = usdt;
+        USDT = IOFT(OFT_USDT).token();
     }
 
     /// @dev Default receive function enabling the contract to accept native tokens for refunds
@@ -97,7 +95,7 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
     {
         return SendParam({
             dstEid: dstEid,
-            to: _addressToBytes32(receiver),
+            to: bytes32(uint256(uint160(receiver))),
             amountLD: amount,
             minAmountLD: minAmountLD,
             extraOptions: new bytes(0),
@@ -106,10 +104,4 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
         });
     }
 
-    /// @dev Converts an address to bytes32
-    /// @param addr The address to convert
-    /// @return The bytes32 representation
-    function _addressToBytes32(address addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(addr)));
-    }
 }

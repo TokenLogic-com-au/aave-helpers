@@ -41,7 +41,7 @@ contract AaveOFTBridgeTestBase is Test {
 
         mockOFT = new MockOFT(address(usdt));
 
-        bridge = new AaveOFTBridge(address(mockOFT), address(usdt), owner);
+        bridge = new AaveOFTBridge(address(mockOFT), owner);
 
         vm.deal(address(bridge), 10 ether);
     }
@@ -50,12 +50,12 @@ contract AaveOFTBridgeTestBase is Test {
 contract ConstructorTest is AaveOFTBridgeTestBase {
     function test_revertsIf_zero_oft_address() public {
         vm.expectRevert(IAaveOFTBridge.InvalidZeroAddress.selector);
-        new AaveOFTBridge(address(0), address(usdt), owner);
+        new AaveOFTBridge(address(0), owner);
     }
 
     function test_revertsIf_zero_usdt_address() public {
         vm.expectRevert(IAaveOFTBridge.InvalidZeroAddress.selector);
-        new AaveOFTBridge(address(mockOFT), address(0), owner);
+        new AaveOFTBridge(address(mockOFT), owner);
     }
 
     function test_successful() public view {

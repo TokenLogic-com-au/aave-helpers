@@ -46,7 +46,7 @@ contract AaveOFTBridgeForkTestBase is Test, OFTConstants {
         mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"));
 
         // Use USDT0 OFT (OAdapterUpgradeable) on Ethereum for bridging
-        mainnetBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
+        mainnetBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, owner);
 
         receiver = address(AaveV3Arbitrum.COLLECTOR);
 
@@ -146,7 +146,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
 
         address deployer = makeAddr("bridge-deployer");
         vm.prank(deployer);
-        AaveOFTBridge unfundedBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, ETHEREUM_USDT, owner);
+        AaveOFTBridge unfundedBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, owner);
         assertEq(address(unfundedBridge).balance, 0, "Bridge should not be pre-funded");
 
         deal(ETHEREUM_USDT, owner, BRIDGE_AMOUNT);
@@ -210,7 +210,7 @@ contract BridgeArbitrumToEthereumTest is AaveOFTBridgeForkTestBase {
     function setUp() public override {
         arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
         owner = makeAddr("owner");
-        arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
+        arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, owner);
     }
 
     function test_bridge_arbitrumToEthereum_10MillionUSDT() public {
@@ -360,7 +360,7 @@ contract ConstructorAndImmutablesTest is AaveOFTBridgeForkTestBase {
         arbitrumFork = vm.createSelectFork(vm.rpcUrl("arbitrum"));
         vm.selectFork(arbitrumFork);
 
-        arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, ARBITRUM_USDT, owner);
+        arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, owner);
 
         assertEq(arbitrumBridge.OFT_USDT(), ARBITRUM_USDT0_OFT, "OFT_USDT should be set correctly");
         assertEq(arbitrumBridge.USDT(), ARBITRUM_USDT, "USDT should be set correctly");
