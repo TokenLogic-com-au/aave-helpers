@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 /// @title CctpConstants
 /// @notice Constants for CCTP V2 bridge testing
 /// @dev Domain IDs from https://developers.circle.com/cctp/cctp-supported-blockchains
-contract CctpConstants {
+library CctpConstants {
     // CCTP Domain IDs
     uint32 public constant ETHEREUM_DOMAIN = 0;
     uint32 public constant AVALANCHE_DOMAIN = 1;
@@ -15,6 +15,9 @@ contract CctpConstants {
     uint32 public constant POLYGON_DOMAIN = 7;
     uint32 public constant UNICHAIN_DOMAIN = 10;
     uint32 public constant LINEA_DOMAIN = 11;
+    uint32 public constant SONIC_DOMAIN = 13;
+    uint32 public constant MONAD_DOMAIN = 15;
+    uint32 public constant INK_DOMAIN = 21;
 
     // Finality Thresholds
     uint32 public constant FAST_FINALITY_THRESHOLD = 1000;

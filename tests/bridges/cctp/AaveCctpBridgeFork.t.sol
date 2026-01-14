@@ -11,7 +11,7 @@ import {AaveCctpBridge} from "src/bridges/cctp/AaveCctpBridge.sol";
 import {IAaveCctpBridge} from "src/bridges/cctp/interfaces/IAaveCctpBridge.sol";
 import {CctpConstants} from "src/bridges/cctp/CctpConstants.sol";
 
-contract AaveCctpBridgeForkTest is Test, CctpConstants {
+contract AaveCctpBridgeForkTest is Test {
     using SafeERC20 for IERC20;
 
     AaveCctpBridge public bridge;
@@ -31,26 +31,26 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
         string memory rpcUrl = vm.envOr("RPC_MAINNET", string(""));
         vm.createSelectFork(rpcUrl);
 
-        usdc = IERC20(ETHEREUM_USDC);
+        usdc = IERC20(CctpConstants.ETHEREUM_USDC);
 
         bridge = new AaveCctpBridge(
-            ETHEREUM_TOKEN_MESSENGER,
-            ETHEREUM_USDC,
-            ETHEREUM_DOMAIN,
+            CctpConstants.ETHEREUM_TOKEN_MESSENGER,
+            CctpConstants.ETHEREUM_USDC,
+            CctpConstants.ETHEREUM_DOMAIN,
             owner,
             guardian
         );
 
         // Set up collectors for all destination domains
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ARBITRUM_DOMAIN, receiver);
-        bridge.setDestinationCollector(AVALANCHE_DOMAIN, receiver);
-        bridge.setDestinationCollector(OPTIMISM_DOMAIN, receiver);
-        bridge.setDestinationCollector(BASE_DOMAIN, receiver);
-        bridge.setDestinationCollector(POLYGON_DOMAIN, receiver);
-        bridge.setDestinationCollectorNonEVM(SOLANA_DOMAIN, _addressToBytes32(receiver));
-        bridge.setDestinationCollector(UNICHAIN_DOMAIN, receiver);
-        bridge.setDestinationCollector(LINEA_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.ARBITRUM_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.AVALANCHE_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.OPTIMISM_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.BASE_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.POLYGON_DOMAIN, receiver);
+        bridge.setDestinationCollectorNonEVM(CctpConstants.SOLANA_DOMAIN, _addressToBytes32(receiver));
+        bridge.setDestinationCollector(CctpConstants.UNICHAIN_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.LINEA_DOMAIN, receiver);
         vm.stopPrank();
     }
 
@@ -71,52 +71,52 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
     }
 
     function test_bridge_fast() public {
-        _bridgeTo(ARBITRUM_DOMAIN, AMOUNT / 100, IAaveCctpBridge.TransferSpeed.Fast);
+        _bridgeTo(CctpConstants.ARBITRUM_DOMAIN, AMOUNT / 100, IAaveCctpBridge.TransferSpeed.Fast);
     }
 
     function test_bridge_standard() public {
-        _bridgeTo(ARBITRUM_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.ARBITRUM_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_bridge_to_avalanche() public {
-        _bridgeTo(AVALANCHE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.AVALANCHE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_bridge_to_optimism() public {
-        _bridgeTo(OPTIMISM_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
-    }
-
-    function test_bridge_to_base() public {
-        _bridgeTo(BASE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.OPTIMISM_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_bridge_to_polygon() public {
-        _bridgeTo(POLYGON_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.POLYGON_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_bridge_to_solana() public {
-        _bridgeTo(SOLANA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.SOLANA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_bridge_to_unichain() public {
-        _bridgeTo(UNICHAIN_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.UNICHAIN_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_bridge_to_linea() public {
-        _bridgeTo(LINEA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+        _bridgeTo(CctpConstants.LINEA_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
+    }
+
+    function test_bridge_to_base() public {
+        _bridgeTo(CctpConstants.BASE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
     }
 
     function test_revertsIf_callerNotOwnerOrGuardian() public {
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
-        bridge.bridge(ARBITRUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(CctpConstants.ARBITRUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
     }
 
     function test_revertsIf_zeroAmount() public {
         vm.startPrank(owner);
         vm.expectRevert(IAaveCctpBridge.InvalidZeroAmount.selector);
-        bridge.bridge(ARBITRUM_DOMAIN, 0, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(CctpConstants.ARBITRUM_DOMAIN, 0, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
     }
 
@@ -130,9 +130,9 @@ contract AaveCctpBridgeForkTest is Test, CctpConstants {
 
     function test_revertsIf_sameDestinationDomain() public {
         vm.startPrank(owner);
-        bridge.setDestinationCollector(ETHEREUM_DOMAIN, receiver);
+        bridge.setDestinationCollector(CctpConstants.ETHEREUM_DOMAIN, receiver);
         vm.expectRevert(IAaveCctpBridge.InvalidDestinationDomain.selector);
-        bridge.bridge(ETHEREUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
+        bridge.bridge(CctpConstants.ETHEREUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
         vm.stopPrank();
     }
 }

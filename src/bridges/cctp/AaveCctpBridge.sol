@@ -63,10 +63,10 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
         uint256 maxFee,
         TransferSpeed speed
     ) external onlyOwnerOrGuardian {
-        if (amount < 1) revert InvalidZeroAmount();
-        if (destinationDomain == LOCAL_DOMAIN) revert InvalidDestinationDomain();
+        require(amount > 0, InvalidZeroAmount());
+        require(destinationDomain != LOCAL_DOMAIN, InvalidDestinationDomain());
         bytes32 receiver = _destinations[destinationDomain];
-        if (receiver == bytes32(0)) revert CollectorNotConfigured(destinationDomain);
+        require(receiver != bytes32(0), CollectorNotConfigured(destinationDomain));
 
         uint32 finalityThreshold = speed == TransferSpeed.Fast ? FAST : STANDARD;
 
@@ -88,13 +88,13 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
 
     /// @inheritdoc IAaveCctpBridge
     function setDestinationCollector(uint32 destinationDomain, address collector) external onlyOwner {
-        if (collector == address(0)) revert InvalidZeroAddress();
-        _setDestinationCollector(destinationDomain, _addressToBytes32(collector));
+        require(collector != address(0), InvalidZeroAddress());
+        _setDestinationCollector(destinationDomain, bytes32(uint256(uint160(collector))));
     }
 
     /// @inheritdoc IAaveCctpBridge
     function setDestinationCollectorNonEVM(uint32 destinationDomain, bytes32 collector) external onlyOwner {
-        if (collector == bytes32(0)) revert InvalidZeroAddress();
+        require(collector != bytes32(0), InvalidZeroAddress());
         _setDestinationCollector(destinationDomain, collector);
     }
 
@@ -116,10 +116,6 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     function _setDestinationCollector(uint32 destinationDomain, bytes32 collector) internal {
         _destinations[destinationDomain] = collector;
         emit CollectorSet(destinationDomain, collector);
-    }
-
-    function _addressToBytes32(address addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(addr)));
     }
 
 }

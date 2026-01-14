@@ -14,65 +14,65 @@ import {CctpConstants} from 'src/bridges/cctp/CctpConstants.sol';
 address constant TOKEN_LOGIC = 0x3765A685a401622C060E5D700D9ad89413363a91;
 address constant GUARDIAN = 0x3765A685a401622C060E5D700D9ad89413363a91;
 
-contract DeployCCTPBridgeEthereum is EthereumScript, CctpConstants {
+contract DeployCCTPBridgeEthereum is EthereumScript {
   function run() external broadcast {
     bytes32 salt = 'Aave CCTP Bridge';
     new AaveCctpBridge{salt: salt}(
-      ETHEREUM_TOKEN_MESSENGER,
-      ETHEREUM_USDC,
-      ETHEREUM_DOMAIN,
+      CctpConstants.ETHEREUM_TOKEN_MESSENGER,
+      CctpConstants.ETHEREUM_USDC,
+      CctpConstants.ETHEREUM_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
   }
 }
 
-contract DeployCCTPBridgeArbitrum is ArbitrumScript, CctpConstants {
+contract DeployCCTPBridgeArbitrum is ArbitrumScript {
   function run() external broadcast {
     bytes32 salt = 'Aave CCTP Bridge';
     new AaveCctpBridge{salt: salt}(
-      ARBITRUM_TOKEN_MESSENGER,
-      ARBITRUM_USDC,
-      ARBITRUM_DOMAIN,
+      CctpConstants.ARBITRUM_TOKEN_MESSENGER,
+      CctpConstants.ARBITRUM_USDC,
+      CctpConstants.ARBITRUM_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
   }
 }
 
-contract DeployCCTPBridgeOptimism is OptimismScript, CctpConstants {
+contract DeployCCTPBridgeOptimism is OptimismScript {
   function run() external broadcast {
     bytes32 salt = 'Aave CCTP Bridge';
     new AaveCctpBridge{salt: salt}(
-      OPTIMISM_TOKEN_MESSENGER,
-      OPTIMISM_USDC,
-      OPTIMISM_DOMAIN,
+      CctpConstants.OPTIMISM_TOKEN_MESSENGER,
+      CctpConstants.OPTIMISM_USDC,
+      CctpConstants.OPTIMISM_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
   }
 }
 
-contract DeployCCTPBridgePolygon is PolygonScript, CctpConstants {
+contract DeployCCTPBridgePolygon is PolygonScript {
   function run() external broadcast {
     bytes32 salt = 'Aave CCTP Bridge';
     new AaveCctpBridge{salt: salt}(
-      POLYGON_TOKEN_MESSENGER,
-      POLYGON_USDC,
-      POLYGON_DOMAIN,
+      CctpConstants.POLYGON_TOKEN_MESSENGER,
+      CctpConstants.POLYGON_USDC,
+      CctpConstants.POLYGON_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
   }
 }
 
-contract DeployCCTPBridgeBase is BaseScript, CctpConstants {
+contract DeployCCTPBridgeBase is BaseScript {
   function run() external broadcast {
     bytes32 salt = 'Aave CCTP Bridge';
     new AaveCctpBridge{salt: salt}(
-      BASE_TOKEN_MESSENGER,
-      BASE_USDC,
-      BASE_DOMAIN,
+      CctpConstants.BASE_TOKEN_MESSENGER,
+      CctpConstants.BASE_USDC,
+      CctpConstants.BASE_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
