@@ -31,11 +31,11 @@ contract CommonTestBase is Test {
 
   address public constant EOA = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
 
-  function executePayload(Vm vm, address payload) internal {
+  function executePayload(Vm vm, address payload) internal virtual {
     GovV3Helpers.executePayload(vm, payload);
   }
 
-  function executePayload(Vm vm, address payload, IPool pool) internal {
+  function executePayload(Vm vm, address payload, IPool pool) internal virtual {
     GovV3Helpers.executePayload(
       vm,
       payload,
@@ -112,7 +112,7 @@ contract CommonTestBase is Test {
     }
     if (block.chainid == ChainIds.GNOSIS) {
       if (asset == AaveV3GnosisAssets.EURe_UNDERLYING) {
-        vm.prank(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+        vm.prank(0x845C8bc94610807fCbaB5dd2bc7aC9DAbaFf3c55);
         IERC20(asset).transfer(user, amount);
         return true;
       }
