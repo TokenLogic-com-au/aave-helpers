@@ -12,13 +12,14 @@ The AaveCctpBridge is a contract to facilitate bridging USDC across chains using
 
 CCTP V2 supports two transfer speed modes:
 
-| Speed    | Finality Threshold | Description                          |
-| -------- | ------------------ | ------------------------------------ |
-| Fast     | 1000               | Faster transfer, may incur a fee     |
-| Standard | 2000               | Slower transfer, no fee  |
+| Speed    | Finality Threshold | Description                      |
+| -------- | ------------------ | -------------------------------- |
+| Fast     | 1000               | Faster transfer, may incur a fee |
+| Standard | 2000               | Slower transfer, no fee          |
 
 Essentially, the Fast mode is just a tx confirmation is sufficient while the Standard mode requires hard finality and a large number of mined blocks.
 The exact numbers per chain can be found in the Circle documentation:
+
 - [cctp-fast-message-attestation-times](https://developers.circle.com/cctp/required-block-confirmations#cctp-fast-message-attestation-times)
 - [cctp-standard-message-attestation-times](https://developers.circle.com/cctp/required-block-confirmations#cctp-standard-message-attestation-times)
 
@@ -55,17 +56,18 @@ Domain IDs are defined by Circle's CCTP. The complete list can be found in the [
 
 ```solidity
 function bridge(
-    uint32 destinationDomain,
-    uint256 amount,
-    address receiver,
-    uint256 maxFee,
-    TransferSpeed speed
+  uint32 destinationDomain,
+  uint256 amount,
+  address receiver,
+  uint256 maxFee,
+  TransferSpeed speed
 ) external onlyOwner;
 ```
 
 Bridges USDC to a destination chain. The caller (owner) must have approved the bridge contract to spend the specified amount of USDC. Upon execution, the USDC is burned on the source chain and minted on the destination chain to the receiver address.
 
 Parameters:
+
 - `destinationDomain`: The CCTP domain ID of the destination chain
 - `amount`: Amount of USDC to bridge (must be > 0)
 - `receiver`: Recipient address on the destination chain
