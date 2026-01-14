@@ -50,7 +50,7 @@ contract DeployOFTOptimism is OptimismScript {
     new AaveOFTBridge{salt: salt}(
       0xF03b4d9AC1D5d1E7c4cEf54C2A313b9fe051A0aD, // USDT0 OFT (OUpgradeable)
       0x01bFF41798a0BcF287b996046Ca68b395DbC1071, // USDT0 Token
-      TOKEN_LOGIC  // owner
+      TOKEN_LOGIC // owner
     );
   }
 }
@@ -61,7 +61,7 @@ contract DeployOFTPlasma is PlasmaScript {
     new AaveOFTBridge{salt: salt}(
       0x02ca37966753bDdDf11216B73B16C1dE756A7CF9, // USDT0 OFT (OUpgradeable)
       0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb, // USDT0 Token
-      TOKEN_LOGIC  // owner
+      TOKEN_LOGIC // owner
     );
   }
 }
