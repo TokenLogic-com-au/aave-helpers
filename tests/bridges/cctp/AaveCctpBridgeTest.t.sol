@@ -10,6 +10,7 @@ import {IWithGuardian} from "solidity-utils/contracts/access-control/OwnableWith
 
 import {AaveCctpBridge} from "src/bridges/cctp/AaveCctpBridge.sol";
 import {IAaveCctpBridge} from "src/bridges/cctp/interfaces/IAaveCctpBridge.sol";
+import {MockMessageTransmitterV2} from "./mocks/MockMessageTransmitterV2.sol";
 import {MockTokenMessengerV2} from "./mocks/MockTokenMessengerV2.sol";
 import {CctpConstants} from "src/bridges/cctp/CctpConstants.sol";
 
@@ -66,15 +67,10 @@ contract AaveCctpBridgeTestBase is Test {
         ERC20Mock mockUsdc = new ERC20Mock();
         usdc = IERC20(address(mockUsdc));
 
-        mockTokenMessenger = new MockTokenMessengerV2(makeAddr("messageTransmitter"));
+        MockMessageTransmitterV2 mockMessageTransmitter = new MockMessageTransmitterV2(CctpConstants.ETHEREUM_DOMAIN);
+        mockTokenMessenger = new MockTokenMessengerV2(address(mockMessageTransmitter));
 
-        bridge = new AaveCctpBridge(
-            address(mockTokenMessenger),
-            address(usdc),
-            CctpConstants.ETHEREUM_DOMAIN,
-            owner,
-            guardian
-        );
+        bridge = new AaveCctpBridge(address(mockTokenMessenger), address(usdc), owner, guardian);
 
         // Set up collectors for different domains
         vm.startPrank(owner);
@@ -89,17 +85,17 @@ contract AaveCctpBridgeTestBase is Test {
 contract ConstructorTest is AaveCctpBridgeTestBase {
     function test_revertsIf_zeroTokenMessenger() public {
         vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
-        new AaveCctpBridge(address(0), address(usdc), CctpConstants.ETHEREUM_DOMAIN, owner, guardian);
+        new AaveCctpBridge(address(0), address(usdc), owner, guardian);
     }
 
     function test_revertsIf_zeroUsdc() public {
         vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
-        new AaveCctpBridge(address(mockTokenMessenger), address(0), CctpConstants.ETHEREUM_DOMAIN, owner, guardian);
+        new AaveCctpBridge(address(mockTokenMessenger), address(0), owner, guardian);
     }
 
     function test_revertsIf_zeroOwner() public {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableInvalidOwner.selector, address(0)));
-        new AaveCctpBridge(address(mockTokenMessenger), address(usdc), CctpConstants.ETHEREUM_DOMAIN, address(0), guardian);
+        new AaveCctpBridge(address(mockTokenMessenger), address(usdc), address(0), guardian);
     }
 
     function test_successful() public view {

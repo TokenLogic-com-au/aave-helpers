@@ -8,6 +8,7 @@ import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/Resc
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 
 import {IAaveCctpBridge} from "./interfaces/IAaveCctpBridge.sol";
+import {IMessageTransmitterV2} from "./interfaces/IMessageTransmitterV2.sol";
 import {ITokenMessengerV2} from "./interfaces/ITokenMessengerV2.sol";
 
 /// @title AaveCctpBridge
@@ -38,13 +39,11 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
 
     /// @param tokenMessenger The TokenMessengerV2 address on this chain
     /// @param usdc The USDC token address on this chain
-    /// @param localDomain The CCTP domain identifier for this chain
     /// @param owner The owner of the contract upon deployment
     /// @param guardian The initial guardian of the contract upon deployment
     constructor(
         address tokenMessenger,
         address usdc,
-        uint32 localDomain,
         address owner,
         address guardian
     ) OwnableWithGuardian(owner, guardian) {
@@ -53,7 +52,8 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
 
         TOKEN_MESSENGER = tokenMessenger;
         USDC = usdc;
-        LOCAL_DOMAIN = localDomain;
+        address localMessageTransmitter = ITokenMessengerV2(tokenMessenger).localMessageTransmitter();
+        LOCAL_DOMAIN = IMessageTransmitterV2(localMessageTransmitter).localDomain();
     }
 
     /// @inheritdoc IAaveCctpBridge

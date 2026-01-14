@@ -20,7 +20,6 @@ contract DeployCCTPBridgeEthereum is EthereumScript {
     new AaveCctpBridge{salt: salt}(
       CctpConstants.ETHEREUM_TOKEN_MESSENGER,
       CctpConstants.ETHEREUM_USDC,
-      CctpConstants.ETHEREUM_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
@@ -33,7 +32,6 @@ contract DeployCCTPBridgeArbitrum is ArbitrumScript {
     new AaveCctpBridge{salt: salt}(
       CctpConstants.ARBITRUM_TOKEN_MESSENGER,
       CctpConstants.ARBITRUM_USDC,
-      CctpConstants.ARBITRUM_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
@@ -46,7 +44,6 @@ contract DeployCCTPBridgeOptimism is OptimismScript {
     new AaveCctpBridge{salt: salt}(
       CctpConstants.OPTIMISM_TOKEN_MESSENGER,
       CctpConstants.OPTIMISM_USDC,
-      CctpConstants.OPTIMISM_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
@@ -59,7 +56,6 @@ contract DeployCCTPBridgePolygon is PolygonScript {
     new AaveCctpBridge{salt: salt}(
       CctpConstants.POLYGON_TOKEN_MESSENGER,
       CctpConstants.POLYGON_USDC,
-      CctpConstants.POLYGON_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );
@@ -72,7 +68,6 @@ contract DeployCCTPBridgeBase is BaseScript {
     new AaveCctpBridge{salt: salt}(
       CctpConstants.BASE_TOKEN_MESSENGER,
       CctpConstants.BASE_USDC,
-      CctpConstants.BASE_DOMAIN,
       TOKEN_LOGIC,
       GUARDIAN
     );

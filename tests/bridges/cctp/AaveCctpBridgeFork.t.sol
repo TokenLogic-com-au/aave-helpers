@@ -33,13 +33,7 @@ contract AaveCctpBridgeForkTest is Test {
 
         usdc = IERC20(CctpConstants.ETHEREUM_USDC);
 
-        bridge = new AaveCctpBridge(
-            CctpConstants.ETHEREUM_TOKEN_MESSENGER,
-            CctpConstants.ETHEREUM_USDC,
-            CctpConstants.ETHEREUM_DOMAIN,
-            owner,
-            guardian
-        );
+        bridge = new AaveCctpBridge(CctpConstants.ETHEREUM_TOKEN_MESSENGER, CctpConstants.ETHEREUM_USDC, owner, guardian);
 
         // Set up collectors for all destination domains
         vm.startPrank(owner);

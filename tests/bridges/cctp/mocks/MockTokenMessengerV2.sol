@@ -10,6 +10,8 @@ import {ITokenMessengerV2} from "src/bridges/cctp/interfaces/ITokenMessengerV2.s
 contract MockTokenMessengerV2 is ITokenMessengerV2 {
     using SafeERC20 for IERC20;
 
+    address internal immutable _localMessageTransmitter;
+
     // Track deposits for verification
     struct DepositRecord {
         uint256 amount;
@@ -40,8 +42,13 @@ contract MockTokenMessengerV2 is ITokenMessengerV2 {
     /// @dev Amount must be greater than zero
     error InvalidAmount();
 
-    constructor(address) {
+    constructor(address localMessageTransmitter_) {
         _nextNonce = 1;
+        _localMessageTransmitter = localMessageTransmitter_;
+    }
+
+    function localMessageTransmitter() external view override returns (address) {
+        return _localMessageTransmitter;
     }
 
     function depositForBurn(
