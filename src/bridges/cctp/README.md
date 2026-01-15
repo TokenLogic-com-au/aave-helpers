@@ -1,4 +1,4 @@
-# AaveCctpBridge
+# Aave CCTP Bridge
 
 The AaveCctpBridge is a contract to facilitate bridging USDC across chains using Circle's Cross-Chain Transfer Protocol (CCTP) V2. The contract provides a simplified interface for Aave DAO governance to move USDC between supported networks.
 
@@ -24,6 +24,43 @@ The exact numbers per chain can be found in the Circle documentation:
 - [cctp-standard-message-attestation-times](https://developers.circle.com/cctp/required-block-confirmations#cctp-standard-message-attestation-times)
 
 The `maxFee` parameter allows specifying the maximum fee (in USDC) willing to pay for Fast transfers.
+
+- For `TransferSpeed.Fast`, `maxFee` is the maximum fee you are willing to pay (in USDC base units).
+- For `TransferSpeed.Standard`, fees are `0` (per Iris) so `maxFee` should be set to `0`.
+
+### Querying fees for Fast transfers
+
+Circle exposes the minimum fee rate for a route (in basis points) via Iris. To derive a `maxFee` for `TransferSpeed.Fast`, query:
+
+Example:
+
+```bash
+# Arbitrum (3) -> Base (6)
+curl -s "https://iris-api.circle.com/v2/burn/USDC/fees/3/6"
+```
+
+- Mainnet: `GET https://iris-api.circle.com/v2/burn/USDC/fees/{sourceDomainId}/{destDomainId}`
+- Testnet: `GET https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/{sourceDomainId}/{destDomainId}`
+
+The response includes entries for `finalityThreshold` `1000` (Fast / Confirmed) and `2000` (Standard / Finalized).
+
+To derive a `maxFee` for `TransferSpeed.Fast`, use the `minimumFee` where `finalityThreshold == 1000`, then compute (rounding up):
+
+`maxFee = ceil(amount * minimumFee / 10_000)`
+
+**Denomination / decimals**
+
+- Onchain, both `amount` and `maxFee` are expected in the token’s smallest unit (for USDC: `6` decimals, i.e. `1 USDC = 1_000_000` base units).
+- The Iris API returns a fee _rate_ (`minimumFee` in bps). This value can be fractional (e.g. `1.3` bps), so do the computation off-chain using decimal math and then round up to base units.
+
+Example (1000 USDC, `minimumFee = 1.3` bps):
+
+- `amountBaseUnits = 1000 * 1_000_000 = 1_000_000_000`
+- choose `scale = 10` (one decimal place), so `minimumFeeScaled = 13`
+- `maxFeeBaseUnits = ceil(1_000_000_000 * 13 / (10_000 * 10)) = 130_000`
+- `130_000` base units = `0.13` USDC
+
+Note: the API returns a fee _rate_ (`minimumFee` in bps), not a precomputed absolute `maxFee`; you derive the absolute value from your `amount`.
 
 ## Permissions
 
@@ -51,6 +88,9 @@ Domain IDs are defined by Circle's CCTP. The complete list can be found in the [
 | Polygon   | 7         |
 | Unichain  | 10        |
 | Linea     | 11        |
+| Sonic     | 13        |
+| Monad     | 15        |
+| Ink       | 21        |
 
 ## Functions
 

@@ -10,6 +10,7 @@ import {IWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWith
 
 import {AaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
 import {IAaveCctpBridge} from 'src/bridges/cctp/interfaces/IAaveCctpBridge.sol';
+import {ITokenMessengerV2} from 'src/bridges/cctp/interfaces/ITokenMessengerV2.sol';
 import {MockMessageTransmitterV2} from './mocks/MockMessageTransmitterV2.sol';
 import {MockTokenMessengerV2} from './mocks/MockTokenMessengerV2.sol';
 import {CctpConstants} from 'src/bridges/cctp/CctpConstants.sol';
@@ -379,7 +380,7 @@ contract SetDestinationCollectorTest is AaveCctpBridgeTestBase {
     bridge.setDestinationCollectorNonEVM(CctpConstants.SOLANA_DOMAIN, newCollector);
     vm.stopPrank();
 
-    assertEq(bridge.getDestinationCollector(CctpConstants.ARBITRUM_DOMAIN), newCollector);
+    assertEq(bridge.getDestinationCollector(CctpConstants.SOLANA_DOMAIN), newCollector);
   }
 
   function test_canUpdateExisting() public {

@@ -45,8 +45,8 @@ interface IAaveCctpBridge {
   /// @notice Bridges USDC to a destination chain using CCTP V2
   /// @dev Receiver is the pre-configured collector for the destination domain
   /// @param destinationDomain The CCTP domain of the destination chain
-  /// @param amount The amount of USDC to bridge
-  /// @param maxFee Maximum fee willing to pay for Fast Transfer (in USDC)
+  /// @param amount The amount of USDC to bridge, denominated in USDC with 6 decimals, 1 USDC = 1_000_000
+  /// @param maxFee Maximum fee willing to pay for a Fast Transfer, denominated in USDC with 6 decimals, 1 USDC = 1_000_000
   /// @param speed Transfer speed (Fast or Standard)
   function bridge(
     uint32 destinationDomain,
