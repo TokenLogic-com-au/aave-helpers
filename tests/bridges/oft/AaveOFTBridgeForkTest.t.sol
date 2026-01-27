@@ -10,6 +10,7 @@ import {AaveV3Ethereum} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV3Arbitrum} from 'aave-address-book/AaveV3Arbitrum.sol';
 import {AaveV3Plasma} from 'aave-address-book/AaveV3Plasma.sol';
 import {IRescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
+import {IWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 
 import {OFTConstants} from './Constants.sol';
 import {AaveOFTBridge} from 'src/bridges/oft/AaveOFTBridge.sol';
@@ -29,6 +30,7 @@ contract AaveOFTBridgeForkTestBase is Test, OFTConstants {
   uint256 public arbitrumFork;
 
   address public owner = makeAddr('owner');
+  address public guardian = makeAddr('guardian');
   address public receiver;
 
   AaveOFTBridge public mainnetBridge;
@@ -46,7 +48,7 @@ contract AaveOFTBridgeForkTestBase is Test, OFTConstants {
     mainnetFork = vm.createSelectFork(vm.rpcUrl('mainnet'));
 
     // Use USDT0 OFT (OAdapterUpgradeable) on Ethereum for bridging
-    mainnetBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, owner);
+    mainnetBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, owner, guardian);
 
     receiver = address(AaveV3Arbitrum.COLLECTOR);
 
@@ -150,7 +152,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
     address notOwner = makeAddr('not-owner');
 
     vm.startPrank(notOwner);
-    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, notOwner));
     mainnetBridge.bridge(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
     vm.stopPrank();
   }
@@ -160,7 +162,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
 
     address deployer = makeAddr('bridge-deployer');
     vm.prank(deployer);
-    AaveOFTBridge unfundedBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, owner);
+    AaveOFTBridge unfundedBridge = new AaveOFTBridge(ETHEREUM_USDT0_OFT, owner, guardian);
     assertEq(address(unfundedBridge).balance, 0, 'Bridge should not be pre-funded');
 
     deal(ETHEREUM_USDT, owner, BRIDGE_AMOUNT);
@@ -233,7 +235,7 @@ contract BridgeArbitrumToEthereumTest is AaveOFTBridgeForkTestBase {
   function setUp() public override {
     arbitrumFork = vm.createSelectFork(vm.rpcUrl('arbitrum'));
     owner = makeAddr('owner');
-    arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, owner);
+    arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, owner, guardian);
   }
 
   function test_bridge_arbitrumToEthereum_10MillionUSDT() public {
@@ -405,7 +407,7 @@ contract ConstructorAndImmutablesTest is AaveOFTBridgeForkTestBase {
     arbitrumFork = vm.createSelectFork(vm.rpcUrl('arbitrum'));
     vm.selectFork(arbitrumFork);
 
-    arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, owner);
+    arbitrumBridge = new AaveOFTBridge(ARBITRUM_USDT0_OFT, owner, guardian);
 
     assertEq(arbitrumBridge.OFT_USDT(), ARBITRUM_USDT0_OFT, 'OFT_USDT should be set correctly');
     assertEq(arbitrumBridge.USDT(), ARBITRUM_USDT, 'USDT should be set correctly');

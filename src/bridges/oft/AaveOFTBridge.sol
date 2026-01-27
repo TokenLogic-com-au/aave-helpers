@@ -3,7 +3,7 @@ pragma solidity ^0.8.27;
 
 import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
-import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
+import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 
@@ -13,7 +13,7 @@ import {IOFT, SendParam, MessagingFee, OFTReceipt} from './interfaces/IOFT.sol';
 /// @title AaveOFTBridge
 /// @author @stevyhacker (TokenLogic)
 /// @notice Helper contract to bridge USDT using OFT V2 (LayerZero OFT)
-contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
+contract AaveOFTBridge is OwnableWithGuardian, Rescuable, IAaveOFTBridge {
   using SafeERC20 for IERC20;
 
   /// @inheritdoc IAaveOFTBridge
@@ -24,13 +24,13 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
 
   /// @param oftUsdt The OFT address for USDT on this chain
   /// @param owner The owner of the contract upon deployment
-  constructor(address oftUsdt, address owner) Ownable(owner) {
+  constructor(address oftUsdt, address owner, address guardian) OwnableWithGuardian(owner, guardian) {
     require(oftUsdt != address(0), InvalidZeroAddress());
     OFT_USDT = oftUsdt;
     USDT = IOFT(OFT_USDT).token();
   }
 
-  /// @dev Default receive function enabling the contract to accept native tokens for refunds
+  /// @dev Default receive function enabling the contract to accept native tokens for gas fees
   receive() external payable {}
 
   /// @inheritdoc IAaveOFTBridge
@@ -39,7 +39,7 @@ contract AaveOFTBridge is Ownable, Rescuable, IAaveOFTBridge {
     uint256 amount,
     address receiver,
     uint256 minAmountLD
-  ) external payable onlyOwner {
+  ) external payable onlyOwnerOrGuardian {
     require(amount >= 1, InvalidZeroAmount());
 
     IERC20(USDT).safeTransferFrom(msg.sender, address(this), amount);

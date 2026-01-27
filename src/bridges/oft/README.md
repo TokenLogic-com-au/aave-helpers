@@ -42,8 +42,8 @@ uint256 expectedReceived = bridge.quoteOFT(dstEid, amount, receiver);
 // 2. Quote the native fee
 uint256 fee = bridge.quoteBridge(dstEid, amount, receiver, expectedReceived);
 
-// 3. Transfer USDT to the bridge contract
-IERC20(usdt).transfer(address(bridge), amount);
+// 3. Approve USDT to the bridge contract
+IERC20(usdt).approve(address(bridge), amount);
 
 // 4. Ensure bridge has native tokens for fees
 // (can be sent beforehand or via governance proposal)
