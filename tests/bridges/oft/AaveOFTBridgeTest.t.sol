@@ -27,6 +27,8 @@ contract AaveOFTBridgeTestBase is Test {
 
   AaveOFTBridge bridge;
 
+  uint256 public maxFee;
+
   event Bridge(
     address indexed token,
     uint32 indexed dstEid,
@@ -44,7 +46,7 @@ contract AaveOFTBridgeTestBase is Test {
     mockOFT = new MockOFT(address(usdt));
 
     bridge = new AaveOFTBridge(address(mockOFT), owner, guardian);
-
+    maxFee = bridge.quoteBridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT);
     vm.deal(address(bridge), 10 ether);
   }
 }
@@ -66,14 +68,14 @@ contract BridgeTest is AaveOFTBridgeTestBase {
   function test_revertsIf_callerNotOwner() public {
     vm.startPrank(alice);
     vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
-    bridge.bridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT);
+    bridge.bridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT, maxFee);
     vm.stopPrank();
   }
 
   function test_revertsIf_zeroAmount() public {
     vm.startPrank(owner);
     vm.expectRevert(IAaveOFTBridge.InvalidZeroAmount.selector);
-    bridge.bridge(ARBITRUM_EID, 0, receiver, 0);
+    bridge.bridge(ARBITRUM_EID, 0, receiver, 0, maxFee);
     vm.stopPrank();
   }
 
@@ -87,7 +89,7 @@ contract BridgeTest is AaveOFTBridgeTestBase {
     vm.expectEmit(true, true, true, true, address(bridge));
     emit Bridge(address(usdt), ARBITRUM_EID, receiver, AMOUNT, AMOUNT);
 
-    bridge.bridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT);
+    bridge.bridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT, maxFee);
 
     vm.stopPrank();
 
@@ -108,7 +110,9 @@ contract BridgeTest is AaveOFTBridgeTestBase {
     vm.expectEmit(true, true, true, true, address(bridge));
     emit Bridge(address(usdt), dstEid, receiver, amount, amount);
 
-    bridge.bridge(dstEid, amount, receiver, amount);
+    uint256 fee = bridge.quoteBridge(dstEid, amount, receiver, amount);
+
+    bridge.bridge(dstEid, amount, receiver, amount, fee);
 
     vm.stopPrank();
 

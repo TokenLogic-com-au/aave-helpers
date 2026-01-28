@@ -38,7 +38,8 @@ contract AaveOFTBridge is OwnableWithGuardian, Rescuable, IAaveOFTBridge {
     uint32 dstEid,
     uint256 amount,
     address receiver,
-    uint256 minAmountLD
+    uint256 minAmountLD,
+    uint256 maxFee
   ) external payable onlyOwnerOrGuardian {
     require(amount >= 1, InvalidZeroAmount());
 
@@ -47,6 +48,8 @@ contract AaveOFTBridge is OwnableWithGuardian, Rescuable, IAaveOFTBridge {
     SendParam memory sendParam = _buildSendParam(dstEid, amount, receiver, minAmountLD);
 
     MessagingFee memory messagingFee = IOFT(OFT_USDT).quoteSend(sendParam, false);
+
+    require(messagingFee.nativeFee <= maxFee, ExceedsMaxFee());
 
     IERC20(USDT).forceApprove(OFT_USDT, amount);
 

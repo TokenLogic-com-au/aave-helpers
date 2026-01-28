@@ -25,6 +25,7 @@ contract AaveOFTBridgeForkTestBase is Test, OFTConstants {
 
   uint256 public constant LARGE_BRIDGE_AMOUNT = 10_000_000e6; // 10 million USDT
   uint256 public constant BRIDGE_AMOUNT = 1000e6; // 1000 USDT
+  uint256 public maxFee;
 
   uint256 public mainnetFork;
   uint256 public arbitrumFork;
@@ -53,6 +54,9 @@ contract AaveOFTBridgeForkTestBase is Test, OFTConstants {
     receiver = address(AaveV3Arbitrum.COLLECTOR);
 
     vm.deal(address(mainnetBridge), 100 ether);
+
+    maxFee = mainnetBridge.quoteBridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+
   }
 }
 
@@ -127,7 +131,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
     vm.expectEmit(true, true, true, true, address(mainnetBridge));
     emit Bridge(ETHEREUM_USDT, ARBITRUM_EID, receiver, BRIDGE_AMOUNT, BRIDGE_AMOUNT);
 
-    mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+    mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT, fee);
 
     vm.stopPrank();
 
@@ -153,7 +157,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
 
     vm.startPrank(notOwner);
     vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, notOwner));
-    mainnetBridge.bridge(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT);
+    mainnetBridge.bridge(ARBITRUM_EID, LARGE_BRIDGE_AMOUNT, receiver, LARGE_BRIDGE_AMOUNT, 0);
     vm.stopPrank();
   }
 
@@ -180,7 +184,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
     emit Bridge(ETHEREUM_USDT, ARBITRUM_EID, receiver, BRIDGE_AMOUNT, BRIDGE_AMOUNT);
 
     // Send ETH fee as msg.value instead of pre-funding the bridge
-    unfundedBridge.bridge{value: fee}(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+    unfundedBridge.bridge{value: fee}(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT, fee);
 
     vm.stopPrank();
 
@@ -208,7 +212,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
     vm.startPrank(owner);
     SafeERC20.forceApprove(IERC20(ETHEREUM_USDT), address(mainnetBridge), BRIDGE_AMOUNT);
     // Bridge with exact amount (OFT guarantees 1:1)
-    mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT);
+    mainnetBridge.bridge(ARBITRUM_EID, BRIDGE_AMOUNT, receiver, BRIDGE_AMOUNT, maxFee);
     vm.stopPrank();
 
     assertEq(
@@ -223,7 +227,7 @@ contract BridgeEthereumToArbitrumTest is AaveOFTBridgeForkTestBase {
 
     vm.prank(owner);
     vm.expectRevert(IAaveOFTBridge.InvalidZeroAmount.selector);
-    mainnetBridge.bridge(ARBITRUM_EID, 0, receiver, 0);
+    mainnetBridge.bridge(ARBITRUM_EID, 0, receiver, 0, 0);
   }
 }
 
@@ -275,7 +279,7 @@ contract BridgeArbitrumToEthereumTest is AaveOFTBridgeForkTestBase {
     vm.expectEmit(true, true, true, true, address(arbitrumBridge));
     emit Bridge(ARBITRUM_USDT, ETHEREUM_EID, ethReceiver, LARGE_BRIDGE_AMOUNT, LARGE_BRIDGE_AMOUNT);
 
-    arbitrumBridge.bridge(ETHEREUM_EID, LARGE_BRIDGE_AMOUNT, ethReceiver, LARGE_BRIDGE_AMOUNT);
+    arbitrumBridge.bridge(ETHEREUM_EID, LARGE_BRIDGE_AMOUNT, ethReceiver, LARGE_BRIDGE_AMOUNT, fee);
 
     vm.stopPrank();
 

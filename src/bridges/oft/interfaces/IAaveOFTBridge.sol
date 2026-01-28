@@ -8,6 +8,9 @@ interface IAaveOFTBridge {
   /// @dev Thrown when a zero address is provided
   error InvalidZeroAddress();
 
+  /// @dev Thrown when the max fee is exceeded
+  error ExceedsMaxFee();
+
   /// @notice Emitted when USDT is bridged to a destination chain
   /// @param token The token address being bridged
   /// @param dstEid The destination LayerZero endpoint ID
@@ -27,11 +30,13 @@ interface IAaveOFTBridge {
   /// @param amount The amount of USDT to bridge
   /// @param receiver The receiver address on the destination chain
   /// @param minAmountLD The minimum amount to receive on destination (slippage protection)
+  /// @param maxFee The maximum native fee in ETH wei allowed for the bridge
   function bridge(
     uint32 dstEid,
     uint256 amount,
     address receiver,
-    uint256 minAmountLD
+    uint256 minAmountLD,
+    uint256 maxFee
   ) external payable;
 
   /// @notice Returns the OFT address for USDT on the deployed chain
