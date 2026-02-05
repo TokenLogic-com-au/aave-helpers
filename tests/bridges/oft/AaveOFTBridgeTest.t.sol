@@ -6,7 +6,6 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {ERC20Mock} from 'openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol';
 import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
 import {IRescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
-import {IWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 
 import {AaveOFTBridge} from 'src/bridges/oft/AaveOFTBridge.sol';
 import {IAaveOFTBridge} from 'src/bridges/oft/interfaces/IAaveOFTBridge.sol';
@@ -23,7 +22,6 @@ contract AaveOFTBridgeTestBase is Test {
   address public owner = makeAddr('owner');
   address public alice = makeAddr('alice');
   address public receiver = makeAddr('receiver');
-  address public guardian = makeAddr('guardian');
 
   AaveOFTBridge bridge;
 
@@ -45,7 +43,7 @@ contract AaveOFTBridgeTestBase is Test {
 
     mockOFT = new MockOFT(address(usdt));
 
-    bridge = new AaveOFTBridge(address(mockOFT), owner, guardian);
+    bridge = new AaveOFTBridge(address(mockOFT), owner);
     maxFee = bridge.quoteBridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT);
     vm.deal(address(bridge), 10 ether);
   }
@@ -54,7 +52,7 @@ contract AaveOFTBridgeTestBase is Test {
 contract ConstructorTest is AaveOFTBridgeTestBase {
   function test_revertsIf_zero_oft_address() public {
     vm.expectRevert(IAaveOFTBridge.InvalidZeroAddress.selector);
-    new AaveOFTBridge(address(0), owner, guardian);
+    new AaveOFTBridge(address(0), owner);
   }
 
   function test_successful() public view {
@@ -67,7 +65,7 @@ contract ConstructorTest is AaveOFTBridgeTestBase {
 contract BridgeTest is AaveOFTBridgeTestBase {
   function test_revertsIf_callerNotOwner() public {
     vm.startPrank(alice);
-    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
     bridge.bridge(ARBITRUM_EID, AMOUNT, receiver, AMOUNT, maxFee);
     vm.stopPrank();
   }
