@@ -31,6 +31,7 @@ import {GovernanceV3Mantle} from 'aave-address-book/GovernanceV3Mantle.sol';
 import {GovernanceV3Soneium} from 'aave-address-book/GovernanceV3Soneium.sol';
 import {GovernanceV3Ink} from 'aave-address-book/GovernanceV3Ink.sol';
 import {GovernanceV3Plasma} from 'aave-address-book/GovernanceV3Plasma.sol';
+import {GovernanceV3MegaEth} from 'aave-address-book/GovernanceV3MegaEth.sol';
 import {GovernanceV3Bob} from 'aave-address-book/GovernanceV3Bob.sol';
 import {MiscEthereum} from 'aave-address-book/MiscEthereum.sol';
 import {Create2Utils} from 'solidity-utils/contracts/utils/ScriptUtils.sol';
@@ -83,6 +84,8 @@ library GovV3Helpers {
   error LongBytesNotSupportedYet();
   error FfiFailed();
   error PayloadAlreadyCreated();
+  error ExpirationMustBeInTheFuture(uint256 chainId, uint40 payloadId);
+  error MustBeInCreatedState(uint256 chainId, uint40 payloadId);
 
   struct StorageRootResponse {
     address account;
@@ -961,6 +964,30 @@ library GovV3Helpers {
    * @param vm Vm
    * @param actions actions array
    */
+  function buildMegaEthPayload(
+    Vm vm,
+    IPayloadsControllerCore.ExecutionAction[] memory actions
+  ) internal returns (PayloadsControllerUtils.Payload memory) {
+    return _buildPayload(vm, ChainIds.MEGAETH, actions);
+  }
+
+  /**
+   * Builds a payload to be executed via governance
+   * @param vm Vm
+   * @param action single action struct
+   */
+  function buildMegaEthPayload(
+    Vm vm,
+    IPayloadsControllerCore.ExecutionAction memory action
+  ) internal returns (PayloadsControllerUtils.Payload memory) {
+    return _buildPayload(vm, ChainIds.MEGAETH, action);
+  }
+
+  /**
+   * Builds a payload to be executed via governance
+   * @param vm Vm
+   * @param actions actions array
+   */
   function buildBobPayload(
     Vm vm,
     IPayloadsControllerCore.ExecutionAction[] memory actions
@@ -1113,6 +1140,8 @@ library GovV3Helpers {
       return GovernanceV3Ink.PAYLOADS_CONTROLLER;
     } else if (chainId == ChainIds.PLASMA) {
       return GovernanceV3Plasma.PAYLOADS_CONTROLLER;
+    } else if (chainId == ChainIds.MEGAETH) {
+      return GovernanceV3MegaEth.PAYLOADS_CONTROLLER;
     } else if (chainId == ChainIds.BOB) {
       return GovernanceV3Bob.PAYLOADS_CONTROLLER;
     }
@@ -1215,7 +1244,7 @@ library GovV3Helpers {
     uint256 chainId,
     IPayloadsControllerCore payloadsController,
     IPayloadsControllerCore.ExecutionAction[] memory actions
-  ) private returns (PayloadsControllerUtils.AccessControl, uint40) {
+  ) internal returns (PayloadsControllerUtils.AccessControl, uint40) {
     (uint256 prevFork, uint256 currentFork) = ChainHelpers.selectChain(vm, chainId);
     (uint40 payloadId, IPayloadsControllerCore.Payload memory payload) = _findPayloadId(
       payloadsController,
@@ -1223,9 +1252,12 @@ library GovV3Helpers {
     );
     require(
       payload.state == IPayloadsControllerCore.PayloadState.Created,
-      'MUST_BE_IN_CREATED_STATE'
+      MustBeInCreatedState(chainId, payloadId)
     );
-    require(payload.expirationTime >= block.timestamp, 'EXPIRATION_MUST_BE_IN_THE_FUTURE');
+    require(
+      payload.expirationTime >= block.timestamp + 7 days,
+      ExpirationMustBeInTheFuture(chainId, payloadId)
+    );
     if (prevFork != currentFork) {
       ChainHelpers.selectChain(vm, ChainIds.MAINNET);
     }
