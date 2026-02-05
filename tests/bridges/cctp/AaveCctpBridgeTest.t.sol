@@ -6,7 +6,6 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {ERC20Mock} from 'openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol';
 import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
 import {IRescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
-import {IWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 
 import {AaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
 import {IAaveCctpBridge} from 'src/bridges/cctp/interfaces/IAaveCctpBridge.sol';
@@ -111,10 +110,10 @@ contract ConstructorTest is AaveCctpBridgeTestBase {
 }
 
 contract BridgeTest is AaveCctpBridgeTestBase {
-  function test_revertsIf_callerNotOwnerOrGuardian() public {
+  function test_revertsIf_callerNotOwner() public {
     vm.startPrank(alice);
     vm.expectRevert(
-      abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice)
+      abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice)
     );
     bridge.bridge(CctpConstants.ARBITRUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
     vm.stopPrank();
@@ -202,25 +201,13 @@ contract BridgeTest is AaveCctpBridgeTestBase {
     );
   }
 
-  function test_successful_guardianCanBridge() public {
-    deal(address(usdc), guardian, AMOUNT);
-
+  function test_revertsIf_guardianTriesToBridge() public {
     vm.startPrank(guardian);
-    usdc.approve(address(bridge), AMOUNT);
-
-    vm.expectEmit(true, true, true, true, address(bridge));
-    emit Bridge(
-      address(usdc),
-      CctpConstants.ARBITRUM_DOMAIN,
-      _addressToBytes32(receiver),
-      AMOUNT,
-      IAaveCctpBridge.TransferSpeed.Fast
+    vm.expectRevert(
+      abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, guardian)
     );
-
     bridge.bridge(CctpConstants.ARBITRUM_DOMAIN, AMOUNT, 1000, IAaveCctpBridge.TransferSpeed.Fast);
     vm.stopPrank();
-
-    assertEq(usdc.balanceOf(address(bridge)), 0, 'Bridge should have no USDC left');
   }
 
   function test_fuzz_successful(uint256 amount, uint32 dstDomain) public {

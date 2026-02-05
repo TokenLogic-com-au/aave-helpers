@@ -5,7 +5,6 @@ import {Test} from 'forge-std/Test.sol';
 import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
-import {IWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
 
 import {AaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
 import {IAaveCctpBridge} from 'src/bridges/cctp/interfaces/IAaveCctpBridge.sol';
@@ -105,11 +104,9 @@ contract AaveCctpBridgeForkTest is Test {
     _bridgeTo(CctpConstants.BASE_DOMAIN, 0, IAaveCctpBridge.TransferSpeed.Standard);
   }
 
-  function test_revertsIf_callerNotOwnerOrGuardian() public {
+  function test_revertsIf_callerNotOwner() public {
     vm.startPrank(alice);
-    vm.expectRevert(
-      abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice)
-    );
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
     bridge.bridge(CctpConstants.ARBITRUM_DOMAIN, AMOUNT, 0, IAaveCctpBridge.TransferSpeed.Fast);
     vm.stopPrank();
   }

@@ -5,7 +5,7 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
-import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
+import {Ownable} from 'openzeppelin-contracts/contracts/access/Ownable.sol';
 
 import {IAaveCctpBridge} from './interfaces/IAaveCctpBridge.sol';
 import {IMessageTransmitterV2} from './interfaces/IMessageTransmitterV2.sol';
@@ -14,7 +14,7 @@ import {ITokenMessengerV2} from './interfaces/ITokenMessengerV2.sol';
 /// @title AaveCctpBridge
 /// @author stevyhacker (TokenLogic)
 /// @notice Helper contract to bridge USDC using Circle's CCTP V2
-contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
+contract AaveCctpBridge is Ownable, Rescuable, IAaveCctpBridge {
   using SafeERC20 for IERC20;
 
   /// @notice Finality threshold constant for Fast Transfer is 1000 and means just tx confirmation is sufficient
@@ -40,13 +40,11 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
   /// @param tokenMessenger The TokenMessengerV2 address on this chain
   /// @param usdc The USDC token address on this chain
   /// @param owner The owner of the contract upon deployment
-  /// @param guardian The initial guardian of the contract upon deployment
   constructor(
     address tokenMessenger,
     address usdc,
-    address owner,
-    address guardian
-  ) OwnableWithGuardian(owner, guardian) {
+    address owner
+  ) Ownable(owner) {
     if (tokenMessenger == address(0)) revert InvalidZeroAddress();
     if (usdc == address(0)) revert InvalidZeroAddress();
 
@@ -62,7 +60,7 @@ contract AaveCctpBridge is OwnableWithGuardian, Rescuable, IAaveCctpBridge {
     uint256 amount,
     uint256 maxFee,
     TransferSpeed speed
-  ) external onlyOwnerOrGuardian {
+  ) external onlyOwner {
     require(amount > 0, InvalidZeroAmount());
     require(destinationDomain != LOCAL_DOMAIN, InvalidDestinationDomain());
     bytes32 receiver = _destinations[destinationDomain];
