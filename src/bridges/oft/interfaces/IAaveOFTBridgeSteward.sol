@@ -2,6 +2,18 @@
 pragma solidity ^0.8.0;
 
 interface IAaveOFTBridgeSteward {
+  /// @dev Thrown when bridge amount is zero
+  error InvalidZeroAmount();
+
+  /// @dev Thrown when a zero address is provided
+  error InvalidZeroAddress();
+
+  /// @dev Thrown when the max fee is exceeded
+  error ExceedsMaxFee();
+
+  /// @dev Thrown when a recipient is passed which is not allowed in the mapping
+  error OnlyAllowedRecipients();
+
   /// @notice Emitted when USDT is bridged to a destination chain
   /// @param token The token address being bridged
   /// @param dstEid The destination LayerZero endpoint ID
@@ -15,18 +27,6 @@ interface IAaveOFTBridgeSteward {
     uint256 amount,
     uint256 minAmountReceived
   );
-
-  /// @dev Thrown when bridge amount is zero
-  error InvalidZeroAmount();
-
-  /// @dev Thrown when a zero address is provided
-  error InvalidZeroAddress();
-
-  /// @dev Thrown when the max fee is exceeded
-  error ExceedsMaxFee();
-
-  /// @dev Thrown when a recipient is passed which is not allowed in the mapping
-  error OnlyAllowedRecipients();
 
   /// @notice Bridges USDT to a destination chain using OFT
   /// @param dstEid The destination LayerZero endpoint ID

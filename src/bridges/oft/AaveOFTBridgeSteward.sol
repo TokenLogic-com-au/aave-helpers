@@ -5,7 +5,6 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ICollector} from 'aave-v3-origin/contracts/treasury/ICollector.sol';
 import {OwnableWithGuardian} from 'solidity-utils/contracts/access-control/OwnableWithGuardian.sol';
-import {Rescuable} from 'solidity-utils/contracts/utils/Rescuable.sol';
 import {RescuableBase, IRescuableBase} from 'solidity-utils/contracts/utils/RescuableBase.sol';
 
 import {IAaveOFTBridgeSteward} from './interfaces/IAaveOFTBridgeSteward.sol';

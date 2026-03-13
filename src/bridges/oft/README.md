@@ -21,11 +21,11 @@ USDT0 is Tether's official cross-chain solution using LayerZero's OFT standard. 
 
 ### `bridge()`
 
-Bridges USDT to a destination chain. The steward pulls USDT from the Aave Collector via `ICollector.transfer()`, so it must have the Collector `FUNDS_ADMIN` role and needs to have or receive sufficient native tokens for the LayerZero messaging fee.
+Bridges USDT to a destination chain. The steward pulls USDT from the Aave Collector via `ICollector.transfer()`, so it must have the Collector `FUNDS_ADMIN` role. The quoted LayerZero messaging fee should be supplied as native token value with the `bridge()` call.
 
 ### `quoteBridge()`
 
-Returns the native token fee required for bridging. Call this before `bridge()` to know how much native token to send.
+Returns the native token fee required for bridging. Call this before `bridge()` to know how much native token value to send with the transaction.
 
 ### `quoteOFT()`
 
@@ -48,11 +48,8 @@ IAccessControl(address(collector)).grantRole(
     address(bridge)
 );
 
-// 4. Ensure bridge has native tokens for fees
-// (can be sent beforehand or via governance proposal)
-
-// 5. Execute the bridge
-bridge.bridge(dstEid, amount, receiver, expectedReceived, fee);
+// 4. Execute the bridge, sending the quoted native fee
+bridge.bridge{value: fee}(dstEid, amount, receiver, expectedReceived, fee);
 ```
 
 ## Permissions
@@ -73,7 +70,7 @@ Only the owner can:
 
 ## Security Considerations
 
-- The contract inherits from `Rescuable`, allowing token rescue in case of issues
+- The contract inherits from `RescuableBase`, exposing rescue hooks used by the steward's rescue functions
 - Slippage protection via `minAmountLD` parameter prevents receiving less than expected
 - The `quoteOFT()` function should be called immediately before bridging to get accurate amounts
 - Only the owner or guardian can execute bridges, and only to explicitly allowed receivers
@@ -128,7 +125,7 @@ USDT0 is currently deployed on the following chains:
 
 ## Known Limitations
 
-1. **Same Asset Only**: Only USDT-to-USDT bridging is supported.
+1. **USDT0 Only**: Only transfers within the USDT0 system are supported.
 
 2. **LayerZero Fees**: A small native token fee is required for the LayerZero messaging. Use `quoteBridge()` to get the exact fee.
 
