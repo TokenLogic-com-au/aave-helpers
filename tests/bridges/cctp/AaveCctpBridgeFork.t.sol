@@ -5,16 +5,13 @@ import {AaveV3Ethereum} from 'aave-address-book/AaveV3Ethereum.sol';
 import {IAccessControl} from 'openzeppelin-contracts/contracts/access/IAccessControl.sol';
 import {Test} from 'forge-std/Test.sol';
 import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
-import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {IWithGuardian} from 'solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol';
 
 import {AaveCctpBridge} from 'src/bridges/cctp/AaveCctpBridge.sol';
 import {IAaveCctpBridge} from 'src/bridges/cctp/interfaces/IAaveCctpBridge.sol';
 import {CctpConstants} from 'src/bridges/cctp/CctpConstants.sol';
 
-contract AaveCctpBridgeForkTest is Test {
-  using SafeERC20 for IERC20;
-
+contract AaveCctpBridgeForkTestBase is Test {
   AaveCctpBridge public bridge;
   IERC20 public usdc;
   address public owner = makeAddr('owner');
@@ -44,7 +41,7 @@ contract AaveCctpBridgeForkTest is Test {
     deal(address(usdc), collector, amount);
   }
 
-  function setUp() public {
+  function setUp() public virtual {
     string memory rpcUrl = vm.envOr('RPC_MAINNET', string(''));
     vm.createSelectFork(rpcUrl);
 
@@ -121,7 +118,9 @@ contract AaveCctpBridgeForkTest is Test {
       'Collector should transfer USDC'
     );
   }
+}
 
+contract BridgeEvmTest is AaveCctpBridgeForkTestBase {
   function test_bridge_fast() public {
     _bridgeToEvm(
       CctpConstants.ARBITRUM_DOMAIN,
@@ -190,15 +189,6 @@ contract AaveCctpBridgeForkTest is Test {
 
   function test_bridge_to_polygon() public {
     _bridgeToEvm(CctpConstants.POLYGON_DOMAIN, receiver, 0, IAaveCctpBridge.TransferSpeed.Standard);
-  }
-
-  function test_bridge_to_solana() public {
-    _bridgeToNonEvm(
-      CctpConstants.SOLANA_DOMAIN,
-      _addressToBytes32(receiver),
-      0,
-      IAaveCctpBridge.TransferSpeed.Standard
-    );
   }
 
   function test_bridge_to_unichain() public {
@@ -286,7 +276,20 @@ contract AaveCctpBridgeForkTest is Test {
     );
     vm.stopPrank();
   }
+}
 
+contract BridgeNonEvmTest is AaveCctpBridgeForkTestBase {
+  function test_bridge_to_solana() public {
+    _bridgeToNonEvm(
+      CctpConstants.SOLANA_DOMAIN,
+      _addressToBytes32(receiver),
+      0,
+      IAaveCctpBridge.TransferSpeed.Standard
+    );
+  }
+}
+
+contract ConstructorTest is AaveCctpBridgeForkTestBase {
   function test_revertsIf_constructorTokenMessengerZero() public {
     vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
     new AaveCctpBridge(address(0), CctpConstants.ETHEREUM_USDC, owner, guardian, collector);
@@ -324,19 +327,25 @@ contract AaveCctpBridgeForkTest is Test {
       address(0)
     );
   }
+}
 
+contract SetAllowedReceiverTest is AaveCctpBridgeForkTestBase {
   function test_revertsIf_setAllowedReceiverZeroAddress() public {
     vm.prank(owner);
     vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
     bridge.setAllowedReceiver(address(0), true);
   }
+}
 
+contract SetAllowedReceiverNonEvmTest is AaveCctpBridgeForkTestBase {
   function test_revertsIf_setAllowedReceiverNonEvmZeroAddress() public {
     vm.prank(owner);
     vm.expectRevert(IAaveCctpBridge.InvalidZeroAddress.selector);
     bridge.setAllowedReceiverNonEVM(bytes32(0), true);
   }
+}
 
+contract RescuableTest is AaveCctpBridgeForkTestBase {
   function test_rescueToken_guardian() public {
     AaveCctpBridge rescueBridge = _deployBridge(receiver);
     deal(address(usdc), address(rescueBridge), AMOUNT);
