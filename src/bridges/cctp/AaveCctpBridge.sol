@@ -117,6 +117,13 @@ contract AaveCctpBridge is OwnableWithGuardian, RescuableBase, IAaveCctpBridge {
     return IERC20(token).balanceOf(address(this));
   }
 
+  /// @notice Executes a USDC bridge transfer using CCTP V2
+  /// @dev Pulls USDC from the source collector, approves the token messenger, and burns for minting on the destination domain
+  /// @param destinationDomain The CCTP domain of the destination chain
+  /// @param amount The amount of USDC to bridge, denominated in USDC with 6 decimals, 1 USDC = 1_000_000
+  /// @param receiver The destination receiver identifier
+  /// @param maxFee Maximum fee willing to pay for a Fast Transfer, denominated in USDC with 6 decimals, 1 USDC = 1_000_000
+  /// @param speed Transfer speed (Fast or Standard)
   function _bridge(
     uint32 destinationDomain,
     uint256 amount,

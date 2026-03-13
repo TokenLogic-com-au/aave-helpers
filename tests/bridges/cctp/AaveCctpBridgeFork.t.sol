@@ -71,6 +71,15 @@ contract AaveCctpBridgeForkTest is Test {
     _fundCollector(AMOUNT);
     uint256 collectorBalanceBefore = usdc.balanceOf(collector);
 
+    vm.expectEmit(true, true, true, true, address(bridge));
+    emit IAaveCctpBridge.Bridge(
+      address(usdc),
+      destinationDomain,
+      _addressToBytes32(destinationReceiver),
+      AMOUNT,
+      speed
+    );
+
     vm.startPrank(owner);
     bridge.bridge(destinationDomain, AMOUNT, destinationReceiver, maxFee, speed);
     vm.stopPrank();
@@ -91,6 +100,15 @@ contract AaveCctpBridgeForkTest is Test {
   ) internal {
     _fundCollector(AMOUNT);
     uint256 collectorBalanceBefore = usdc.balanceOf(collector);
+
+    vm.expectEmit(true, true, true, true, address(bridge));
+    emit IAaveCctpBridge.Bridge(
+      address(usdc),
+      destinationDomain,
+      destinationReceiver,
+      AMOUNT,
+      speed
+    );
 
     vm.startPrank(owner);
     bridge.bridgeNonEvm(destinationDomain, AMOUNT, destinationReceiver, maxFee, speed);
@@ -116,6 +134,15 @@ contract AaveCctpBridgeForkTest is Test {
   function test_bridge_fast_guardian() public {
     _fundCollector(AMOUNT);
     uint256 collectorBalanceBefore = usdc.balanceOf(collector);
+
+    vm.expectEmit(true, true, true, true, address(bridge));
+    emit IAaveCctpBridge.Bridge(
+      address(usdc),
+      CctpConstants.ARBITRUM_DOMAIN,
+      _addressToBytes32(receiver),
+      AMOUNT,
+      IAaveCctpBridge.TransferSpeed.Fast
+    );
 
     vm.prank(guardian);
     bridge.bridge(
