@@ -7,6 +7,7 @@ import {IERC20} from 'openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 import {IERC20Metadata} from 'openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ReserveConfiguration} from 'aave-v3-origin/contracts/protocol/libraries/configuration/ReserveConfiguration.sol';
+import {EModeConfiguration} from 'aave-v3-origin/contracts/protocol/libraries/configuration/EModeConfiguration.sol';
 import {PercentageMath} from 'aave-v3-origin/contracts/protocol/libraries/math/PercentageMath.sol';
 import {WadRayMath} from 'aave-v3-origin/contracts/protocol/libraries/math/WadRayMath.sol';
 import {IDefaultInterestRateStrategyV2} from 'aave-v3-origin/contracts/interfaces/IDefaultInterestRateStrategyV2.sol';
@@ -21,6 +22,7 @@ import {ILegacyDefaultInterestRateStrategy} from './dependencies/ILegacyDefaultI
 import {Strings} from 'openzeppelin-contracts/contracts/utils/Strings.sol';
 import {SeatbeltUtils} from './SeatbeltUtils.sol';
 import {GovV3Helpers} from './GovV3Helpers.sol';
+import {IPayloadsControllerCore, PayloadsControllerUtils} from 'aave-address-book/GovernanceV3.sol';
 
 struct InterestStrategyValues {
   address addressesProvider;
@@ -94,8 +96,6 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
     uint256 gasUsed = startGas - gasleft();
     assertLt(gasUsed, (block.gaslimit * 95) / 100, 'BLOCK_GAS_LIMIT_EXCEEDED'); // 5% is kept as a buffer
 
-    ReserveConfig[] memory configAfter = createConfigurationSnapshot(afterString, pool);
-
     {
       string memory rawDiff = vm.getStateDiffJson();
       vm.writeJson(rawDiff, string(abi.encodePacked('./reports/', afterString, '.json')), '$.raw');
@@ -104,6 +104,16 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
         logsJson,
         string(abi.encodePacked('./reports/', afterString, '.json')),
         '$.logs'
+      );
+    }
+
+    // as executor does delegateCall to the payload, the executor should have no storage changes
+    {
+      IPayloadsControllerCore pc = GovV3Helpers.getPayloadsController(pool, block.chainid);
+      _validateNoExecutorStorageChange(
+        pc
+          .getExecutorSettingsByAccessControl(PayloadsControllerUtils.AccessControl.Level_1)
+          .executor
       );
     }
 
@@ -116,13 +126,16 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
       );
     }
 
-    configChangePlausibilityTest(configBefore, configAfter);
+    ReserveConfig[] memory configAfter = createConfigurationSnapshot(afterString, pool);
+
+    configChangePlausibilityTest(pool, configBefore, configAfter);
 
     if (runE2E) e2eTest(pool);
     return (configBefore, configAfter);
   }
 
   function configChangePlausibilityTest(
+    IPool pool,
     ReserveConfig[] memory configBefore,
     ReserveConfig[] memory configAfter
   ) public view {
@@ -133,10 +146,16 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
       if (i < configsBeforeLength) {
         // borrow increase should only happen on assets with borrowing enabled
         // unless it is setting a borrow cap for the first time
+        // or the asset is borrowable in an e-mode (matching ValidationLogic.validateBorrow)
         if (
           configBefore[i].borrowCap < configAfter[i].borrowCap && configBefore[i].borrowCap != 0
         ) {
-          require(configAfter[i].borrowingEnabled, 'PL_BORROW_CAP_BORROW_DISABLED');
+          if (!configAfter[i].borrowingEnabled) {
+            require(
+              _isBorrowableInAnyEMode(pool, configAfter[i].underlying),
+              'PL_BORROW_CAP_BORROW_DISABLED'
+            );
+          }
         }
       } else {
         // at least newly listed assets should never have a supply cap exceeding total supply
@@ -156,6 +175,20 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
         require(configAfter[i].borrowCap <= configAfter[i].supplyCap, 'PL_SUPPLY_LT_BORROW');
       }
     }
+  }
+
+  function _isBorrowableInAnyEMode(IPool pool, address asset) internal view returns (bool) {
+    uint16 reserveId = pool.getReserveData(asset).id;
+    for (uint256 categoryId = 1; categoryId <= 255; categoryId++) {
+      uint128 borrowableBitmap = pool.getEModeCategoryBorrowableBitmap(uint8(categoryId));
+      if (
+        borrowableBitmap != 0 &&
+        EModeConfiguration.isReserveEnabledOnBitmap(borrowableBitmap, reserveId)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -728,5 +761,33 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
     }
 
     vm.stopPrank();
+  }
+
+  /**
+   * @dev Validates that no storage was written to the executor contract during payload execution.
+   *      Since the executor delegatecalls the payload, any storage variable in the payload
+   *      (or any contract it delegatecalls) would modify the executor's storage.
+   *      This check inspects the actual state diff rather than the payload's artifact,
+   *      so it also catches indirect delegatecall chains.
+   *
+   *      Requires vm.startStateDiffRecording() to have been called before payload execution.
+   */
+  function _validateNoExecutorStorageChange(address executor) internal view virtual {
+    Vm.StorageAccess[] memory storageAccesses = vm.getStorageAccesses();
+    for (uint256 i = 0; i < storageAccesses.length; i++) {
+      require(
+        !(storageAccesses[i].account == executor &&
+          storageAccesses[i].isWrite &&
+          !storageAccesses[i].reverted),
+        string(
+          abi.encodePacked(
+            'EXECUTOR_MUST_NOT_HAVE_STORAGE_CHANGES: slot ',
+            Strings.toHexString(uint256(storageAccesses[i].slot)),
+            ' was modified on executor ',
+            Strings.toHexString(uint160(executor), 20)
+          )
+        )
+      );
+    }
   }
 }
