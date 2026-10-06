@@ -29,4 +29,68 @@ contract AaveSwapperNextTest is Test {
       IComposableCow(COMPOSABLE_COW)
     );
   }
+
+  function test_constructor() public {}
+
+  function test_transferOwnership_revertsWith_OwnableUnauthorizedAccount() public {}
+
+  function test_transferOwnership() public {}
+
+  function test_updateGuardian_revertsWith_OnlyGuardianOrOwnerInvalidCaller() public {}
+
+  function test_updateGuardian() public {}
+
+  function test_updateGuardian_toZeroAddress() public {}
+
+  function test_emergencyTokenTransfer_revertsWith_OnlyRescueGuardian() public {}
+
+  function test_emergencyTokenTransfer() public {}
+
+  function test_swap_revertsWith_OwnableUnauthorizedAccount() public {}
+
+  function test_swap_revertsWith_Invalid0xAddress_fromToken() public {}
+
+  function test_swap_revertsWith_Invalid0xAddress_toToken() public {}
+
+  function test_swap_revertsWith_InvalidAmount() public {}
+
+  function test_swap_revertsWith_InvalidRecipient() public {}
+
+  function test_swap_revertsWith_InvalidSlippage() public {}
+
+  function test_swap_revertsWith_OracleNotSet() public {}
+
+  function test_swap_revertsWith_SwapAlreadyPending() public {}
+
+  function test_swap() public {}
+
+  function test_cancelSwap_revertsWith_OnlyGuardianOrOwnerInvalidCaller() public {}
+
+  function test_cancelSwap_revertsWith_SwapNotFound() public {}
+
+  function test_cancelSwap() public {}
+
+  function test_cancelSwap_afterSettlement() public {}
+
+  function test_isValidSignature_revertsWith_InvalidHash() public {}
+
+  function test_isValidSignature_revertsWith_SingleOrderNotAuthed_afterCancel() public {}
+
+  function test_isValidSignature() public {}
+
+  function test_getExpectedOut_revertsWith_OracleNotSet_fromOracle() public {}
+
+  function test_getExpectedOut_revertsWith_OracleNotSet_toOracle() public {}
+
+  function test_getExpectedOut() public {}
+
+  function test_settle() public {}
+
+  function test_settle_revertsWith_OrderNotValid_worseBuyAmount() public {}
+
+  function test_settle_sameValidToBucket() public {}
+
+  function test_settle_revertsWith_OrderNotValid_afterBucketChange() public {}
+
+  function test_settle_revertsWith_OrderNotValid_afterOracleRoundChange() public {}
 }
