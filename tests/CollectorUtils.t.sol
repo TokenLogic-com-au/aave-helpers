@@ -100,6 +100,24 @@ contract CollectorUtilsTest is Test {
     );
   }
 
+  function testWithdrawAllCollectorFundsFromV3() public {
+    _genericWithdrawAllCollectorFundsToReceiver(
+      address(V3_POOL),
+      A_TOKEN_V3,
+      CollectorUtils.withdrawFromV3,
+      true
+    );
+  }
+
+  function testWithdrawAllCollectorFundsFromV2() public {
+    _genericWithdrawAllCollectorFundsToReceiver(
+      address(V2_POOL),
+      A_TOKEN_V2,
+      CollectorUtils.withdrawFromV2,
+      false
+    );
+  }
+
   function testStream(uint128 amount) public {
     uint256 underlyingBalanceOfCollectorBefore = UNDERLYING.balanceOf(address(COLLECTOR));
     amount = uint128(bound(amount, 1 days, underlyingBalanceOfCollectorBefore)); // otherwise actual amount is rounded to 0
@@ -245,6 +263,36 @@ contract CollectorUtilsTest is Test {
     }
   }
 
+  function _genericWithdrawAllCollectorFundsToReceiver(
+    address pool,
+    IERC20 aToken,
+    function(ICollector, CollectorUtils.IOInput memory, address) returns (uint256) withdraw,
+    bool withATokenCheck
+  ) internal {
+    uint256 aTokenBalanceOfCollectorBefore = aToken.balanceOf(address(COLLECTOR));
+    uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
+
+    uint256 withdrawnAmount = withdraw(
+      COLLECTOR,
+      CollectorUtils.IOInput({
+        amount: type(uint256).max,
+        underlying: address(UNDERLYING),
+        pool: pool
+      }),
+      testReceiver
+    );
+
+    assertApproxEqAbs(withdrawnAmount, aTokenBalanceOfCollectorBefore, 2);
+    assertEq(
+      UNDERLYING.balanceOf(testReceiver),
+      underlyingBalanceOfReceiverBefore + withdrawnAmount
+    );
+    // because we mint to treasury straight away on v2, hard to check the final amount we expect
+    if (withATokenCheck) {
+      assertApproxEqAbs(aToken.balanceOf(address(COLLECTOR)), 0, 2);
+    }
+  }
+
   function testDepositCollectorFundsToV4(uint128 amount) public {
     uint256 underlyingBalanceOfCollectorBefore = UNDERLYING.balanceOf(address(COLLECTOR));
     amount = uint128(bound(amount, 2, underlyingBalanceOfCollectorBefore));
@@ -306,22 +354,35 @@ contract CollectorUtilsTest is Test {
   function testWithdrawCollectorFundsFromV4(uint128 amount) public {
     COLLECTOR.depositToV4(address(SPOKE), type(uint256).max);
     uint256 sharesOfCollectorBefore = SPOKE.balanceOf(address(COLLECTOR));
-    // leave room for share rounding so previewWithdraw never exceeds the collector shares
-    amount = uint128(bound(amount, 1, SPOKE.maxWithdraw(address(COLLECTOR)) - 1));
+    amount = uint128(bound(amount, 1, SPOKE.maxWithdraw(address(COLLECTOR))));
     uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
+    uint256 expectedShares = SPOKE.previewWithdraw(amount);
 
     uint256 withdrawnAmount = COLLECTOR.withdrawFromV4(address(SPOKE), amount, testReceiver);
 
-    assertApproxEqAbs(withdrawnAmount, amount, 1);
+    assertEq(withdrawnAmount, amount);
+    assertEq(UNDERLYING.balanceOf(testReceiver), underlyingBalanceOfReceiverBefore + amount);
+    assertEq(SPOKE.balanceOf(address(COLLECTOR)), sharesOfCollectorBefore - expectedShares);
+    assertEq(SPOKE.balanceOf(address(this)), 0);
+  }
+
+  function testWithdrawAllCollectorFundsFromV4() public {
+    COLLECTOR.depositToV4(address(SPOKE), type(uint256).max);
+    uint256 maxWithdrawBefore = SPOKE.maxWithdraw(address(COLLECTOR));
+    uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
+
+    uint256 withdrawnAmount = COLLECTOR.withdrawFromV4(
+      address(SPOKE),
+      type(uint256).max,
+      testReceiver
+    );
+
+    assertEq(withdrawnAmount, maxWithdrawBefore);
     assertEq(
       UNDERLYING.balanceOf(testReceiver),
       underlyingBalanceOfReceiverBefore + withdrawnAmount
     );
-    assertApproxEqAbs(
-      SPOKE.balanceOf(address(COLLECTOR)),
-      sharesOfCollectorBefore - SPOKE.previewWithdraw(amount),
-      1
-    );
+    assertEq(SPOKE.maxWithdraw(address(COLLECTOR)), 0);
     assertEq(SPOKE.balanceOf(address(this)), 0);
   }
 
