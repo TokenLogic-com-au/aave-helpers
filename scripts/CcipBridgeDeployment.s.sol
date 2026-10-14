@@ -18,12 +18,12 @@ import {GovernanceV3Ethereum} from 'aave-address-book/GovernanceV3Ethereum.sol';
 import {GovernanceV3Plasma} from 'aave-address-book/GovernanceV3Plasma.sol';
 import {GovernanceV3XLayer} from 'aave-address-book/GovernanceV3XLayer.sol';
 import {ArbitrumScript, AvalancheScript, EthereumScript, PlasmaScript, XLayerScript} from 'solidity-utils/contracts/utils/ScriptUtils.sol';
+import {ITokenPool} from 'src/dependencies/chainlink/interfaces/ITokenPool.sol';
 import {AaveGhoCcipBridge} from 'src/bridges/ccip/AaveGhoCcipBridge.sol';
 
 /**
  * @dev Deploys a new instance of the AaveGhoCcipBridge with the deployer as initial owner, sets Ethereum mainnet
  * as destination chain (pointing to the mainnet AaveGhoCcipBridge) and transfers the ownership to EXECUTOR_LVL_1.
- * CCIP routers are read from each network's GHO_CCIP_TOKEN_POOL.getRouter().
  */
 library CcipBridgeDeployerLib {
   uint64 internal constant MAINNET_CHAIN_SELECTOR = 5009297550715157269;
@@ -50,7 +50,7 @@ contract DeployEthereum is EthereumScript {
   function run() external broadcast {
     (, address deployer, ) = vm.readCallers();
     AaveGhoCcipBridge bridge = new AaveGhoCcipBridge(
-      0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D,
+      ITokenPool(GhoEthereum.GHO_CCIP_TOKEN_POOL).getRouter(),
       GhoEthereum.GHO_TOKEN,
       address(AaveV3Ethereum.COLLECTOR),
       deployer
@@ -63,7 +63,7 @@ contract DeployArbitrum is ArbitrumScript {
   function run() external broadcast {
     (, address deployer, ) = vm.readCallers();
     CcipBridgeDeployerLib.deploy(
-      0x141fa059441E0ca23ce184B6A78bafD2A517DdE8,
+      ITokenPool(GhoArbitrum.GHO_CCIP_TOKEN_POOL).getRouter(),
       GhoArbitrum.GHO_TOKEN,
       address(AaveV3Arbitrum.COLLECTOR),
       deployer,
@@ -76,7 +76,7 @@ contract DeployAvalanche is AvalancheScript {
   function run() external broadcast {
     (, address deployer, ) = vm.readCallers();
     CcipBridgeDeployerLib.deploy(
-      0xF4c7E640EdA248ef95972845a62bdC74237805dB,
+      ITokenPool(GhoAvalanche.GHO_CCIP_TOKEN_POOL).getRouter(),
       GhoAvalanche.GHO_TOKEN,
       address(AaveV3Avalanche.COLLECTOR),
       deployer,
@@ -89,7 +89,7 @@ contract DeployPlasma is PlasmaScript {
   function run() external broadcast {
     (, address deployer, ) = vm.readCallers();
     CcipBridgeDeployerLib.deploy(
-      0xcDca5D374e46A6DDDab50bD2D9acB8c796eC35C3,
+      ITokenPool(GhoPlasma.GHO_CCIP_TOKEN_POOL).getRouter(),
       GhoPlasma.GHO_TOKEN,
       address(AaveV3Plasma.COLLECTOR),
       deployer,
@@ -102,7 +102,7 @@ contract DeployXLayer is XLayerScript {
   function run() external broadcast {
     (, address deployer, ) = vm.readCallers();
     CcipBridgeDeployerLib.deploy(
-      0xF2b6Cb7867EB5502C3249dD37D7bc1Cc148e5232,
+      ITokenPool(GhoXLayer.GHO_CCIP_TOKEN_POOL).getRouter(),
       GhoXLayer.GHO_TOKEN,
       address(AaveV3XLayer.COLLECTOR),
       deployer,
