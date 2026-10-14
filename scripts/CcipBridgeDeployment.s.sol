@@ -26,9 +26,13 @@ import {AaveGhoCcipBridge} from 'src/bridges/ccip/AaveGhoCcipBridge.sol';
  * as destination chain (pointing to the mainnet AaveGhoCcipBridge) and transfers the ownership to EXECUTOR_LVL_1.
  */
 library CcipBridgeDeployerLib {
-  uint64 internal constant MAINNET_CHAIN_SELECTOR = 5009297550715157269;
-  address internal constant MAINNET_BRIDGE = 0x7F2f96fcdC3A29Be75938d2aC3D92E7006919fe6;
   uint32 internal constant GAS_LIMIT = 450_000;
+
+  // https://docs.chain.link/ace/supported-networks#mainnet-networks
+  uint64 internal constant MAINNET_CHAIN_SELECTOR = 5009297550715157269;
+
+  // https://etherscan.io/address/0x7F2f96fcdC3A29Be75938d2aC3D92E7006919fe6
+  address internal constant MAINNET_BRIDGE = 0x7F2f96fcdC3A29Be75938d2aC3D92E7006919fe6;
 
   function deploy(
     address router,
