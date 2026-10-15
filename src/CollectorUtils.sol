@@ -19,10 +19,11 @@ library CollectorUtils {
   error InvalidZeroAmount();
   error PriceOracleDecimalsMismatch();
 
-  /* @notice Object with deposit or withdrawal params
-   * @param pool Aave V3 or V2 (only in case of withdraw) pool
-   * @param underlying ERC20 compatible asset, listed on the corresponding Aave v3 pool
-   * @param amount to be withdrawn/deposited
+  /**
+   * @notice Object with deposit or withdrawal params
+   * @param pool The address of the Aave V3 or V2 (only in case of withdraw) pool
+   * @param underlying The address of the ERC20 compatible asset, listed on the corresponding Aave pool
+   * @param amount The amount to be withdrawn or deposited, type(uint256).max for the full collector balance
    */
   struct IOInput {
     address pool;
@@ -31,12 +32,12 @@ library CollectorUtils {
   }
 
   /**
-   * @notice object with stream parameters
-   * @param underlying ERC20 compatible asset
-   * @param receiver receiver of the stream
-   * @param amount streamed amount in wei
-   * @param start of the stream in seconds
-   * @param duration duration of the stream in seconds
+   * @notice Object with stream parameters
+   * @param underlying The address of the ERC20 compatible asset
+   * @param receiver The address of the receiver of the stream
+   * @param amount The streamed amount in wei
+   * @param start The start timestamp of the stream in seconds
+   * @param duration The duration of the stream in seconds
    */
   struct CreateStreamInput {
     address underlying;
@@ -47,13 +48,15 @@ library CollectorUtils {
   }
 
   /**
-   * @notice object with stream parameters
-   * @param fromUnderlying input asset, ERC20 compatible
-   * @param toUnderlying output asset, ERC20 compatible
-   * @param fromUnderlyingPriceFeed price feed for the input asset
-   * @param toUnderlyingPriceFeed price feed for the output asset
-   * @param amount amount of input asset to swap, in wei
-   * @param slippage maximal swap slippage, where 100_00 is equal to 100%
+   * @notice Object with swap parameters
+   * @param milkman The address of the Milkman contract
+   * @param priceChecker The address of the Milkman price checker
+   * @param fromUnderlying The address of the input asset, ERC20 compatible
+   * @param toUnderlying The address of the output asset, ERC20 compatible
+   * @param fromUnderlyingPriceFeed The address of the price feed for the input asset
+   * @param toUnderlyingPriceFeed The address of the price feed for the output asset
+   * @param amount The amount of input asset to swap, in wei
+   * @param slippage The maximal swap slippage, where 100_00 is equal to 100%
    */
   struct SwapInput {
     address milkman;
@@ -69,8 +72,8 @@ library CollectorUtils {
 
   /**
    * @notice Deposit funds of the collector to the Aave v3
-   * @param collector aave collector
-   * @param input deposit parameters wrapped as IOInput
+   * @param collector The address of the Aave collector
+   * @param input The deposit parameters wrapped as IOInput
    */
   function depositToV3(ICollector collector, IOInput memory input) internal {
     if (input.amount == 0) {
@@ -87,36 +90,36 @@ library CollectorUtils {
 
   /**
    * @notice Deposit funds of the collector to an Aave v4 TokenizationSpoke
-   * @dev the underlying is derived from the spoke, as each TokenizationSpoke tokenizes a single asset
-   * @param collector aave collector
-   * @param spoke Aave v4 TokenizationSpoke (ERC4626 vault)
-   * @param amount of underlying to deposit, type(uint256).max for the full collector balance
-   * @return the amount of spoke shares minted to the collector
+   * @dev The underlying is derived from the tokenization spoke, as each TokenizationSpoke tokenizes a single asset
+   * @param collector The address of the Aave collector
+   * @param tokenizationSpoke The address of the Aave V4 TokenizationSpoke
+   * @param amount The amount of underlying to deposit, type(uint256).max for the full collector balance
+   * @return The amount of tokenization spoke shares minted to the collector
    */
   function depositToV4(
     ICollector collector,
-    address spoke,
+    address tokenizationSpoke,
     uint256 amount
   ) internal returns (uint256) {
     if (amount == 0) {
       revert InvalidZeroAmount();
     }
 
-    address underlying = ITokenizationSpoke(spoke).asset();
+    address underlying = ITokenizationSpoke(tokenizationSpoke).asset();
     if (amount == type(uint256).max) {
       amount = IERC20(underlying).balanceOf(address(collector));
     }
     collector.transfer(IERC20(underlying), address(this), amount);
-    IERC20(underlying).forceApprove(spoke, amount);
-    return ITokenizationSpoke(spoke).deposit(amount, address(collector));
+    IERC20(underlying).forceApprove(tokenizationSpoke, amount);
+    return ITokenizationSpoke(tokenizationSpoke).deposit(amount, address(collector));
   }
 
   /**
    * @notice Withdraw funds of the collector from the Aave v3 to the receiver
-   * @dev due to imprecision may get 1-2 wei less then specified amount
-   * @param collector aave collector
-   * @param receiver receiver of the underlying
-   * @param input withdraw parameters wrapped as IOInput, amount type(uint256).max for the full collector balance
+   * @dev Due to imprecision may get 1-2 wei less than the specified amount
+   * @param collector The address of the Aave collector
+   * @param receiver The address of the receiver of the underlying
+   * @param input The withdrawal parameters wrapped as IOInput, amount type(uint256).max for the full collector balance
    */
   function withdrawFromV3(
     ICollector collector,
@@ -129,15 +132,15 @@ library CollectorUtils {
 
   /**
    * @notice Withdraw funds of the collector from an Aave v4 TokenizationSpoke to the receiver
-   * @param collector aave collector
-   * @param spoke Aave v4 TokenizationSpoke (ERC4626 vault)
-   * @param amount of underlying to withdraw, type(uint256).max for the max withdrawable by the collector
-   * @param receiver receiver of the underlying
-   * @return the actual amount of underlying withdrawn
+   * @param collector The address of the Aave collector
+   * @param tokenizationSpoke The address of the Aave V4 TokenizationSpoke
+   * @param amount The amount of underlying to withdraw, type(uint256).max for the max withdrawable by the collector
+   * @param receiver The address of the receiver of the underlying
+   * @return The actual amount of underlying withdrawn
    */
   function withdrawFromV4(
     ICollector collector,
-    address spoke,
+    address tokenizationSpoke,
     uint256 amount,
     address receiver
   ) internal returns (uint256) {
@@ -146,20 +149,20 @@ library CollectorUtils {
     }
 
     if (amount == type(uint256).max) {
-      amount = ITokenizationSpoke(spoke).maxWithdraw(address(collector));
+      amount = ITokenizationSpoke(tokenizationSpoke).maxWithdraw(address(collector));
     }
-    uint256 shares = ITokenizationSpoke(spoke).previewWithdraw(amount);
-    collector.transfer(IERC20(spoke), address(this), shares);
-    ITokenizationSpoke(spoke).withdraw(amount, receiver, address(this));
+    uint256 shares = ITokenizationSpoke(tokenizationSpoke).previewWithdraw(amount);
+    collector.transfer(IERC20(tokenizationSpoke), address(this), shares);
+    ITokenizationSpoke(tokenizationSpoke).withdraw(amount, receiver, address(this));
     return amount;
   }
 
   /**
    * @notice Withdraw funds of the collector from the Aave v2 to the receiver
-   * @dev due to imprecision may get 1-2 wei less then specified amount
-   * @param collector aave collector
-   * @param receiver receiver of the underlying
-   * @param input withdraw parameters wrapped as IOInput, amount type(uint256).max for the full collector balance
+   * @dev Due to imprecision may get 1-2 wei less than the specified amount
+   * @param collector The address of the Aave collector
+   * @param receiver The address of the receiver of the underlying
+   * @param input The withdrawal parameters wrapped as IOInput, amount type(uint256).max for the full collector balance
    */
   function withdrawFromV2(
     ICollector collector,
@@ -174,9 +177,9 @@ library CollectorUtils {
 
   /**
    * @notice Open a funds stream to the receiver with exact amount after rounding
-   * @param collector aave collector
-   * @param input stream creation parameters wrapped as CreateStreamInput
-   * @return the actual stream amount
+   * @param collector The address of the Aave collector
+   * @param input The stream creation parameters wrapped as CreateStreamInput
+   * @return The actual stream amount
    */
   function stream(ICollector collector, CreateStreamInput memory input) internal returns (uint256) {
     if (input.amount == 0) {
@@ -197,9 +200,9 @@ library CollectorUtils {
 
   /**
    * @notice Open a swap order on AaveSwapper, to swap collector funds fromUnderlying to toUnderlying
-   * @param collector aave collector
-   * @param swapper AaveSwapper
-   * @param input swap parameters wrapped as SwapInput
+   * @param collector The address of the Aave collector
+   * @param swapper The address of the AaveSwapper
+   * @param input The swap parameters wrapped as SwapInput
    */
   function swap(ICollector collector, address swapper, SwapInput memory input) internal {
     if (input.amount == 0) {
@@ -219,7 +222,7 @@ library CollectorUtils {
     collector.transfer(IERC20(input.fromUnderlying), swapper, input.amount);
     uint256 swapperBalance = IERC20(input.fromUnderlying).balanceOf(swapper);
 
-    // some tokens, like stETH, can loose 1-2wei on transfer
+    // Some tokens, like stETH, can lose 1-2 wei on transfer
     if (swapperBalance < input.amount) {
       input.amount = swapperBalance;
     }
@@ -239,13 +242,13 @@ library CollectorUtils {
 
   /**
    * @notice Withdraw funds of the collector from Aave
-   * @dev internal template for both v2 and v3
-   * @dev due to imprecision may get 1-2 wei less then specified amount
-   * @param collector aave collector
-   * @param input withdraw parameters wrapped as IOInput
-   * @param aTokenAddress aToken address for the corresponding reserve in the pool
-   * @param receiver receiver of the underlying
-   * @return the actual amount of underlying withdrawn
+   * @dev Internal template for both v2 and v3
+   * @dev Due to imprecision may get 1-2 wei less than the specified amount
+   * @param collector The address of the Aave collector
+   * @param input The withdrawal parameters wrapped as IOInput
+   * @param aTokenAddress The address of the aToken for the corresponding reserve in the pool
+   * @param receiver The address of the receiver of the underlying
+   * @return The actual amount of underlying withdrawn
    */
   function __withdraw(
     ICollector collector,
@@ -267,7 +270,7 @@ library CollectorUtils {
     uint256 balanceAfterTransfer = IERC20(aTokenAddress).balanceOf(address(this));
     input.amount = balanceAfterTransfer - balanceBeforeTransfer;
 
-    // @dev withdrawal interfaces of v2 and v3 is the same, so we use any
+    // Withdrawal interfaces of v2 and v3 are the same, so we use either
     return IPool(input.pool).withdraw(input.underlying, input.amount, address(receiver));
   }
 }
