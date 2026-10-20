@@ -71,7 +71,7 @@ library CollectorUtils {
   using SafeERC20 for IERC20;
 
   /**
-   * @notice Deposit funds of the collector to the Aave v3
+   * @notice Deposit funds of the collector to the Aave V3
    * @param collector The address of the Aave collector
    * @param input The deposit parameters wrapped as IOInput
    */
@@ -89,7 +89,7 @@ library CollectorUtils {
   }
 
   /**
-   * @notice Deposit funds of the collector to an Aave v4 TokenizationSpoke
+   * @notice Deposit funds of the collector to an Aave V4 TokenizationSpoke
    * @dev The underlying is derived from the tokenization spoke, as each TokenizationSpoke tokenizes a single asset
    * @param collector The address of the Aave collector
    * @param tokenizationSpoke The address of the Aave V4 TokenizationSpoke
@@ -115,11 +115,12 @@ library CollectorUtils {
   }
 
   /**
-   * @notice Withdraw funds of the collector from the Aave v3 to the receiver
+   * @notice Withdraw funds of the collector from the Aave V3 to the receiver
    * @dev Due to imprecision may get 1-2 wei less than the specified amount
    * @param collector The address of the Aave collector
    * @param receiver The address of the receiver of the underlying
    * @param input The withdrawal parameters wrapped as IOInput, amount type(uint256).max for the full collector balance
+   * @return The actual amount of underlying withdrawn
    */
   function withdrawFromV3(
     ICollector collector,
@@ -131,7 +132,7 @@ library CollectorUtils {
   }
 
   /**
-   * @notice Withdraw funds of the collector from an Aave v4 TokenizationSpoke to the receiver
+   * @notice Withdraw funds of the collector from an Aave V4 TokenizationSpoke to the receiver
    * @param collector The address of the Aave collector
    * @param tokenizationSpoke The address of the Aave V4 TokenizationSpoke
    * @param amount The amount of underlying to withdraw, type(uint256).max for the max withdrawable by the collector
@@ -153,16 +154,21 @@ library CollectorUtils {
     }
     uint256 shares = ITokenizationSpoke(tokenizationSpoke).previewWithdraw(amount);
     collector.transfer(IERC20(tokenizationSpoke), address(this), shares);
-    ITokenizationSpoke(tokenizationSpoke).withdraw(amount, receiver, address(this));
+    ITokenizationSpoke(tokenizationSpoke).withdraw({
+      assets: amount,
+      receiver: receiver,
+      owner: address(this)
+    });
     return amount;
   }
 
   /**
-   * @notice Withdraw funds of the collector from the Aave v2 to the receiver
+   * @notice Withdraw funds of the collector from the Aave V2 to the receiver
    * @dev Due to imprecision may get 1-2 wei less than the specified amount
    * @param collector The address of the Aave collector
    * @param receiver The address of the receiver of the underlying
    * @param input The withdrawal parameters wrapped as IOInput, amount type(uint256).max for the full collector balance
+   * @return The actual amount of underlying withdrawn
    */
   function withdrawFromV2(
     ICollector collector,
@@ -242,7 +248,7 @@ library CollectorUtils {
 
   /**
    * @notice Withdraw funds of the collector from Aave
-   * @dev Internal template for both v2 and v3
+   * @dev Internal template for both V2 and V3
    * @dev Due to imprecision may get 1-2 wei less than the specified amount
    * @param collector The address of the Aave collector
    * @param input The withdrawal parameters wrapped as IOInput
@@ -270,7 +276,7 @@ library CollectorUtils {
     uint256 balanceAfterTransfer = IERC20(aTokenAddress).balanceOf(address(this));
     input.amount = balanceAfterTransfer - balanceBeforeTransfer;
 
-    // Withdrawal interfaces of v2 and v3 are the same, so we use either
+    // Withdrawal interfaces of V2 and V3 are the same, so we use either
     return IPool(input.pool).withdraw(input.underlying, input.amount, address(receiver));
   }
 }

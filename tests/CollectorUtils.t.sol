@@ -90,25 +90,25 @@ contract CollectorUtilsTest is Test {
   }
 
   function testWithdrawCollectorFundsFromV3(uint128 amount) public {
-    _genericWithdrawCollectorFundsToReceiver(
-      address(V3_POOL),
-      A_TOKEN_V3,
-      amount,
-      testReceiver,
-      CollectorUtils.withdrawFromV3,
-      true
-    );
+    _genericWithdrawCollectorFundsToReceiver({
+      pool: address(V3_POOL),
+      aToken: A_TOKEN_V3,
+      amount: amount,
+      receiver: testReceiver,
+      withdraw: CollectorUtils.withdrawFromV3,
+      withATokenCheck: true
+    });
   }
 
   function testWithdrawCollectorFundsFromV2(uint128 amount) public {
-    _genericWithdrawCollectorFundsToReceiver(
-      address(V2_POOL),
-      A_TOKEN_V2,
-      amount,
-      testReceiver,
-      CollectorUtils.withdrawFromV2,
-      false
-    );
+    _genericWithdrawCollectorFundsToReceiver({
+      pool: address(V2_POOL),
+      aToken: A_TOKEN_V2,
+      amount: amount,
+      receiver: testReceiver,
+      withdraw: CollectorUtils.withdrawFromV2,
+      withATokenCheck: false
+    });
   }
 
   function testWithdrawAllCollectorFundsFromV3() public {
@@ -348,11 +348,19 @@ contract CollectorUtilsTest is Test {
   }
 
   function testWithdrawCollectorFundsFromV4Usdc(uint128 amount) public {
-    _testWithdrawFromV4(USDC_TOKENIZATION_SPOKE, 100_000e6, amount);
+    _testWithdrawFromV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      withdrawAmount: amount
+    });
   }
 
   function testWithdrawAllCollectorFundsFromV4Usdc() public {
-    _testWithdrawFromV4(USDC_TOKENIZATION_SPOKE, 100_000e6, type(uint256).max);
+    _testWithdrawFromV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      withdrawAmount: type(uint256).max
+    });
   }
 
   function testDepositCollectorFundsToV4Weth(uint128 amount) public {
@@ -364,11 +372,19 @@ contract CollectorUtilsTest is Test {
   }
 
   function testWithdrawCollectorFundsFromV4Weth(uint128 amount) public {
-    _testWithdrawFromV4(WETH_TOKENIZATION_SPOKE, 100e18, amount);
+    _testWithdrawFromV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      depositAmount: 100e18,
+      withdrawAmount: amount
+    });
   }
 
   function testWithdrawAllCollectorFundsFromV4Weth() public {
-    _testWithdrawFromV4(WETH_TOKENIZATION_SPOKE, 100e18, type(uint256).max);
+    _testWithdrawFromV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      depositAmount: 100e18,
+      withdrawAmount: type(uint256).max
+    });
   }
 
   function testDepositCollectorFundsToV4Gho(uint128 amount) public {
@@ -380,11 +396,19 @@ contract CollectorUtilsTest is Test {
   }
 
   function testWithdrawCollectorFundsFromV4Gho(uint128 amount) public {
-    _testWithdrawFromV4(GHO_TOKENIZATION_SPOKE, 50_000e18, amount);
+    _testWithdrawFromV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      depositAmount: 50_000e18,
+      withdrawAmount: amount
+    });
   }
 
   function testWithdrawAllCollectorFundsFromV4Gho() public {
-    _testWithdrawFromV4(GHO_TOKENIZATION_SPOKE, 50_000e18, type(uint256).max);
+    _testWithdrawFromV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      depositAmount: 50_000e18,
+      withdrawAmount: type(uint256).max
+    });
   }
 
   function testDepositCollectorFundsToV4Wbtc(uint128 amount) public {
@@ -399,12 +423,69 @@ contract CollectorUtilsTest is Test {
 
   function testWithdrawCollectorFundsFromV4Wbtc(uint128 amount) public {
     _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
-    _testWithdrawFromV4(WBTC_TOKENIZATION_SPOKE, 10e8, amount);
+    _testWithdrawFromV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      depositAmount: 10e8,
+      withdrawAmount: amount
+    });
   }
 
   function testWithdrawAllCollectorFundsFromV4Wbtc() public {
     _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
-    _testWithdrawFromV4(WBTC_TOKENIZATION_SPOKE, 10e8, type(uint256).max);
+    _testWithdrawFromV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      depositAmount: 10e8,
+      withdrawAmount: type(uint256).max
+    });
+  }
+
+  function testDepositAndWithdrawSequenceV4Usdc() public {
+    uint256 totalWithdrawnAmount = _testDepositAndWithdrawSequenceV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      partialWithdrawAmount: 50_000e6
+    });
+
+    assertEq(USDC_TOKENIZATION_SPOKE.asset(), AaveV3EthereumAssets.USDC_UNDERLYING);
+    assertEq(USDC_TOKENIZATION_SPOKE.decimals(), 6);
+    assertGt(totalWithdrawnAmount, 100_000e6);
+  }
+
+  function testDepositAndWithdrawSequenceV4Weth() public {
+    uint256 totalWithdrawnAmount = _testDepositAndWithdrawSequenceV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      depositAmount: 100e18,
+      partialWithdrawAmount: 50e18
+    });
+
+    assertEq(WETH_TOKENIZATION_SPOKE.asset(), AaveV3EthereumAssets.WETH_UNDERLYING);
+    assertEq(WETH_TOKENIZATION_SPOKE.decimals(), 18);
+    assertGt(totalWithdrawnAmount, 100e18);
+  }
+
+  function testDepositAndWithdrawSequenceV4Gho() public {
+    uint256 totalWithdrawnAmount = _testDepositAndWithdrawSequenceV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      depositAmount: 50_000e18,
+      partialWithdrawAmount: 25_000e18
+    });
+
+    assertEq(GHO_TOKENIZATION_SPOKE.asset(), AaveV3EthereumAssets.GHO_UNDERLYING);
+    assertEq(GHO_TOKENIZATION_SPOKE.decimals(), 18);
+    assertGt(totalWithdrawnAmount, 50_000e18);
+  }
+
+  function testDepositAndWithdrawSequenceV4Wbtc() public {
+    _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
+    uint256 totalWithdrawnAmount = _testDepositAndWithdrawSequenceV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      depositAmount: 10e8,
+      partialWithdrawAmount: 5e8
+    });
+
+    assertEq(WBTC_TOKENIZATION_SPOKE.asset(), AaveV3EthereumAssets.WBTC_UNDERLYING);
+    assertEq(WBTC_TOKENIZATION_SPOKE.decimals(), 8);
+    assertGt(totalWithdrawnAmount, 10e8);
   }
 
   function testWithdrawAllCollectorFundsFromV4IncludesInterest() public {
@@ -415,11 +496,11 @@ contract CollectorUtilsTest is Test {
     assertGt(maxWithdrawAfter, maxWithdrawBefore);
     uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
 
-    uint256 withdrawnAmount = COLLECTOR.withdrawFromV4(
-      address(USDC_TOKENIZATION_SPOKE),
-      type(uint256).max,
-      testReceiver
-    );
+    uint256 withdrawnAmount = COLLECTOR.withdrawFromV4({
+      tokenizationSpoke: address(USDC_TOKENIZATION_SPOKE),
+      amount: type(uint256).max,
+      receiver: testReceiver
+    });
 
     assertEq(withdrawnAmount, maxWithdrawAfter);
     assertEq(
@@ -430,7 +511,12 @@ contract CollectorUtilsTest is Test {
 
   function testWithdrawAllCollectorFundsFromV4CappedByLiquidity() public {
     _depositCollectorFundsToV4(USDC_TOKENIZATION_SPOKE, 100_000e6);
+    uint256 sharesOfCollectorBefore = USDC_TOKENIZATION_SPOKE.balanceOf(address(COLLECTOR));
+    uint256 assetsOfCollectorBefore = USDC_TOKENIZATION_SPOKE.convertToAssets(
+      sharesOfCollectorBefore
+    );
     uint256 liquidity = 40_000e6;
+    uint256 expectedShares = USDC_TOKENIZATION_SPOKE.previewWithdraw(liquidity);
     vm.mockCall(
       USDC_TOKENIZATION_SPOKE.hub(),
       abi.encodeWithSelector(
@@ -441,18 +527,28 @@ contract CollectorUtilsTest is Test {
     );
     uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
 
-    uint256 withdrawnAmount = COLLECTOR.withdrawFromV4(
-      address(USDC_TOKENIZATION_SPOKE),
-      type(uint256).max,
-      testReceiver
-    );
+    uint256 withdrawnAmount = COLLECTOR.withdrawFromV4({
+      tokenizationSpoke: address(USDC_TOKENIZATION_SPOKE),
+      amount: type(uint256).max,
+      receiver: testReceiver
+    });
 
     assertEq(withdrawnAmount, liquidity);
     assertEq(UNDERLYING.balanceOf(testReceiver), underlyingBalanceOfReceiverBefore + liquidity);
+    assertEq(
+      USDC_TOKENIZATION_SPOKE.balanceOf(address(COLLECTOR)),
+      sharesOfCollectorBefore - expectedShares
+    );
+    assertApproxEqAbs(
+      USDC_TOKENIZATION_SPOKE.convertToAssets(
+        USDC_TOKENIZATION_SPOKE.balanceOf(address(COLLECTOR))
+      ),
+      assetsOfCollectorBefore - liquidity,
+      1
+    );
   }
 
   function testDepositToV4RevertsOnAddCapExceeded() public {
-    // WBTC add cap is 0 at this block
     deal(WBTC_TOKENIZATION_SPOKE.asset(), address(COLLECTOR), 1e8);
     vm.expectRevert(abi.encodeWithSelector(IHub.AddCapExceeded.selector, uint256(0)));
     this.depositToV4External(address(WBTC_TOKENIZATION_SPOKE), 1e8);
@@ -505,18 +601,44 @@ contract CollectorUtilsTest is Test {
     this.withdrawFromV4External(address(USDC_TOKENIZATION_SPOKE), 500e6);
   }
 
+  function testDepositAllToV4RevertsOnZeroCollectorBalance() public {
+    deal(address(UNDERLYING), address(COLLECTOR), 0);
+    vm.expectRevert(IHub.InvalidAmount.selector);
+    this.depositToV4External(address(USDC_TOKENIZATION_SPOKE), type(uint256).max);
+  }
+
+  function testDepositToV4RevertsOnInsufficientCollectorBalance() public {
+    deal(address(UNDERLYING), address(COLLECTOR), 1_000e6);
+    vm.expectRevert(bytes('ERC20: transfer amount exceeds balance'));
+    this.depositToV4External(address(USDC_TOKENIZATION_SPOKE), 1_000e6 + 1);
+  }
+
+  function testWithdrawAllFromV4RevertsOnZeroShares() public {
+    assertEq(USDC_TOKENIZATION_SPOKE.balanceOf(address(COLLECTOR)), 0);
+    vm.expectRevert(IHub.InvalidAmount.selector);
+    this.withdrawFromV4External(address(USDC_TOKENIZATION_SPOKE), type(uint256).max);
+  }
+
+  function testWithdrawAllFromV4RevertsWhenSpokeHalted() public {
+    _depositCollectorFundsToV4(USDC_TOKENIZATION_SPOKE, 1_000e6);
+    _setSpokeHalted(USDC_TOKENIZATION_SPOKE);
+    // maxWithdraw returns 0 on a halted spoke, so this reverts with InvalidAmount, not SpokeHalted
+    vm.expectRevert(IHub.InvalidAmount.selector);
+    this.withdrawFromV4External(address(USDC_TOKENIZATION_SPOKE), type(uint256).max);
+  }
+
   function testDepositAndWithdrawV4ViaPayload() public {
     address executor = GovernanceV3Ethereum.EXECUTOR_LVL_1;
     uint256 underlyingBalanceOfCollectorBefore = UNDERLYING.balanceOf(address(COLLECTOR));
     uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
     uint256 underlyingBalanceOfExecutorBefore = UNDERLYING.balanceOf(executor);
     uint256 sharesOfExecutorBefore = USDC_TOKENIZATION_SPOKE.balanceOf(executor);
-    CollectorUtilsV4Payload payload = new CollectorUtilsV4Payload(
-      address(USDC_TOKENIZATION_SPOKE),
-      testReceiver,
-      10_000e6,
-      5_000e6
-    );
+    CollectorUtilsV4Payload payload = new CollectorUtilsV4Payload({
+      tokenizationSpoke: address(USDC_TOKENIZATION_SPOKE),
+      receiver: testReceiver,
+      depositAmount: 10_000e6,
+      withdrawAmount: 5_000e6
+    });
 
     GovV3Helpers.executePayload(vm, address(payload));
 
@@ -533,8 +655,9 @@ contract CollectorUtilsTest is Test {
   function _testDepositToV4(ITokenizationSpoke spoke, uint256 amount, bool depositAll) internal {
     IERC20 underlying = IERC20(spoke.asset());
     (uint256 executorUnderlying, uint256 executorShares) = _seedExecutor(spoke);
-    amount = bound(amount, 1e3, spoke.maxDeposit(address(COLLECTOR)));
-    deal(address(underlying), address(COLLECTOR), amount);
+    amount = bound(amount, 2, spoke.maxDeposit(address(COLLECTOR)));
+    uint256 extra = depositAll ? 0 : 10 ** spoke.decimals();
+    deal(address(underlying), address(COLLECTOR), amount + extra);
     uint256 sharesOfCollectorBefore = spoke.balanceOf(address(COLLECTOR));
     uint256 expectedShares = spoke.previewDeposit(amount);
 
@@ -547,7 +670,7 @@ contract CollectorUtilsTest is Test {
     );
 
     assertEq(shares, expectedShares);
-    assertEq(underlying.balanceOf(address(COLLECTOR)), 0);
+    assertEq(underlying.balanceOf(address(COLLECTOR)), extra);
     assertEq(spoke.balanceOf(address(COLLECTOR)), sharesOfCollectorBefore + shares);
     _assertExecutorUntouched(spoke, executorUnderlying, executorShares);
   }
@@ -589,7 +712,44 @@ contract CollectorUtilsTest is Test {
       underlyingBalanceOfReceiverBefore + expectedAmount
     );
     assertEq(spoke.balanceOf(address(COLLECTOR)), sharesOfCollectorBefore - expectedShares);
+    if (withdrawAmount == type(uint256).max) {
+      assertEq(spoke.balanceOf(address(COLLECTOR)), 0);
+    }
     _assertExecutorUntouched(spoke, executorUnderlying, executorShares);
+  }
+
+  function _testDepositAndWithdrawSequenceV4(
+    ITokenizationSpoke spoke,
+    uint256 depositAmount,
+    uint256 partialWithdrawAmount
+  ) internal returns (uint256) {
+    IERC20 underlying = IERC20(spoke.asset());
+    uint256 underlyingBalanceOfReceiverBefore = underlying.balanceOf(testReceiver);
+    _depositCollectorFundsToV4(spoke, depositAmount);
+
+    skip(30 days);
+    uint256 partialWithdrawnAmount = COLLECTOR.withdrawFromV4({
+      tokenizationSpoke: address(spoke),
+      amount: partialWithdrawAmount,
+      receiver: testReceiver
+    });
+
+    skip(30 days);
+    uint256 remainingAmount = spoke.maxWithdraw(address(COLLECTOR));
+    uint256 remainingWithdrawnAmount = COLLECTOR.withdrawFromV4({
+      tokenizationSpoke: address(spoke),
+      amount: type(uint256).max,
+      receiver: testReceiver
+    });
+
+    assertEq(partialWithdrawnAmount, partialWithdrawAmount);
+    assertEq(remainingWithdrawnAmount, remainingAmount);
+    assertEq(spoke.balanceOf(address(COLLECTOR)), 0);
+    assertEq(
+      underlying.balanceOf(testReceiver),
+      underlyingBalanceOfReceiverBefore + partialWithdrawAmount + remainingAmount
+    );
+    return partialWithdrawAmount + remainingAmount;
   }
 
   function _depositCollectorFundsToV4(ITokenizationSpoke spoke, uint256 amount) internal {
@@ -622,21 +782,36 @@ contract CollectorUtilsTest is Test {
     address hub = spoke.hub();
     uint256 assetId = spoke.assetId();
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    AaveV4Ethereum.HUB_CONFIGURATOR.updateSpokeAddCap(hub, assetId, address(spoke), addCap);
+    AaveV4Ethereum.HUB_CONFIGURATOR.updateSpokeAddCap({
+      hub: hub,
+      assetId: assetId,
+      spoke: address(spoke),
+      addCap: addCap
+    });
   }
 
   function _setSpokeHalted(ITokenizationSpoke spoke) internal {
     address hub = spoke.hub();
     uint256 assetId = spoke.assetId();
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    AaveV4Ethereum.HUB_CONFIGURATOR.updateSpokeHalted(hub, assetId, address(spoke), true);
+    AaveV4Ethereum.HUB_CONFIGURATOR.updateSpokeHalted({
+      hub: hub,
+      assetId: assetId,
+      spoke: address(spoke),
+      halted: true
+    });
   }
 
   function _setSpokeInactive(ITokenizationSpoke spoke) internal {
     address hub = spoke.hub();
     uint256 assetId = spoke.assetId();
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    AaveV4Ethereum.HUB_CONFIGURATOR.updateSpokeActive(hub, assetId, address(spoke), false);
+    AaveV4Ethereum.HUB_CONFIGURATOR.updateSpokeActive({
+      hub: hub,
+      assetId: assetId,
+      spoke: address(spoke),
+      active: false
+    });
   }
 
   function depositToV4External(address spoke, uint256 amount) external returns (uint256) {
@@ -676,7 +851,8 @@ contract CollectorUtilsTest is Test {
   }
 
   function withdrawFromV4External(address spoke, uint256 amount) external returns (uint256) {
-    return COLLECTOR.withdrawFromV4(spoke, amount, testReceiver);
+    return
+      COLLECTOR.withdrawFromV4({tokenizationSpoke: spoke, amount: amount, receiver: testReceiver});
   }
 
   function streamExternal(uint256 amount) external {
@@ -730,6 +906,10 @@ contract CollectorUtilsV4Payload {
 
   function execute() external {
     AaveV3Ethereum.COLLECTOR.depositToV4(TOKENIZATION_SPOKE, DEPOSIT_AMOUNT);
-    AaveV3Ethereum.COLLECTOR.withdrawFromV4(TOKENIZATION_SPOKE, WITHDRAW_AMOUNT, RECEIVER);
+    AaveV3Ethereum.COLLECTOR.withdrawFromV4({
+      tokenizationSpoke: TOKENIZATION_SPOKE,
+      amount: WITHDRAW_AMOUNT,
+      receiver: RECEIVER
+    });
   }
 }
