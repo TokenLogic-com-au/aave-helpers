@@ -80,10 +80,12 @@ library CollectorUtils {
       revert InvalidZeroAmount();
     }
 
-    if (input.amount == type(uint256).max) {
-      input.amount = IERC20(input.underlying).balanceOf(address(collector));
-    }
-    collector.transfer(IERC20(input.underlying), address(this), input.amount);
+    input.amount = __transferFromCollector(
+      collector,
+      IERC20(input.underlying),
+      address(this),
+      input.amount
+    );
     IERC20(input.underlying).forceApprove(input.pool, input.amount);
     IPool(input.pool).supply(input.underlying, input.amount, address(collector), 0);
   }
@@ -106,10 +108,7 @@ library CollectorUtils {
     }
 
     address underlying = ITokenizationSpoke(tokenizationSpoke).asset();
-    if (amount == type(uint256).max) {
-      amount = IERC20(underlying).balanceOf(address(collector));
-    }
-    collector.transfer(IERC20(underlying), address(this), amount);
+    amount = __transferFromCollector(collector, IERC20(underlying), address(this), amount);
     IERC20(underlying).forceApprove(tokenizationSpoke, amount);
     return ITokenizationSpoke(tokenizationSpoke).deposit(amount, address(collector));
   }
@@ -133,6 +132,8 @@ library CollectorUtils {
 
   /**
    * @notice Withdraw funds of the collector from an Aave V4 TokenizationSpoke to the receiver
+   * @dev If amount is type(uint256).max, the withdrawal is capped by the Hub's available liquidity
+   * @dev This can withdraw less than the collector's full position without reverting, so use the returned amount
    * @param collector The address of the Aave collector
    * @param tokenizationSpoke The address of the Aave V4 TokenizationSpoke
    * @param amount The amount of underlying to withdraw, type(uint256).max for the max withdrawable by the collector
@@ -221,11 +222,12 @@ library CollectorUtils {
       revert PriceOracleDecimalsMismatch();
     }
 
-    if (input.amount == type(uint256).max) {
-      input.amount = IERC20(input.fromUnderlying).balanceOf(address(collector));
-    }
-
-    collector.transfer(IERC20(input.fromUnderlying), swapper, input.amount);
+    input.amount = __transferFromCollector(
+      collector,
+      IERC20(input.fromUnderlying),
+      swapper,
+      input.amount
+    );
     uint256 swapperBalance = IERC20(input.fromUnderlying).balanceOf(swapper);
 
     // Some tokens, like stETH, can lose 1-2 wei on transfer
@@ -244,6 +246,27 @@ library CollectorUtils {
       input.amount,
       input.slippage
     );
+  }
+
+  /**
+   * @notice Transfer funds out of the collector, resolving type(uint256).max to the collector's full balance
+   * @param collector The address of the Aave collector
+   * @param token The address of the token to transfer
+   * @param recipient The address receiving the funds
+   * @param amount The amount to transfer, type(uint256).max for the full collector balance
+   * @return The amount transferred
+   */
+  function __transferFromCollector(
+    ICollector collector,
+    IERC20 token,
+    address recipient,
+    uint256 amount
+  ) internal returns (uint256) {
+    if (amount == type(uint256).max) {
+      amount = token.balanceOf(address(collector));
+    }
+    collector.transfer(token, recipient, amount);
+    return amount;
   }
 
   /**
@@ -266,12 +289,9 @@ library CollectorUtils {
       revert InvalidZeroAmount();
     }
 
-    if (input.amount == type(uint256).max) {
-      input.amount = IERC20(aTokenAddress).balanceOf(address(collector));
-    }
     uint256 balanceBeforeTransfer = IERC20(aTokenAddress).balanceOf(address(this));
 
-    collector.transfer(IERC20(aTokenAddress), address(this), input.amount);
+    __transferFromCollector(collector, IERC20(aTokenAddress), address(this), input.amount);
 
     uint256 balanceAfterTransfer = IERC20(aTokenAddress).balanceOf(address(this));
     input.amount = balanceAfterTransfer - balanceBeforeTransfer;

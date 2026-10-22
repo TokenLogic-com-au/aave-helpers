@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import 'forge-std/Test.sol';
 
 import {IAccessControl} from 'openzeppelin-contracts/contracts/access/IAccessControl.sol';
+import {IERC20Metadata} from 'openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets, ICollector, IPool} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV2Ethereum, AaveV2EthereumAssets, ILendingPool} from 'aave-address-book/AaveV2Ethereum.sol';
 import {MiscEthereum} from 'aave-address-book/MiscEthereum.sol';
@@ -112,21 +113,43 @@ contract CollectorUtilsTest is Test {
   }
 
   function testWithdrawAllCollectorFundsFromV3() public {
-    _genericWithdrawAllCollectorFundsToReceiver(
-      address(V3_POOL),
-      A_TOKEN_V3,
-      CollectorUtils.withdrawFromV3,
-      true
-    );
+    _genericWithdrawAllCollectorFundsToReceiver({
+      pool: address(V3_POOL),
+      aToken: A_TOKEN_V3,
+      withdraw: CollectorUtils.withdrawFromV3,
+      withATokenCheck: true,
+      seedExecutor: false
+    });
+  }
+
+  function testWithdrawAllCollectorFundsFromV3WithSeededExecutor() public {
+    _genericWithdrawAllCollectorFundsToReceiver({
+      pool: address(V3_POOL),
+      aToken: A_TOKEN_V3,
+      withdraw: CollectorUtils.withdrawFromV3,
+      withATokenCheck: true,
+      seedExecutor: true
+    });
   }
 
   function testWithdrawAllCollectorFundsFromV2() public {
-    _genericWithdrawAllCollectorFundsToReceiver(
-      address(V2_POOL),
-      A_TOKEN_V2,
-      CollectorUtils.withdrawFromV2,
-      false
-    );
+    _genericWithdrawAllCollectorFundsToReceiver({
+      pool: address(V2_POOL),
+      aToken: A_TOKEN_V2,
+      withdraw: CollectorUtils.withdrawFromV2,
+      withATokenCheck: false,
+      seedExecutor: false
+    });
+  }
+
+  function testWithdrawAllCollectorFundsFromV2WithSeededExecutor() public {
+    _genericWithdrawAllCollectorFundsToReceiver({
+      pool: address(V2_POOL),
+      aToken: A_TOKEN_V2,
+      withdraw: CollectorUtils.withdrawFromV2,
+      withATokenCheck: false,
+      seedExecutor: true
+    });
   }
 
   function testStream(uint128 amount) public {
@@ -278,8 +301,16 @@ contract CollectorUtilsTest is Test {
     address pool,
     IERC20 aToken,
     function(ICollector, CollectorUtils.IOInput memory, address) returns (uint256) withdraw,
-    bool withATokenCheck
+    bool withATokenCheck,
+    bool seedExecutor
   ) internal {
+    if (seedExecutor) {
+      uint256 executorSeed = 10 ** IERC20Metadata(address(aToken)).decimals();
+      COLLECTOR.transfer(aToken, address(this), executorSeed);
+      deal(address(UNDERLYING), address(this), executorSeed);
+    }
+    uint256 aTokenBalanceOfExecutorBefore = aToken.balanceOf(address(this));
+    uint256 underlyingBalanceOfExecutorBefore = UNDERLYING.balanceOf(address(this));
     uint256 aTokenBalanceOfCollectorBefore = aToken.balanceOf(address(COLLECTOR));
     uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
 
@@ -298,9 +329,16 @@ contract CollectorUtilsTest is Test {
       UNDERLYING.balanceOf(testReceiver),
       underlyingBalanceOfReceiverBefore + withdrawnAmount
     );
+    if (seedExecutor) {
+      // the balance-diff in __withdraw can move an executor's own aTokens by 1 wei
+      assertApproxEqAbs(aToken.balanceOf(address(this)), aTokenBalanceOfExecutorBefore, 1);
+    } else {
+      assertEq(aToken.balanceOf(address(this)), 0);
+    }
+    assertEq(UNDERLYING.balanceOf(address(this)), underlyingBalanceOfExecutorBefore);
     // because we mint to treasury straight away on v2, hard to check the final amount we expect
     if (withATokenCheck) {
-      assertApproxEqAbs(aToken.balanceOf(address(COLLECTOR)), 0, 2);
+      assertEq(aToken.balanceOf(address(COLLECTOR)), 0);
     }
   }
 
