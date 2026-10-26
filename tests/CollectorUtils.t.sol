@@ -5,6 +5,7 @@ import 'forge-std/Test.sol';
 
 import {IAccessControl} from 'openzeppelin-contracts/contracts/access/IAccessControl.sol';
 import {IERC20Metadata} from 'openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol';
+import {SafeERC20} from 'openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol';
 import {AaveV3Ethereum, AaveV3EthereumAssets, ICollector, IPool} from 'aave-address-book/AaveV3Ethereum.sol';
 import {AaveV2Ethereum, AaveV2EthereumAssets, ILendingPool} from 'aave-address-book/AaveV2Ethereum.sol';
 import {MiscEthereum} from 'aave-address-book/MiscEthereum.sol';
@@ -19,6 +20,7 @@ import {GovV3Helpers} from '../src/GovV3Helpers.sol';
 
 contract CollectorUtilsTest is Test {
   using CollectorUtils for ICollector;
+  using SafeERC20 for IERC20;
 
   ICollector public constant COLLECTOR = AaveV3Ethereum.COLLECTOR;
   IERC20 public constant UNDERLYING = IERC20(AaveV3EthereumAssets.USDC_UNDERLYING);
@@ -35,6 +37,8 @@ contract CollectorUtilsTest is Test {
     AaveV4EthereumTokenizationSpokes.CORE_GHO_TOKENIZATION_SPOKE;
   ITokenizationSpoke public constant WBTC_TOKENIZATION_SPOKE =
     AaveV4EthereumTokenizationSpokes.CORE_WBTC_TOKENIZATION_SPOKE;
+  ITokenizationSpoke public constant USDT_TOKENIZATION_SPOKE =
+    AaveV4EthereumTokenizationSpokes.CORE_USDT_TOKENIZATION_SPOKE;
 
   // using static address instead of fuzz address as it's slow on a non anvil fork
   address testReceiver = address(0xB0B);
@@ -200,54 +204,63 @@ contract CollectorUtilsTest is Test {
     uint256 balance = UNDERLYING.balanceOf(address(COLLECTOR));
     vm.assume(amount <= balance && amount != 0);
 
-    CollectorUtils.SwapInput memory input = CollectorUtils.SwapInput({
-      milkman: milkman,
-      priceChecker: priceChecker,
-      fromUnderlying: address(UNDERLYING),
-      toUnderlying: toUnderlying,
-      fromUnderlyingPriceFeed: fromUnderlyingPriceFeed,
-      toUnderlyingPriceFeed: toUnderlyingPriceFeed,
-      amount: amount,
-      slippage: slippage
-    });
+    _testSwap(
+      CollectorUtils.SwapInput({
+        milkman: milkman,
+        priceChecker: priceChecker,
+        fromUnderlying: address(UNDERLYING),
+        toUnderlying: toUnderlying,
+        fromUnderlyingPriceFeed: fromUnderlyingPriceFeed,
+        toUnderlyingPriceFeed: toUnderlyingPriceFeed,
+        amount: amount,
+        slippage: slippage
+      }),
+      false
+    );
+  }
 
-    uint256 balanceOfSwapperBefore = IERC20(input.fromUnderlying).balanceOf(SWAPPER);
+  function testSwapAllCollectorFunds() public {
+    _testSwap(_swapInput(UNDERLYING.balanceOf(address(COLLECTOR))), true);
+  }
 
-    vm.expectCall(
-      SWAPPER,
-      abi.encodeCall(
-        AaveSwapper.swap,
-        (
-          input.milkman,
-          input.priceChecker,
-          input.fromUnderlying,
-          input.toUnderlying,
-          input.fromUnderlyingPriceFeed,
-          input.toUnderlyingPriceFeed,
-          address(COLLECTOR),
-          amount,
-          input.slippage
-        )
+  function testSwapFullCollectorBalance() public {
+    _testSwap(_swapInput(UNDERLYING.balanceOf(address(COLLECTOR))), false);
+  }
+
+  function _swapInput(uint256 amount) internal returns (CollectorUtils.SwapInput memory) {
+    return
+      CollectorUtils.SwapInput({
+        milkman: makeAddr('milkman'),
+        priceChecker: makeAddr('priceChecker'),
+        fromUnderlying: address(UNDERLYING),
+        toUnderlying: AaveV3EthereumAssets.USDT_UNDERLYING,
+        fromUnderlyingPriceFeed: makeAddr('fromUnderlyingPriceFeed'),
+        toUnderlyingPriceFeed: makeAddr('toUnderlyingPriceFeed'),
+        amount: amount,
+        slippage: 100
+      });
+  }
+
+  function _testSwap(CollectorUtils.SwapInput memory input, bool useMaxSentinel) internal {
+    uint256 balanceOfSwapperBefore = UNDERLYING.balanceOf(SWAPPER);
+    uint256 balanceOfCollectorBefore = UNDERLYING.balanceOf(address(COLLECTOR));
+    bytes memory expectedSwapCall = abi.encodeCall(
+      AaveSwapper.swap,
+      (
+        input.milkman,
+        input.priceChecker,
+        input.fromUnderlying,
+        input.toUnderlying,
+        input.fromUnderlyingPriceFeed,
+        input.toUnderlyingPriceFeed,
+        address(COLLECTOR),
+        input.amount,
+        input.slippage
       )
     );
-    vm.mockCall(
-      SWAPPER,
-      abi.encodeCall(
-        AaveSwapper.swap,
-        (
-          input.milkman,
-          input.priceChecker,
-          input.fromUnderlying,
-          input.toUnderlying,
-          input.fromUnderlyingPriceFeed,
-          input.toUnderlyingPriceFeed,
-          address(COLLECTOR),
-          amount,
-          input.slippage
-        )
-      ),
-      bytes('0')
-    );
+
+    vm.expectCall(SWAPPER, expectedSwapCall);
+    vm.mockCall(SWAPPER, expectedSwapCall, bytes('0'));
     vm.mockCall(
       input.fromUnderlyingPriceFeed,
       abi.encodeCall(IChainlinkAggregator.decimals, ()),
@@ -258,10 +271,15 @@ contract CollectorUtilsTest is Test {
       abi.encodeCall(IChainlinkAggregator.decimals, ()),
       abi.encode(18)
     );
-    COLLECTOR.swap(SWAPPER, input);
-    uint256 balanceOfSwapperAfter = UNDERLYING.balanceOf(SWAPPER);
 
-    assertEq(balanceOfSwapperAfter, balanceOfSwapperBefore + amount);
+    uint256 expectedAmount = input.amount;
+    if (useMaxSentinel) {
+      input.amount = type(uint256).max;
+    }
+    COLLECTOR.swap(SWAPPER, input);
+
+    assertEq(UNDERLYING.balanceOf(SWAPPER), balanceOfSwapperBefore + expectedAmount);
+    assertEq(UNDERLYING.balanceOf(address(COLLECTOR)), balanceOfCollectorBefore - expectedAmount);
   }
 
   function _genericWithdrawCollectorFundsToReceiver(
@@ -378,18 +396,39 @@ contract CollectorUtilsTest is Test {
   }
 
   function testDepositCollectorFundsToV4Usdc(uint128 amount) public {
-    _testDepositToV4(USDC_TOKENIZATION_SPOKE, amount, false);
+    _testDepositToV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: false,
+      useMaxSentinel: false
+    });
   }
 
   function testDepositAllCollectorFundsToV4Usdc(uint128 amount) public {
-    _testDepositToV4(USDC_TOKENIZATION_SPOKE, amount, true);
+    _testDepositToV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testDepositFullBalanceToV4Usdc() public {
+    _testDepositToV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      amount: 100_000e6,
+      depositAll: true,
+      useMaxSentinel: false
+    });
   }
 
   function testWithdrawCollectorFundsFromV4Usdc(uint128 amount) public {
     _testWithdrawFromV4({
       spoke: USDC_TOKENIZATION_SPOKE,
       depositAmount: 100_000e6,
-      withdrawAmount: amount
+      withdrawAmount: amount,
+      withdrawAll: false,
+      useMaxSentinel: false
     });
   }
 
@@ -397,23 +436,56 @@ contract CollectorUtilsTest is Test {
     _testWithdrawFromV4({
       spoke: USDC_TOKENIZATION_SPOKE,
       depositAmount: 100_000e6,
-      withdrawAmount: type(uint256).max
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testWithdrawFullBalanceFromV4Usdc() public {
+    _testWithdrawFromV4({
+      spoke: USDC_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: false
     });
   }
 
   function testDepositCollectorFundsToV4Weth(uint128 amount) public {
-    _testDepositToV4(WETH_TOKENIZATION_SPOKE, amount, false);
+    _testDepositToV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: false,
+      useMaxSentinel: false
+    });
   }
 
   function testDepositAllCollectorFundsToV4Weth(uint128 amount) public {
-    _testDepositToV4(WETH_TOKENIZATION_SPOKE, amount, true);
+    _testDepositToV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testDepositFullBalanceToV4Weth() public {
+    _testDepositToV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      amount: 100e18,
+      depositAll: true,
+      useMaxSentinel: false
+    });
   }
 
   function testWithdrawCollectorFundsFromV4Weth(uint128 amount) public {
     _testWithdrawFromV4({
       spoke: WETH_TOKENIZATION_SPOKE,
       depositAmount: 100e18,
-      withdrawAmount: amount
+      withdrawAmount: amount,
+      withdrawAll: false,
+      useMaxSentinel: false
     });
   }
 
@@ -421,23 +493,56 @@ contract CollectorUtilsTest is Test {
     _testWithdrawFromV4({
       spoke: WETH_TOKENIZATION_SPOKE,
       depositAmount: 100e18,
-      withdrawAmount: type(uint256).max
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testWithdrawFullBalanceFromV4Weth() public {
+    _testWithdrawFromV4({
+      spoke: WETH_TOKENIZATION_SPOKE,
+      depositAmount: 100e18,
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: false
     });
   }
 
   function testDepositCollectorFundsToV4Gho(uint128 amount) public {
-    _testDepositToV4(GHO_TOKENIZATION_SPOKE, amount, false);
+    _testDepositToV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: false,
+      useMaxSentinel: false
+    });
   }
 
   function testDepositAllCollectorFundsToV4Gho(uint128 amount) public {
-    _testDepositToV4(GHO_TOKENIZATION_SPOKE, amount, true);
+    _testDepositToV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testDepositFullBalanceToV4Gho() public {
+    _testDepositToV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      amount: 50_000e18,
+      depositAll: true,
+      useMaxSentinel: false
+    });
   }
 
   function testWithdrawCollectorFundsFromV4Gho(uint128 amount) public {
     _testWithdrawFromV4({
       spoke: GHO_TOKENIZATION_SPOKE,
       depositAmount: 50_000e18,
-      withdrawAmount: amount
+      withdrawAmount: amount,
+      withdrawAll: false,
+      useMaxSentinel: false
     });
   }
 
@@ -445,18 +550,50 @@ contract CollectorUtilsTest is Test {
     _testWithdrawFromV4({
       spoke: GHO_TOKENIZATION_SPOKE,
       depositAmount: 50_000e18,
-      withdrawAmount: type(uint256).max
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testWithdrawFullBalanceFromV4Gho() public {
+    _testWithdrawFromV4({
+      spoke: GHO_TOKENIZATION_SPOKE,
+      depositAmount: 50_000e18,
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: false
     });
   }
 
   function testDepositCollectorFundsToV4Wbtc(uint128 amount) public {
     _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
-    _testDepositToV4(WBTC_TOKENIZATION_SPOKE, amount, false);
+    _testDepositToV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: false,
+      useMaxSentinel: false
+    });
   }
 
   function testDepositAllCollectorFundsToV4Wbtc(uint128 amount) public {
     _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
-    _testDepositToV4(WBTC_TOKENIZATION_SPOKE, amount, true);
+    _testDepositToV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testDepositFullBalanceToV4Wbtc() public {
+    _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
+    _testDepositToV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      amount: 10e8,
+      depositAll: true,
+      useMaxSentinel: false
+    });
   }
 
   function testWithdrawCollectorFundsFromV4Wbtc(uint128 amount) public {
@@ -464,7 +601,9 @@ contract CollectorUtilsTest is Test {
     _testWithdrawFromV4({
       spoke: WBTC_TOKENIZATION_SPOKE,
       depositAmount: 10e8,
-      withdrawAmount: amount
+      withdrawAmount: amount,
+      withdrawAll: false,
+      useMaxSentinel: false
     });
   }
 
@@ -473,7 +612,20 @@ contract CollectorUtilsTest is Test {
     _testWithdrawFromV4({
       spoke: WBTC_TOKENIZATION_SPOKE,
       depositAmount: 10e8,
-      withdrawAmount: type(uint256).max
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testWithdrawFullBalanceFromV4Wbtc() public {
+    _setAddCap(WBTC_TOKENIZATION_SPOKE, 100);
+    _testWithdrawFromV4({
+      spoke: WBTC_TOKENIZATION_SPOKE,
+      depositAmount: 10e8,
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: false
     });
   }
 
@@ -524,6 +676,75 @@ contract CollectorUtilsTest is Test {
     assertEq(WBTC_TOKENIZATION_SPOKE.asset(), AaveV3EthereumAssets.WBTC_UNDERLYING);
     assertEq(WBTC_TOKENIZATION_SPOKE.decimals(), 8);
     assertGt(totalWithdrawnAmount, 10e8);
+  }
+
+  function testDepositCollectorFundsToV4Usdt(uint128 amount) public {
+    _testDepositToV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: false,
+      useMaxSentinel: false
+    });
+  }
+
+  function testDepositAllCollectorFundsToV4Usdt(uint128 amount) public {
+    _testDepositToV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      amount: amount,
+      depositAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testDepositFullBalanceToV4Usdt() public {
+    _testDepositToV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      amount: 100_000e6,
+      depositAll: true,
+      useMaxSentinel: false
+    });
+  }
+
+  function testWithdrawCollectorFundsFromV4Usdt(uint128 amount) public {
+    _testWithdrawFromV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      withdrawAmount: amount,
+      withdrawAll: false,
+      useMaxSentinel: false
+    });
+  }
+
+  function testWithdrawAllCollectorFundsFromV4Usdt() public {
+    _testWithdrawFromV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: true
+    });
+  }
+
+  function testWithdrawFullBalanceFromV4Usdt() public {
+    _testWithdrawFromV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      withdrawAmount: 0,
+      withdrawAll: true,
+      useMaxSentinel: false
+    });
+  }
+
+  function testDepositAndWithdrawSequenceV4Usdt() public {
+    uint256 totalWithdrawnAmount = _testDepositAndWithdrawSequenceV4({
+      spoke: USDT_TOKENIZATION_SPOKE,
+      depositAmount: 100_000e6,
+      partialWithdrawAmount: 50_000e6
+    });
+
+    assertEq(USDT_TOKENIZATION_SPOKE.asset(), AaveV3EthereumAssets.USDT_UNDERLYING);
+    assertEq(USDT_TOKENIZATION_SPOKE.decimals(), 6);
+    assertGt(totalWithdrawnAmount, 100_000e6);
   }
 
   function testWithdrawAllCollectorFundsFromV4IncludesInterest() public {
@@ -671,6 +892,10 @@ contract CollectorUtilsTest is Test {
     uint256 underlyingBalanceOfReceiverBefore = UNDERLYING.balanceOf(testReceiver);
     uint256 underlyingBalanceOfExecutorBefore = UNDERLYING.balanceOf(executor);
     uint256 sharesOfExecutorBefore = USDC_TOKENIZATION_SPOKE.balanceOf(executor);
+    uint256 sharesOfCollectorBefore = USDC_TOKENIZATION_SPOKE.balanceOf(address(COLLECTOR));
+    uint256 expectedSharesOfCollector = sharesOfCollectorBefore +
+      USDC_TOKENIZATION_SPOKE.previewDeposit(10_000e6) -
+      USDC_TOKENIZATION_SPOKE.previewWithdraw(5_000e6);
     CollectorUtilsV4Payload payload = new CollectorUtilsV4Payload({
       tokenizationSpoke: address(USDC_TOKENIZATION_SPOKE),
       receiver: testReceiver,
@@ -688,9 +913,15 @@ contract CollectorUtilsTest is Test {
     assertEq(UNDERLYING.balanceOf(executor), underlyingBalanceOfExecutorBefore);
     assertEq(USDC_TOKENIZATION_SPOKE.balanceOf(executor), sharesOfExecutorBefore);
     assertEq(UNDERLYING.allowance(executor, address(USDC_TOKENIZATION_SPOKE)), 0);
+    assertEq(USDC_TOKENIZATION_SPOKE.balanceOf(address(COLLECTOR)), expectedSharesOfCollector);
   }
 
-  function _testDepositToV4(ITokenizationSpoke spoke, uint256 amount, bool depositAll) internal {
+  function _testDepositToV4(
+    ITokenizationSpoke spoke,
+    uint256 amount,
+    bool depositAll,
+    bool useMaxSentinel
+  ) internal {
     IERC20 underlying = IERC20(spoke.asset());
     (uint256 executorUnderlying, uint256 executorShares) = _seedExecutor(spoke);
     amount = bound(amount, 2, spoke.maxDeposit(address(COLLECTOR)));
@@ -704,7 +935,7 @@ contract CollectorUtilsTest is Test {
     // called through the external wrapper so expectEmit checks the whole library call
     uint256 shares = this.depositToV4External(
       address(spoke),
-      depositAll ? type(uint256).max : amount
+      depositAll && useMaxSentinel ? type(uint256).max : amount
     );
 
     assertEq(shares, expectedShares);
@@ -716,32 +947,28 @@ contract CollectorUtilsTest is Test {
   function _testWithdrawFromV4(
     ITokenizationSpoke spoke,
     uint256 depositAmount,
-    uint256 withdrawAmount
+    uint256 withdrawAmount,
+    bool withdrawAll,
+    bool useMaxSentinel
   ) internal {
     IERC20 underlying = IERC20(spoke.asset());
     _depositCollectorFundsToV4(spoke, depositAmount);
     skip(30 days);
     (uint256 executorUnderlying, uint256 executorShares) = _seedExecutor(spoke);
 
-    uint256 expectedAmount = withdrawAmount == type(uint256).max
-      ? spoke.maxWithdraw(address(COLLECTOR))
-      : bound(withdrawAmount, 1, spoke.maxWithdraw(address(COLLECTOR)));
+    uint256 maxWithdrawBefore = spoke.maxWithdraw(address(COLLECTOR));
+    uint256 expectedAmount = withdrawAll
+      ? maxWithdrawBefore
+      : bound(withdrawAmount, 1, maxWithdrawBefore);
     uint256 expectedShares = spoke.previewWithdraw(expectedAmount);
     uint256 sharesOfCollectorBefore = spoke.balanceOf(address(COLLECTOR));
     uint256 underlyingBalanceOfReceiverBefore = underlying.balanceOf(testReceiver);
 
-    vm.expectEmit(true, true, true, true, address(spoke));
-    emit IERC4626.Withdraw(
-      address(this),
-      testReceiver,
-      address(this),
-      expectedAmount,
-      expectedShares
-    );
+    _expectWithdrawEvent(spoke, expectedAmount, expectedShares);
     // called through the external wrapper so expectEmit checks the whole library call
     uint256 withdrawnAmount = this.withdrawFromV4External(
       address(spoke),
-      withdrawAmount == type(uint256).max ? withdrawAmount : expectedAmount
+      withdrawAll && useMaxSentinel ? type(uint256).max : expectedAmount
     );
 
     assertEq(withdrawnAmount, expectedAmount);
@@ -750,7 +977,7 @@ contract CollectorUtilsTest is Test {
       underlyingBalanceOfReceiverBefore + expectedAmount
     );
     assertEq(spoke.balanceOf(address(COLLECTOR)), sharesOfCollectorBefore - expectedShares);
-    if (withdrawAmount == type(uint256).max) {
+    if (expectedAmount == maxWithdrawBefore) {
       assertEq(spoke.balanceOf(address(COLLECTOR)), 0);
     }
     _assertExecutorUntouched(spoke, executorUnderlying, executorShares);
@@ -790,6 +1017,11 @@ contract CollectorUtilsTest is Test {
     return partialWithdrawAmount + remainingAmount;
   }
 
+  function _expectWithdrawEvent(ITokenizationSpoke spoke, uint256 assets, uint256 shares) internal {
+    vm.expectEmit(true, true, true, true, address(spoke));
+    emit IERC4626.Withdraw(address(this), testReceiver, address(this), assets, shares);
+  }
+
   function _depositCollectorFundsToV4(ITokenizationSpoke spoke, uint256 amount) internal {
     deal(spoke.asset(), address(COLLECTOR), amount);
     COLLECTOR.depositToV4(address(spoke), amount);
@@ -801,7 +1033,7 @@ contract CollectorUtilsTest is Test {
     IERC20 underlying = IERC20(spoke.asset());
     uint256 seed = 10 ** spoke.decimals();
     deal(address(underlying), address(this), 2 * seed);
-    underlying.approve(address(spoke), seed);
+    underlying.forceApprove(address(spoke), seed);
     spoke.deposit(seed, address(this));
     return (underlying.balanceOf(address(this)), spoke.balanceOf(address(this)));
   }
