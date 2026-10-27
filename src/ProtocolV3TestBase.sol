@@ -603,6 +603,7 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
 
   /**
    * @dev Returns the first eMode category where collateralAsset is collateral AND borrowAsset is borrowable.
+   * Categories flagging collateralAsset as ltvzero are skipped, as it cannot back a borrow there.
    * Returns 0 if no shared eMode exists.
    */
   function _getSharedEModeCategory(
@@ -624,9 +625,11 @@ contract ProtocolV3TestBase is RawProtocolV3TestBase, SeatbeltUtils, CommonTestB
       emptyCounter = 0;
       uint128 collateralBitmap = pool.getEModeCategoryCollateralBitmap(uint8(categoryId));
       uint128 borrowableBitmap = pool.getEModeCategoryBorrowableBitmap(uint8(categoryId));
+      uint128 ltvzeroBitmap = pool.getEModeCategoryLtvzeroBitmap(uint8(categoryId));
       if (
         EModeConfiguration.isReserveEnabledOnBitmap(collateralBitmap, collateralReserveId) &&
-        EModeConfiguration.isReserveEnabledOnBitmap(borrowableBitmap, borrowReserveId)
+        EModeConfiguration.isReserveEnabledOnBitmap(borrowableBitmap, borrowReserveId) &&
+        !EModeConfiguration.isReserveEnabledOnBitmap(ltvzeroBitmap, collateralReserveId)
       ) {
         return uint8(categoryId);
       }
